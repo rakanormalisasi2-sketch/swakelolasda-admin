@@ -1,0 +1,1023 @@
+'use client';
+import { useEffect, useState, useCallback, Fragment } from 'react';
+import React from 'react';
+import * as XLSX from 'xlsx';
+import { supabase } from '@/lib/supabase';
+import { useAuth } from '@/context/AuthContext';
+
+export default function LaporanPelaksanaanPage() {
+  const { profile } = useAuth();
+  const [logs, setLogs] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [pdfConfig, setPdfConfig] = useState(null);
+  
+  // Modals Data & Flow
+  const [filterTab, setFilterTab] = useState('semua');
+  const [printModalInfo, setPrintModalInfo] = useState({ open: false, type: '' });
+  const [printSelectedIds, setPrintSelectedIds] = useState([]);
+  
+  const [dokModalOpen, setDokModalOpen] = useState(false);
+  const [dokSelection, setDokSelection] = useState({});
+  
+  const [hmModalOpen, setHmModalOpen] = useState(false);
+  const [hmSelection, setHmSelection] = useState({});
+
+  const loadData = useCallback(async () => {
+    setLoading(true);
+    if (!profile?.role) return;
+
+    // Fetch section configuration
+    const { data: sectionData } = await supabase.from('section_settings').select('*').eq('role', profile.role).single();
+    if (sectionData) {
+      setPdfConfig({
+        subKegiatan: sectionData.pdf_sub_kegiatan || 'NORMALISASI / RESTORASI SUNGAI',
+        pekerjaanPrefix: sectionData.pdf_pekerjaan_prefix || 'NORMALISASI SUNGAI',
+        namaStaf: sectionData.pdf_nama_staf || 'PANGESTU EKA DEWANTO W, A.Md.T',
+        nipStaf: sectionData.pdf_nip_staf || '19980711 202204 1 001',
+        program: 'PENGELOLAAN SUMBER DAYA AIR',
+        kegiatan: 'PENGELOLAAN SDA DAN BANGUNAN PENGAMAN PANTAI PADA WILAYAH SUNGAI (WS) DALAM 1 (SATU) DAERAH KABUPATEN/KOTA'
+      });
+    }
+
+    const { data: assignments } = await supabase
+      .from('assignments')
+      .select('id, status')
+      .eq('created_by_role', profile.role);
+
+    const assignmentIds = assignments?.map(a => a.id) || [];
+
+    if (assignmentIds.length > 0) {
+      const { data: logsData } = await supabase
+        .from('operator_logs')
+        .select(`
+          *,
+          assignment:assignments(id, status, job_type, job_sub_type, location_district, location_village, helper_override, helper:user_profiles!assignments_helper_id_fkey(full_name)),
+          operator:user_profiles!operator_logs_operator_id_fkey(full_name),
+          equipment:heavy_equipment(name, merk_type)
+        `)
+        .in('assignment_id', assignmentIds)
+        .order('assignment_id', { ascending: true })
+        .order('tanggal', { ascending: true });
+
+      if (logsData && logsData.length > 0) {
+        logsData.sort((a, b) => {
+           const opA = a.override_operator || a.operator?.full_name || '';
+           const alA = a.override_alat || a.equipment?.name || '';
+           const kA = a.override_kecamatan || a.assignment?.location_district || '';
+           const dA = a.override_desa || a.assignment?.location_village || '';
+
+           const opB = b.override_operator || b.operator?.full_name || '';
+           const alB = b.override_alat || b.equipment?.name || '';
+           const kB = b.override_kecamatan || b.assignment?.location_district || '';
+           const dB = b.override_desa || b.assignment?.location_village || '';
+
+           const groupA = `${opA} ${alA} ${kA} ${dA}`;
+           const groupB = `${opB} ${alB} ${kB} ${dB}`;
+           
+           if (groupA < groupB) return -1;
+           if (groupA > groupB) return 1;
+           return new Date(a.tanggal).getTime() - new Date(b.tanggal).getTime();
+        });
+      }
+      setLogs(logsData || []);
+    } else {
+      setLogs([]);
+    }
+    setLoading(false);
+  }, [profile]);
+
+  useEffect(() => { loadData(); }, [loadData]);
+
+
+  // ============ INLINE SPREADSHEET LOGIC ============
+  const handleInlineEdit = (id, field, value) => {
+    setLogs(prev => prev.map(l => l.id === id ? { ...l, [field]: value } : l));
+  };
+
+  const handleBlurSave = async (id, field, value) => {
+    setSaving(true);
+    const { error } = await supabase.from('operator_logs').update({ [field]: value }).eq('id', id);
+    if (error) alert('Gagal menyimpan perubahan: ' + error.message);
+    else setLogs(prev => prev.map(l => l.id === id ? { ...l, [field]: value } : l));
+    setSaving(false);
+  };
+  
+  const handleDeleteRow = async (id) => {
+    if (!confirm('Apakah Anda yakin ingin menghapus laporan harian ini secara permanen?')) return;
+    setSaving(true);
+    const { error } = await supabase.from('operator_logs').delete().eq('id', id);
+    setSaving(false);
+    if (error) alert('Gagal menghapus baris: ' + error.message);
+    else loadData();
+  };
+
+  const handleUploadTambahan = async (event, logId, type = 'lapangan') => {
+    const files = event.target.files;
+    if (!files || files.length === 0) return;
+    setSaving(true);
+    let uploadedUrls = [];
+    for (let file of files) {
+      const fileName = `manual_${logId}_${Date.now()}_${file.name}`;
+      const { error } = await supabase.storage.from('laporan-photos').upload(fileName, file);
+      if (!error) {
+        const { data: publicData } = supabase.storage.from('laporan-photos').getPublicUrl(fileName);
+        uploadedUrls.push(publicData.publicUrl);
+      } else {
+        alert('Gagal upload foto: ' + error.message);
+      }
+    }
+    if (uploadedUrls.length > 0) {
+      const targetLog = logs.find(l => l.id === logId);
+      if (targetLog) {
+         let fieldName = type === 'lapangan' ? 'foto_lapangan_urls' : 'foto_hourmeter_urls';
+         let currentUrls = targetLog[fieldName] ? targetLog[fieldName].split(',').map(s=>s.trim()).filter(Boolean) : [];
+         let newUrls = [...currentUrls, ...uploadedUrls].join(',');
+         await handleBlurSave(logId, fieldName, newUrls);
+      }
+    }
+    setSaving(false);
+  };
+
+  // ============ MAIN TABLE GROUPING ============
+  const mainTableGroups = {};
+  logs.filter(log => {
+      if (filterTab === 'semua') return true;
+      const st = (log.assignment?.status || '').toLowerCase();
+      if (filterTab === 'active') return st === 'active';
+      if (filterTab === 'finished') return st === 'finished' || st === 'selesai';
+      return true;
+  }).forEach(log => {
+      const op = log.override_operator || log.operator?.full_name || '-';
+      const al = log.override_alat || log.equipment?.name || '-';
+      const k = log.override_kecamatan || log.assignment?.location_district || '-';
+      const d = log.override_desa || log.assignment?.location_village || '-';
+      const gId = `${op} | ${al} | Kec. ${k} - Desa ${d}`;
+      
+      if(!mainTableGroups[gId]) mainTableGroups[gId] = [];
+      mainTableGroups[gId].push(log);
+  });
+
+
+  // ============ MODAL SELECTION LOGIC ============
+  const openPrintModal = (type) => {
+    setPrintSelectedIds([]);
+    setPrintModalInfo({ open: true, type });
+  };
+
+  const togglePrintRow = (id) => {
+    setPrintSelectedIds(p => p.includes(id) ? p.filter(x => x !== id) : [...p, id]);
+  };
+
+  const togglePrintGroup = (groupIds) => {
+    const allSelected = groupIds.every(id => printSelectedIds.includes(id));
+    if (allSelected) {
+        setPrintSelectedIds(p => p.filter(id => !groupIds.includes(id)));
+    } else {
+        const n = [...printSelectedIds];
+        groupIds.forEach(id => { if(!n.includes(id)) n.push(id) });
+        setPrintSelectedIds(n);
+    }
+  };
+
+  const getModalGroups = () => {
+    const groups = {};
+    logs.forEach(log => {
+      const op = log.override_operator || log.operator?.full_name || '-';
+      const al = log.override_alat || log.equipment?.name || '-';
+      const d = log.override_desa || log.assignment?.location_village || '-';
+      const gId = `${op} | ${al} | ${d}`;
+      if(!groups[gId]) groups[gId] = [];
+      groups[gId].push(log);
+    });
+    return groups;
+  };
+
+
+  // ============ SPREADSHEET & PDF GENERATORS ============
+  const generateExcel = () => {
+    if (logs.length === 0) return alert('Tidak ada data untuk diunduh');
+    const wsData = logs.map(log => ({
+      'Timestamp': new Date(log.reported_at).toLocaleString('id-ID'),
+      'Tanggal Laporan': new Date(log.tanggal).toLocaleDateString('id-ID'),
+      'Nama Operator': log.override_operator || log.operator?.full_name || '',
+      'Pilih Kecamatan': log.override_kecamatan || log.assignment?.location_district || '',
+      'Desa': log.override_desa || log.assignment?.location_village || '',
+      'Jenis Alat Berat': log.override_alat || log.equipment?.name || '',
+      'Progress Pekerjaan': log.progress_pekerjaan || '',
+      'Foto Lapangan': log.foto_lapangan_urls || '',
+      'Keterangan Tambahan': log.keterangan_tambahan || '',
+      'HM Akhir': log.hm_akhir || '',
+      'Panjang Pekerjaan': log.panjang_pekerjaan || '',
+      'HM Awal': log.hm_awal || '',
+      'Nama Helper': log.assignment?.helper_override || log.assignment?.helper?.full_name || '',
+      'Lama Waktu Bekerja': log.jam_kerja || ''
+    }));
+    const worksheet = XLSX.utils.json_to_sheet(wsData);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, "Laporan_Pelaksanaan");
+    XLSX.writeFile(workbook, "Rekap_Laporan_Alat_Berat.xlsx");
+  };
+
+  const executePrintBatch = () => {
+    const selectedData = logs.filter(l => printSelectedIds.includes(l.id));
+    if (selectedData.length === 0) return alert('Pilih minimal 1 baris.');
+    
+    if (printModalInfo.type === 'harian') printHarianLogic(selectedData);
+    if (printModalInfo.type === 'mingguan') printMingguanLogic(selectedData);
+    
+    setPrintModalInfo({ open: false, type: '' });
+  };
+
+  const printHarianLogic = (selectedData) => {
+    // Gunakan pdfConfig global atau fallback Default
+    const config = pdfConfig || {
+      subKegiatan: 'NORMALISASI / RESTORASI SUNGAI',
+      pekerjaanPrefix: 'NORMALISASI SUNGAI',
+      namaStaf: 'PANGESTU EKA DEWANTO W, A.Md.T',
+      nipStaf: '19980711 202204 1 001'
+    };
+
+    const printWin = window.open('', '_blank');
+    let html = `<html><head><title>Batch Cetak Harian</title>
+      <style>
+        @media print { @page { size: landscape; } body { -webkit-print-color-adjust: exact; } }
+        body { font-family: "Times New Roman", Times, serif; padding: 20px; font-size: 12px; line-height: 1.4; }
+        .page-break { page-break-after: always; }
+        .header { text-align: center; font-weight: bold; font-size: 14px; text-decoration: underline; margin-bottom: 15px; }
+        .sub-header { width: 100%; border-collapse: collapse; margin-bottom: 8px; font-size: 12px; font-weight: bold; }
+        .sub-header td { padding: 3px 4px; font-size: 12px; }
+        .main-table { width: 100%; border-collapse: collapse; border: 1px solid #000; font-size: 12px; }
+        .main-table th, .main-table td { border: 1px solid #000; padding: 4px 5px; vertical-align: top; font-size: 12px; }
+        .signature-table { width: 100%; border-collapse: collapse; margin-top: 0px; border-top: none; font-size: 12px; }
+        .signature-table td { padding: 5px; vertical-align: top; border: 1px solid #000; border-top: none; font-size: 11px; }
+      </style></head><body>`;
+
+    // Map sub_type ke label pekerjaan PDF
+    const SUB_TYPE_MAP = {
+      normalisasi_sungai: 'NORMALISASI SUNGAI', saluran_afvoer: 'SALURAN AIR / AFVOER',
+      normalisasi_embung: 'NORMALISASI EMBUNG', pembangunan_embung: 'PEMBANGUNAN EMBUNG'
+    };
+
+    selectedData.forEach((log, idx) => {
+      const kec = (log.override_kecamatan || log.assignment?.location_district || '').toUpperCase();
+      const desa = (log.override_desa || log.assignment?.location_village || '').toUpperCase();
+      const oprName = (log.override_operator || log.operator?.full_name || '').toUpperCase();
+      const alatName = (log.override_alat || log.equipment?.name || '').toUpperCase();
+      const helperName = (log.assignment?.helper_override || log.assignment?.helper?.full_name || '').toUpperCase();
+      const tglStr = new Date(log.tanggal).toLocaleDateString('id-ID', {day:'numeric', month:'long', year:'numeric'}).toUpperCase();
+      // Resolve pekerjaan: job_sub_type > config.pekerjaanPrefix > fallback
+      const resolvedPekerjaan = SUB_TYPE_MAP[log.assignment?.job_sub_type] || config.pekerjaanPrefix;
+
+      html += `<div class="header">LAPORAN HARIAN</div>
+        <table class="sub-header">
+          <tr><td width="15%">SUB KEGIATAN</td><td width="2%">:</td><td width="53%"><span style="background-color: yellow;">${config.subKegiatan}</span></td><td width="30%">CATATAN HARIAN :</td></tr>
+          <tr><td>PEKERJAAN</td><td>:</td><td colspan="2">${resolvedPekerjaan} DESA ${desa} KECAMATAN ${kec}</td></tr>
+          <tr><td>LOKASI</td><td>:</td><td colspan="2">DESA ${desa} KECAMATAN ${kec}</td></tr>
+        </table>
+        
+        <table class="main-table">
+          <tr>
+            <th colspan="2" width="40%" style="text-align:left;">TENAGA KERJA</th>
+            <th colspan="2" width="30%" style="text-align:left;">BAHAN</th>
+            <th width="30%" style="text-align:left;">Hasil Capaian Pekerjaan</th>
+          </tr>
+          <tr>
+            <td width="20%">Pekerja</td>
+            <td width="20%">Waktu</td>
+            <td width="15%">Barang Habis<br/>Pakai</td>
+            <td width="15%">Jumlah<br/>yang ambil</td>
+            <td rowspan="6">
+               1. PANJANG PEKERJAAN<br/>
+               <div style="margin-left:15px; margin-top:5px; font-weight:bold;">${log.panjang_pekerjaan || '-'}</div>
+            </td>
+          </tr>
+          <tr style="text-align:left; font-weight:bold;">
+            <td>1</td><td>2</td><td>3</td><td>4</td>
+          </tr>
+          <tr>
+            <td>
+              <div style="margin-bottom:4px;">1. OPERATOR</div>
+              <div style="margin-bottom:4px;">2. PEMBANTU OPERATOR</div>
+              <div style="margin-bottom:4px;">3. SOPIR</div>
+              <div>4. PEMBANTU SOPIR</div>
+            </td>
+            <td>
+              <div style="margin-bottom:4px;">1. ${log.jam_kerja || '-'} Jam</div>
+              <div style="margin-bottom:4px;">2. ${log.jam_kerja ? log.jam_kerja : '-'} Jam</div>
+              <div style="margin-bottom:4px;">3. &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Jam</div>
+              <div>4. &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Jam</div>
+            </td>
+            <td>
+              <div style="margin-bottom:4px;">1. SOLAR</div>
+              <div>2. GREASE</div>
+            </td>
+            <td style="text-align:right">
+              <div style="margin-bottom:4px;">Liter</div>
+              <div>Kg</div>
+            </td>
+          </tr>
+          <tr>
+            <th colspan="4" style="text-align:left;">PERALATAN</th>
+          </tr>
+          <tr>
+            <td>JENIS ALAT</td>
+            <td>HM<br/>AKHIR</td>
+            <td>HM AWAL</td>
+            <td></td>
+          </tr>
+          <tr>
+            <td>
+              <div style="margin-bottom:4px;">1. EXCAVATOR</div>
+              <div style="margin-bottom:4px;">2. BULLDOZER</div>
+              <div>3. DUMP TRUCK</div>
+            </td>
+            <td>
+              <br/><b>${log.hm_akhir || '-'}</b><br/><br/>
+            </td>
+            <td>
+              <br/><b>${log.hm_awal || '-'}</b><br/><br/>
+            </td>
+            <td>
+              MODEL/TYPE<br/>
+              <b>${alatName}</b><br/>
+              MODEL/TYPE<br/>
+              <br/>
+              MODEL/TYPE<br/>
+              <br/>
+            </td>
+          </tr>
+        </table>
+        
+        <table class="signature-table">
+          <tr>
+            <td width="45%" style="font-size:11px;">
+               Pekerjaan mulai pukul 08.00 WIB pagi sampai 16.00 WIB sore (apabila lebih dianggap lembur)<br/>
+               (untuk penjaga malam mulai 16.00 WIB sore sampai dengan 08.00 WIB pagi)<br/>
+               Sepenuhnya dapat dikerjakan.<br/>
+               &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+               &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span style="font-weight:bold;">Tanggal: </span> ${tglStr}<br/>
+               dan jika tidak dipergunakan untuk bekerja oleh karena :<br/>
+               <b>${log.keterangan_tambahan || '-'}</b><br/><br/>
+               <hr style="border:0; border-top:1px solid #000; margin:10px 0;" />
+               Catatan tentang pekerjaan/Direksi
+            </td>
+            <td width="55%">
+               <div style="margin-bottom:15px;">BOJONEGORO, Tanggal <b>${tglStr}</b></div>
+               <table style="width:100%; border:none;">
+                 <tr>
+                   <td style="width:50%; border:none; text-align:left; vertical-align:top; font-size:11px;">
+                     Menyetujui :<br/><br/><br/><br/><br/>
+                     Staf Administrasi<br/>
+                     Dinas PU SDA Kabupaten Bojonegoro<br/>
+                     Nama : <span style="background-color: yellow;">${config.namaStaf}</span><br/>
+                     <hr style="border:0; border-top:1px solid #000; margin:2px 0; width:90%; float:left;" />
+                     <div style="clear:both;"></div>
+                     NIP. <span style="background-color: yellow;">${config.nipStaf}</span>
+                   </td>
+                   <td style="width:50%; border:none; text-align:center; vertical-align:top; font-size:11px;">
+                     Dibuat Oleh<br/><br/><br/><br/><br/><br/>
+                     Pelaksana Lapangan<br/>
+                     <b>${oprName}</b>
+                   </td>
+                 </tr>
+               </table>
+            </td>
+          </tr>
+        </table>
+      `;
+      if (idx < selectedData.length - 1) html += `<div class="page-break"></div>`;
+    });
+    html += `</body></html>`;
+    printWin.document.write(html);
+    printWin.document.close();
+    printWin.focus();
+    setTimeout(() => { printWin.print(); }, 800);
+  };
+
+  const printMingguanLogic = (selectedData) => {
+    // Gunakan pdfConfig global 
+    const config = pdfConfig || {
+      subKegiatan: 'NORMALISASI / RESTORASI SUNGAI',
+      pekerjaanPrefix: 'NORMALISASI SUNGAI',
+      namaStaf: 'PANGESTU EKA DEWANTO W, A.Md.T',
+      nipStaf: '19980711 202204 1 001'
+    };
+
+    // Map sub_type ke label pekerjaan PDF
+    const SUB_TYPE_MAP = {
+      normalisasi_sungai: 'NORMALISASI SUNGAI', saluran_afvoer: 'SALURAN AIR / AFVOER',
+      normalisasi_embung: 'NORMALISASI EMBUNG', pembangunan_embung: 'PEMBANGUNAN EMBUNG'
+    };
+
+    const grouped = {};
+    selectedData.forEach(log => {
+      const d = new Date(log.tanggal);
+      const dayNum = d.getUTCDay() || 7;
+      const thu = new Date(d);
+      thu.setUTCDate(thu.getUTCDate() + 4 - dayNum);
+      const yearStart = new Date(Date.UTC(thu.getUTCFullYear(), 0, 1));
+      const weekNo = Math.ceil((((thu - yearStart) / 86400000) + 1) / 7);
+      const weekKey = thu.getUTCFullYear() + '-W' + String(weekNo).padStart(2, '0');
+      
+      const opr = log.override_operator || log.operator?.full_name || 'Unknown';
+      const alat = log.override_alat || log.equipment?.name || 'Unknown';
+      const desa = log.override_desa || log.assignment?.location_village || '';
+      const kec = log.override_kecamatan || log.assignment?.location_district || '';
+      const subType = log.assignment?.job_sub_type || '';
+      
+      const key = weekKey + '|' + opr + '|' + alat;
+      if (!grouped[key]) grouped[key] = { operator: opr, alat: alat, desa: desa, kec: kec, subType: subType, rows: [] };
+      grouped[key].rows.push(log);
+    });
+
+    const printWin = window.open('', '_blank');
+    let html = `<html><head><title>Rekap Mingguan</title>
+      <style>
+        body { font-family: "Times New Roman", Times, serif; padding: 20px; font-size: 11px; }
+        .page-break { page-break-after: always; }
+        .header { text-align: center; font-weight: bold; font-size: 14px; margin-bottom: 25px; }
+        .header-info { width: 100%; border-collapse: collapse; margin-bottom: 5px; font-size: 11px; font-weight: bold; }
+        .header-info td { padding: 4px; vertical-align: top; }
+        table.data { width: 100%; border-collapse: collapse; margin-bottom: 10px; }
+        table.data th, table.data td { border: 1px solid #000; padding: 5px 6px; }
+        table.data th { background: #fff; font-weight: bold; text-align: center; }
+        @media print { @page { size: landscape; } body { -webkit-print-color-adjust: exact; } }
+      </style></head><body>`;
+
+    const days = ['Minggu','Senin','Selasa','Rabu','Kamis','Jumat','Sabtu'];
+    Object.keys(grouped).forEach((key, gIdx) => {
+      const g = grouped[key];
+      g.rows.sort((a, b) => new Date(a.tanggal) - new Date(b.tanggal));
+      
+      const resolvedPekerjaan = SUB_TYPE_MAP[g.subType] || config.pekerjaanPrefix;
+
+      html += `<div class="header">REKAPITULASI KEGIATAN</div>
+        <table class="header-info">
+          <tr><td width="15%">SUB KEGIATAN</td><td width="2%">:</td><td width="48%">${config.subKegiatan}</td>
+              <td width="15%" style="text-align:right;">MODEL/TYPE ALAT BERAT</td><td width="2%">:</td><td width="18%"></td></tr>
+          <tr><td>PEKERJAAN</td><td>:</td><td>${resolvedPekerjaan}</td>
+              <td></td><td>:</td><td rowspan="2" style="font-size:12px;">${(g.alat || '').toUpperCase()}</td></tr>
+          <tr><td>LOKASI</td><td>:</td><td>DESA ${(g.desa || '').toUpperCase()} KECAMATAN ${(g.kec || '').toUpperCase()}</td>
+              <td colspan="2"></td></tr>
+        </table>
+        
+        <table class="data">
+          <thead>
+            <tr>
+              <th rowspan="2" width="3%">NO</th>
+              <th rowspan="2" width="8%">HARI</th>
+              <th rowspan="2" width="9%">TANGGAL</th>
+              <th colspan="2" width="22%">PERSONIL</th>
+              <th rowspan="2" width="16%">LOKASI</th>
+              <th colspan="2" width="14%">HM</th>
+              <th rowspan="2" width="18%">KETERANGAN</th>
+              <th rowspan="2" width="10%">SKETSA LAPANGAN</th>
+            </tr>
+            <tr>
+              <th>OPERATOR</th>
+              <th>HELPER</th>
+              <th>AWAL</th>
+              <th>AKHIR</th>
+            </tr>
+          </thead>
+          <tbody>`;
+          
+      // Render 31 rows pad
+      let rowCounter = 0;
+      for (let i = 0; i < 31; i++) {
+        let r = g.rows[i];
+        if (r) {
+          const d = new Date(r.tanggal);
+          const hari = days[d.getDay()];
+          const tglStr = d.toLocaleDateString('id-ID', {day:'numeric',month:'short',year:'numeric'}).toUpperCase();
+          const pOP = (r.override_operator || r.operator?.full_name || '-').toUpperCase();
+          const pHL = (r.assignment?.helper_override || r.assignment?.helper?.full_name || '').toUpperCase();
+          const dLoc = (r.override_desa || r.assignment?.location_village || '').toUpperCase();
+          const hmA = r.hm_awal || '';
+          const hmB = r.hm_akhir || '';
+          const keta = r.progress_pekerjaan ? r.progress_pekerjaan + (r.jam_kerja ? ` (J.Kerja: ${r.jam_kerja})` : '') : '';
+
+          html += `<tr>
+            <td style="text-align:center">${i + 1}</td>
+            <td>${hari}</td><td>${tglStr}</td>
+            <td>${pOP}</td><td>${pHL}</td>
+            <td>${dLoc}</td>
+            <td style="text-align:center;">${hmA}</td>
+            <td style="text-align:center;">${hmB}</td>
+            <td>${keta}</td>
+            <td></td>
+          </tr>`;
+        } else {
+          // Empty Rows to match exactly user's spreadsheet template
+          html += `<tr><td style="text-align:center; height:18px;">${i + 1}</td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td></tr>`;
+        }
+      }
+
+      html += `</tbody></table>`;
+      if (gIdx < Object.keys(grouped).length - 1) html += `<div class="page-break"></div>`;
+    });
+    html += `</body></html>`;
+    printWin.document.write(html);
+    printWin.document.close();
+    printWin.focus();
+    setTimeout(() => { printWin.print(); }, 800);
+  };
+
+  const openDokumentasi = () => { setDokSelection({}); setDokModalOpen(true); };
+  const executePrintDokumentasi = () => {
+    // Gunakan pdfConfig global
+    const config = pdfConfig || {
+      program: 'PENGELOLAAN SUMBER DAYA AIR',
+      kegiatan: 'PENGELOLAAN SDA DAN BANGUNAN PENGAMAN PANTAI PADA WILAYAH SUNGAI (WS) DALAM 1 (SATU) DAERAH KABUPATEN/KOTA',
+      pekerjaanPrefix: 'NORMALISASI SUNGAI'
+    };
+
+    const printWin = window.open('', '_blank');
+    let html = `<html><head><title>Cetak Dokumentasi</title>
+      <style>
+        body { font-family: Arial, sans-serif; padding: 40px; font-size: 13px; line-height: 1.5; }
+        .page-break { page-break-after: always; }
+        .header-title { font-size: 20px; font-weight: bold; text-align: center; margin-bottom: 40px; }
+        .header-table { width: 100%; border-collapse: collapse; margin-bottom: 30px; }
+        .header-table td { padding: 8px 5px; vertical-align: top; font-weight: bold; }
+        .photo-table { width: 100%; border-collapse: collapse; margin-bottom: 25px; page-break-inside: avoid; }
+        .photo-table td { padding: 10px; border: 1px solid #000; vertical-align: middle; }
+        .img-container { width: 450px; text-align: center; }
+        .img-container img { max-width: 440px; max-height: 250px; object-fit: contain; }
+      </style></head><body>`;
+
+    let hasPage = false;
+    logs.forEach((log) => {
+      if(!log.foto_lapangan_urls) return;
+      const urls = log.foto_lapangan_urls.split(',');
+      const selectedForThisLog = urls.map((url, idx) => {
+         const prog = dokSelection[log.id + '_' + idx];
+         return prog && prog !== 'skip' ? { url, prog } : null;
+      }).filter(Boolean);
+
+      if (selectedForThisLog.length === 0) return; 
+      if (hasPage) html += `<div class="page-break"></div>`;
+      hasPage = true;
+
+      const v = log.override_desa || log.assignment?.location_village || '';
+      const k = log.override_kecamatan || log.assignment?.location_district || '';
+      const loc = `DESA ${v} KECAMATAN ${k}`.toUpperCase();
+      const tglStr = new Date(log.tanggal).toLocaleDateString('id-ID', {day:'numeric', month:'short', year:'numeric'}).toUpperCase();
+      // Resolve pekerjaan dari job_sub_type per log
+      const SUB_TYPE_MAP_DOK = {
+        normalisasi_sungai: 'NORMALISASI SUNGAI', saluran_afvoer: 'SALURAN AIR / AFVOER',
+        normalisasi_embung: 'NORMALISASI EMBUNG', pembangunan_embung: 'PEMBANGUNAN EMBUNG'
+      };
+      const resolvedPekerjaan = SUB_TYPE_MAP_DOK[log.assignment?.job_sub_type] || config.pekerjaanPrefix;
+
+      html += `
+        <div class="header-title">FOTO DOKUMENTASI</div>
+        <table class="header-table">
+          <tr><td width="20%">PROGRAM</td><td width="2%">:</td><td>${config.program}</td></tr>
+          <tr><td>KEGIATAN</td><td>:</td><td>${config.kegiatan}</td></tr>
+          <tr><td>PEKERJAAN</td><td>:</td><td>${resolvedPekerjaan} ${loc}</td></tr>
+          <tr><td>TAHUN ANGGARAN</td><td>:</td><td>${new Date(log.tanggal).getFullYear()}</td></tr>
+          <tr><td>LOKASI</td><td>:</td><td>${loc}</td></tr>
+          <tr><td>TANGGAL</td><td>:</td><td>${tglStr}</td></tr>
+        </table>`;
+
+      selectedForThisLog.sort((a,b) => { const ord = {'0%':0, '50%':1, '100%':2}; return ord[a.prog] - ord[b.prog]; });
+      selectedForThisLog.forEach(item => {
+        html += `<table class="photo-table"><tr>
+          <td width="60%"><div class="img-container"><img src="${item.url.trim()}" /></div></td>
+          <td width="40%"><b>KETERANGAN :</b><br/><br/>FOTO PROSES PELAKSANAAN<br/>${item.prog}</td>
+        </tr></table>`;
+      });
+    });
+
+    html += `</body></html>`;
+    printWin.document.write(html); printWin.document.close(); printWin.focus();
+    setTimeout(() => { printWin.print(); }, 1500);
+    setDokModalOpen(false);
+  };
+
+  const openHourmeter = () => { setHmSelection({}); setHmModalOpen(true); };
+  const executePrintHourmeter = () => {
+    // Gunakan pdfConfig global
+    const config = pdfConfig || {
+      pekerjaanPrefix: 'NORMALISASI SUNGAI'
+    };
+
+    const printWin = window.open('', '_blank');
+    let html = `<html><head><title>Cetak Hourmeter</title>
+      <style>
+        body { font-family: Arial, sans-serif; padding: 40px; font-size: 13px; line-height: 1.5; }
+        .page-break { page-break-after: always; }
+        .header-title { font-size: 22px; font-weight: bold; text-align: center; margin-bottom: 40px; }
+        .header-table { width: 100%; border-collapse: collapse; margin-bottom: 30px; font-weight: bold; font-size: 14px; }
+        .header-table td { padding: 5px; vertical-align: top; }
+        .master-table { width: 100%; border-collapse: collapse; border: 1.5px solid #000; margin-bottom: 30px; page-break-inside: auto; }
+        .master-table tr { page-break-inside: avoid; page-break-after: auto; }
+        .master-table td { border: 1px solid #000; padding: 12px; }
+        .img-cell { text-align: center; vertical-align: middle; width: 50%; height: 260px; }
+        .img-cell img { max-width: 320px; max-height: 240px; object-fit: contain; display: block; margin: auto; }
+      </style></head><body>`;
+
+    const groupedHM = {};
+    logs.forEach(log => {
+       const hasSelection = hmSelection[log.id] && (hmSelection[log.id].before || hmSelection[log.id].after);
+       if (!hasSelection) return;
+       const v = log.override_desa || log.assignment?.location_village || '';
+       const k = log.override_kecamatan || log.assignment?.location_district || '';
+       // Resolve pekerjaan dari job_sub_type
+       const SUB_TYPE_MAP_HM = {
+         normalisasi_sungai: 'NORMALISASI SUNGAI', saluran_afvoer: 'SALURAN AIR / AFVOER',
+         normalisasi_embung: 'NORMALISASI EMBUNG', pembangunan_embung: 'PEMBANGUNAN EMBUNG'
+       };
+       const resolvedPek = SUB_TYPE_MAP_HM[log.assignment?.job_sub_type] || config.pekerjaanPrefix;
+       const locStr = `DESA ${v} KECAMATAN ${k}`.toUpperCase();
+       const key = `${resolvedPek} ${locStr}`;
+       if(!groupedHM[key]) groupedHM[key] = [];
+       groupedHM[key].push(log);
+    });
+
+    Object.keys(groupedHM).forEach((keyTitle, gIdx) => {
+      html += `
+        <div class="header-title">FOTO HOURMETER</div>
+        <table class="header-table">
+          <tr><td width="15%">PEKERJAAN</td><td width="2%">:</td><td>${keyTitle}</td></tr>
+        </table>
+        <table class="master-table">`;
+      groupedHM[keyTitle].sort((a,b) => new Date(a.tanggal) - new Date(b.tanggal)).forEach((log, idx) => {
+         const selection = hmSelection[log.id];
+         const tgl = new Date(log.tanggal).toLocaleDateString('id-ID', {day:'2-digit', month:'short', year:'numeric'}).toUpperCase();
+         html += `<tr><td colspan="2" style="padding:15px; font-size: 14px;"><b>${idx + 1}. &nbsp;&nbsp;&nbsp; ${tgl}</b></td></tr>
+          <tr>
+            <td class="img-cell">${selection.before ? '<img src="' + selection.before.trim() + '" />' : '<i>Belum ada foto</i>'}</td>
+            <td class="img-cell">${selection.after ? '<img src="' + selection.after.trim() + '" />' : '<i>Belum ada foto</i>'}</td>
+          </tr>`;
+      });
+      html += `</table>`;
+      if (gIdx < Object.keys(groupedHM).length - 1) html += `<div class="page-break"></div>`;
+    });
+    html += `</body></html>`;
+    printWin.document.write(html); printWin.document.close(); printWin.focus();
+    setTimeout(() => { printWin.print(); }, 1500);
+    setHmModalOpen(false);
+  };
+
+
+  return (
+    <>
+      <div className="header">
+        <div>
+          <div className="header-title">Spreadsheet Laporan Pelaksanaan</div>
+          <div className="header-subtitle">Edit Data Secara Langsung & Menu Cetak</div>
+        </div>
+        <div className="header-right" style={{display:'flex', gap: 8, flexWrap:'wrap', justifyContent:'flex-end'}}>
+           {saving && <span style={{marginRight: 10, color:'#1e3a5f', fontWeight:'bold', display:'flex', alignItems:'center'}}>💾 Memproses...</span>}
+           <button className="btn btn-primary" onClick={generateExcel}>📥 Unduh .xlsx</button>
+           <button className="btn btn-outline" onClick={() => openPrintModal('harian')}>📄 Cetak Harian</button>
+           <button className="btn btn-outline" onClick={() => openPrintModal('mingguan')}>📘 Cetak Mingguan</button>
+           <button className="btn btn-outline" onClick={openDokumentasi}>📷 Buat Dokumentasi</button>
+           <button className="btn btn-outline" onClick={openHourmeter}>⏱️ Susun Hourmeter</button>
+        </div>
+      </div>
+
+      <div className="page-body" style={{padding: '0 20px 20px 20px'}}>
+        <div style={{display:'flex', gap: 10, marginBottom: 15}}>
+           {['semua', 'active', 'finished'].map(t => (
+              <button key={t} onClick={() => setFilterTab(t)} style={{
+                  padding: '8px 16px', background: filterTab === t ? '#1e3a8a' : '#e2e8f0',
+                  color: filterTab === t ? '#fff' : '#334155', border: 'none', borderRadius: 20, 
+                  fontSize: 13, fontWeight: 'bold', cursor: 'pointer', transition: 'all 0.2s'
+              }}>
+                 {t === 'semua' ? 'Semua Pekerjaan' : t === 'active' ? '🟢 Sedang Aktif' : '✅ Sudah Selesai'}
+              </button>
+           ))}
+        </div>
+
+        <div className="card" style={{padding:0, overflow:'hidden', borderRadius: 8, boxShadow: '0 4px 12px rgba(0,0,0,0.1)'}}>
+          <div className="table-wrapper" style={{margin:0, overflowX:'auto', maxHeight: '70vh'}}>
+            {loading ? (
+              <div style={{padding: 40, textAlign: 'center'}}>Memuat Spreadsheet...</div>
+            ) : Object.keys(mainTableGroups).length === 0 ? (
+              <div className="empty-state" style={{padding:40}}><h3>Belum Ada Data</h3></div>
+            ) : (
+              <table style={{fontSize: 12, borderCollapse:'collapse', minWidth: 1500, whiteSpace:'nowrap'}}>
+                <thead style={{position:'sticky', top:0, zIndex:10}}>
+                  <tr style={{background:'#d9ead3', color:'#000'}}>
+                    <th style={{padding:'8px 12px', border:'1px solid #ccc', fontWeight:'bold', textAlign:'center'}}>Aksi</th>
+                    <th style={{padding:'8px 12px', border:'1px solid #ccc', fontWeight:'bold'}}>Timestamp</th>
+                    <th style={{padding:'8px 12px', border:'1px solid #ccc', fontWeight:'bold'}}>Tanggal Laporan</th>
+                    <th style={{padding:'8px 12px', border:'1px solid #ccc', fontWeight:'bold'}}>Nama Operator</th>
+                    <th style={{padding:'8px 12px', border:'1px solid #ccc', fontWeight:'bold'}}>Pilih Kecamatan</th>
+                    <th style={{padding:'8px 12px', border:'1px solid #ccc', fontWeight:'bold'}}>Desa</th>
+                    <th style={{padding:'8px 12px', border:'1px solid #ccc', fontWeight:'bold'}}>Jenis Alat Berat</th>
+                    <th style={{padding:'8px 12px', border:'1px solid #ccc', fontWeight:'bold'}}>Progress Pekerjaan</th>
+                    <th style={{padding:'8px 12px', border:'1px solid #ccc', fontWeight:'bold'}}>Foto Lapangan</th>
+                    <th style={{padding:'8px 12px', border:'1px solid #ccc', fontWeight:'bold'}}>Keterangan Tambahan</th>
+                    <th style={{padding:'8px 12px', border:'1px solid #ccc', fontWeight:'bold'}}>HM Akhir</th>
+                    <th style={{padding:'8px 12px', border:'1px solid #ccc', fontWeight:'bold'}}>Panjang Pekerjaan</th>
+                    <th style={{padding:'8px 12px', border:'1px solid #ccc', fontWeight:'bold'}}>HM Awal</th>
+                    <th style={{padding:'8px 12px', border:'1px solid #ccc', fontWeight:'bold'}}>Nama Helper</th>
+                    <th style={{padding:'8px 12px', border:'1px solid #ccc', fontWeight:'bold'}}>Jam Kerja</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {Object.keys(mainTableGroups).map(gId => (
+                     <Fragment key={gId}>
+                        <tr className="group-header">
+                           <td colSpan={15} style={{background:'#e2e8f0', color:'#1e3a5f', padding:'10px 15px', fontWeight:'bold', border:'1px solid #ccc', fontSize:14}}>🗂️ {gId}</td>
+                        </tr>
+                        {mainTableGroups[gId].map(log => {
+                           const helper = log.assignment?.helper_override || log.assignment?.helper?.full_name || '';
+                           const inputStyle = { width:'100%', border:'1px dashed transparent', background:'transparent', padding:'4px', fontSize:12 };
+                           const isSelesai = log.assignment?.status?.toLowerCase() === 'selesai' || log.assignment?.status?.toLowerCase() === 'finished';
+                           const openInputStyle = { width:'100%', border:'1px dashed #bbb', background:'#fff', padding:'4px', fontSize:12, borderRadius:4 };
+
+                           return (
+                             <tr key={log.id} style={{background: '#fff', color:'#000'}}>
+                               <td style={{padding:'6px 12px', border:'1px solid rgba(0,0,0,0.1)', textAlign:'center'}}>
+                                  <button onClick={() => handleDeleteRow(log.id)} style={{background:'#dc3545', color:'white', border:'none', padding:'4px 8px', borderRadius:4, cursor:'pointer', fontSize:10}}>Hapus</button>
+                               </td>
+                               <td style={{padding:'6px 12px', border:'1px solid rgba(0,0,0,0.1)'}}>{new Date(log.reported_at).toLocaleString('id-ID')}</td>
+                               
+                               <td style={{padding:'2px 6px', border:'1px solid rgba(0,0,0,0.1)'}}>
+                                  <input type="date" style={inputStyle} value={log.tanggal || ''} 
+                                         onChange={e => handleInlineEdit(log.id, 'tanggal', e.target.value)} 
+                                         onBlur={e => handleBlurSave(log.id, 'tanggal', e.target.value)} />
+                               </td>
+
+                               {/* OVERRIDE FIELDS */}
+                               <td style={{padding:'2px 6px', border:'1px solid rgba(0,0,0,0.1)', fontWeight:'500'}}>
+                                  {isSelesai ? (
+                                    <input type="text" style={openInputStyle} value={log.override_operator || log.operator?.full_name || ''}
+                                         onChange={e => handleInlineEdit(log.id, 'override_operator', e.target.value)}
+                                         onBlur={e => handleBlurSave(log.id, 'override_operator', e.target.value)} />
+                                  ) : ( log.override_operator || log.operator?.full_name || '-' )}
+                               </td>
+                               <td style={{padding:'2px 6px', border:'1px solid rgba(0,0,0,0.1)'}}>
+                                  {isSelesai ? (
+                                    <input type="text" style={openInputStyle} value={log.override_kecamatan || log.assignment?.location_district || ''}
+                                         onChange={e => handleInlineEdit(log.id, 'override_kecamatan', e.target.value)}
+                                         onBlur={e => handleBlurSave(log.id, 'override_kecamatan', e.target.value)} />
+                                  ) : ( log.override_kecamatan || log.assignment?.location_district || '-' )}
+                               </td>
+                               <td style={{padding:'2px 6px', border:'1px solid rgba(0,0,0,0.1)'}}>
+                                  {isSelesai ? (
+                                    <input type="text" style={openInputStyle} value={log.override_desa || log.assignment?.location_village || ''}
+                                         onChange={e => handleInlineEdit(log.id, 'override_desa', e.target.value)}
+                                         onBlur={e => handleBlurSave(log.id, 'override_desa', e.target.value)} />
+                                  ) : ( log.override_desa || log.assignment?.location_village || '-' )}
+                               </td>
+                               <td style={{padding:'2px 6px', border:'1px solid rgba(0,0,0,0.1)'}}>
+                                  {isSelesai ? (
+                                    <input type="text" style={openInputStyle} value={log.override_alat || log.equipment?.name || ''}
+                                         onChange={e => handleInlineEdit(log.id, 'override_alat', e.target.value)}
+                                         onBlur={e => handleBlurSave(log.id, 'override_alat', e.target.value)} />
+                                  ) : ( log.override_alat || log.equipment?.name || '-' )}
+                               </td>
+
+                               {/* NORMAL EDITABLE FIELDS */}
+                               <td style={{padding:'2px 6px', border:'1px solid rgba(0,0,0,0.1)'}}>
+                                  <input type="text" style={inputStyle} value={log.progress_pekerjaan || ''} 
+                                         onChange={e => handleInlineEdit(log.id, 'progress_pekerjaan', e.target.value)} 
+                                         onBlur={e => handleBlurSave(log.id, 'progress_pekerjaan', e.target.value)} />
+                               </td>
+                               <td style={{padding:'6px 12px', border:'1px solid rgba(0,0,0,0.1)'}}>
+                                 {log.foto_lapangan_urls ? <a href={log.foto_lapangan_urls.split(',')[0]} target="_blank" style={{color:'#1a0dab', textDecoration:'underline'}}>Gambar Terlampir...</a> : '-'}
+                               </td>
+                               <td style={{padding:'2px 6px', border:'1px solid rgba(0,0,0,0.1)'}}>
+                                  <input type="text" style={inputStyle} value={log.keterangan_tambahan || ''} 
+                                         onChange={e => handleInlineEdit(log.id, 'keterangan_tambahan', e.target.value)} 
+                                         onBlur={e => handleBlurSave(log.id, 'keterangan_tambahan', e.target.value)} />
+                               </td>
+                               <td style={{padding:'2px 6px', border:'1px solid rgba(0,0,0,0.1)'}}>
+                                  <input type="text" style={inputStyle} value={log.hm_akhir || ''} 
+                                         onChange={e => handleInlineEdit(log.id, 'hm_akhir', e.target.value)} 
+                                         onBlur={e => handleBlurSave(log.id, 'hm_akhir', e.target.value)} />
+                               </td>
+                               <td style={{padding:'2px 6px', border:'1px solid rgba(0,0,0,0.1)'}}>
+                                  <input type="text" style={inputStyle} value={log.panjang_pekerjaan || ''} 
+                                         onChange={e => handleInlineEdit(log.id, 'panjang_pekerjaan', e.target.value)} 
+                                         onBlur={e => handleBlurSave(log.id, 'panjang_pekerjaan', e.target.value)} />
+                               </td>
+                               <td style={{padding:'2px 6px', border:'1px solid rgba(0,0,0,0.1)'}}>
+                                  <input type="text" style={inputStyle} value={log.hm_awal || ''} 
+                                         onChange={e => handleInlineEdit(log.id, 'hm_awal', e.target.value)} 
+                                         onBlur={e => handleBlurSave(log.id, 'hm_awal', e.target.value)} />
+                               </td>
+
+                               {/* HELPER (READONLY) */}
+                               <td style={{padding:'6px 12px', border:'1px solid rgba(0,0,0,0.1)'}}>{helper}</td>
+                               
+                               <td style={{padding:'2px 6px', border:'1px solid rgba(0,0,0,0.1)'}}>
+                                  <input type="text" style={inputStyle} value={log.jam_kerja || ''} 
+                                         onChange={e => handleInlineEdit(log.id, 'jam_kerja', e.target.value)} 
+                                         onBlur={e => handleBlurSave(log.id, 'jam_kerja', e.target.value)} />
+                               </td>
+                             </tr>
+                           );
+                        })}
+                     </Fragment>
+                  ))}
+                </tbody>
+              </table>
+            )}
+          </div>
+        </div>
+      </div>
+
+
+      {/* ================= MODAL SELEKSI CETAK ================= */}
+      {printModalInfo.open && (() => {
+         const groups = getModalGroups();
+         return (
+         <div style={{position:'fixed', top:0, left:0, right:0, bottom:0, background:'rgba(0,0,0,0.6)', zIndex:999, display:'flex', alignItems:'center', justifyContent:'center'}}>
+           <div style={{background:'#fff', width:'60%', height:'80%', borderRadius:10, display:'flex', flexDirection:'column', overflow:'hidden', boxShadow:'0 10px 25px rgba(0,0,0,0.5)'}}>
+               <div style={{padding:20, background:'#1e3a5f', color:'#fff', display:'flex', justifyContent:'space-between', alignItems:'center'}}>
+                  <h3 style={{margin:0}}>Pemilihan Baris - Cetak {printModalInfo.type === 'harian' ? 'Harian' : 'Rekap Mingguan'}</h3>
+                  <button onClick={() => setPrintModalInfo({open:false, type:''})} style={{background:'transparent', border:'none', color:'#fff', cursor:'pointer', fontSize:20}}>✖</button>
+               </div>
+               <div style={{flex:1, overflowY:'auto', padding:20, background:'#f8f9fa'}}>
+                  <p style={{marginTop:0, marginBottom:20, color:'#555'}}>Centang baris yang ingin disertakan ke dalam dokumen cetak.</p>
+                  <table style={{width:'100%', borderCollapse:'collapse', fontSize:13, background:'#fff'}}>
+                    <thead>
+                      <tr style={{background:'#e2e8f0', color:'#333'}}>
+                        <th style={{padding:10}}></th><th style={{padding:10, textAlign:'left'}}>Tanggal</th><th style={{padding:10, textAlign:'left'}}>Desa</th><th style={{padding:10, textAlign:'left'}}>Progress</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {Object.keys(groups).map((groupKey, gIdx) => {
+                         const rows = groups[groupKey];
+                         const rowIds = rows.map(r => r.id);
+                         const isGroupSel = rowIds.every(id => printSelectedIds.includes(id)) && rowIds.length > 0;
+                         return <Fragment key={gIdx}>
+                           <tr style={{background:'#f1f5f9', borderTop:'2px solid #cbd5e1', cursor:'pointer'}} onClick={() => togglePrintGroup(rowIds)}>
+                              <td style={{padding:10, textAlign:'center'}}><input type="checkbox" checked={isGroupSel} onChange={()=>togglePrintGroup(rowIds)} onClick={e=>e.stopPropagation()}/></td>
+                              <td colSpan={3} style={{padding:10, fontWeight:'bold', color:'#0f172a'}}>🗂️ {groupKey}</td>
+                           </tr>
+                           {rows.map(row => (
+                              <tr key={row.id} style={{borderBottom:'1px solid #e2e8f0', cursor:'pointer', background: printSelectedIds.includes(row.id) ? '#eff6ff' : '#fff'}} onClick={()=>togglePrintRow(row.id)}>
+                                 <td style={{padding:8, textAlign:'center'}}><input type="checkbox" checked={printSelectedIds.includes(row.id)} onChange={()=>togglePrintRow(row.id)} onClick={e=>e.stopPropagation()}/></td>
+                                 <td style={{padding:8}}>{new Date(row.tanggal).toLocaleDateString('id-ID')}</td>
+                                 <td style={{padding:8}}>{row.override_desa || row.assignment?.location_village}</td>
+                                 <td style={{padding:8, color:'#64748b'}}>{row.progress_pekerjaan || '-'}</td>
+                              </tr>
+                           ))}
+                         </Fragment>
+                      })}
+                    </tbody>
+                  </table>
+               </div>
+               <div style={{padding:20, background:'#fff', borderTop:'1px solid #ddd', display:'flex', justifyContent:'space-between', alignItems:'center'}}>
+                   <div style={{fontWeight:'bold', color:'#1e3a5f'}}>{printSelectedIds.length} baris dipilih</div>
+                   <div>
+                     <button className="btn btn-outline" style={{marginRight:10}} onClick={() => setPrintModalInfo({open:false, type:''})}>Batal</button>
+                     <button className="btn btn-primary" disabled={printSelectedIds.length===0} onClick={executePrintBatch}>🖨️ Mulai Print</button>
+                   </div>
+               </div>
+           </div>
+         </div>
+       )})()}
+
+      {/* ================= MODAL DOKUMENTASI (PILIH & UPLOAD FOTO) ================= */}
+      {dokModalOpen && (() => {
+        const groups = getModalGroups();
+        return (
+        <div style={{position:'fixed', top:0, left:0, right:0, bottom:0, background:'rgba(0,0,0,0.6)', zIndex:999, display:'flex', alignItems:'center', justifyContent:'center'}}>
+           <div style={{background:'#fff', width:'85%', height:'85%', borderRadius:10, display:'flex', flexDirection:'column', overflow:'hidden', boxShadow:'0 10px 25px rgba(0,0,0,0.5)'}}>
+               <div style={{padding:20, background:'#1e3a5f', color:'#fff', display:'flex', justifyContent:'space-between', alignItems:'center'}}>
+                  <h3 style={{margin:0}}>Konfigurasi Foto Dokumentasi</h3>
+                  <button onClick={() => setDokModalOpen(false)} style={{background:'transparent', border:'none', color:'#fff', cursor:'pointer', fontSize:20}}>✖</button>
+               </div>
+               <div style={{flex:1, overflowY:'auto', padding:20, background:'#f8f9fa'}}>
+                  <p style={{margin:'0 0 20px', color:'#555'}}>Tentukan persentase progres untuk dicetak. Jika operator gagal kirim foto, klik "Upload foto lapangan susulan" untuk menambahkannya.</p>
+                  
+                  {Object.keys(groups).map((groupKey, gIdx) => (
+                    <div key={gIdx} style={{marginBottom: 20}}>
+                      <div style={{background:'#e2e8f0', padding:'10px 15px', fontWeight:'bold', borderRadius: '6px 6px 0 0', border:'1px solid #cbd5e1'}}>
+                        🗂️ {groupKey}
+                      </div>
+                      <div style={{background:'#fff', border:'1px solid #cbd5e1', borderTop:'none', borderRadius: '0 0 6px 6px', padding: 15}}>
+                         {groups[groupKey].map(log => {
+                            const urls = log.foto_lapangan_urls ? log.foto_lapangan_urls.split(',').filter(Boolean) : [];
+                            return (
+                              <Fragment key={log.id}>
+                              <div style={{marginBottom: 20, paddingBottom: 15, borderBottom:'1px dashed #ccc'}}>
+                                <div style={{fontWeight:'bold', color:'#333', marginBottom:10}}>▶ Tanggal: {new Date(log.tanggal).toLocaleDateString('id-ID')} | {log.progress_pekerjaan}</div>
+                                <div style={{display:'flex', gap:15, flexWrap:'wrap', marginLeft: 20}}>
+                                   {urls.map((url, uIdx) => {
+                                      const key = log.id + '_' + uIdx;
+                                      const val = dokSelection[key] || 'skip';
+                                      return (
+                                          <div key={uIdx} style={{border:'1px solid #dee2e6', borderRadius:6, padding:8, width: 170, textAlign:'center'}}>
+                                              <img src={url} style={{width:'100%', height:100, objectFit:'cover', borderRadius:4, marginBottom:5}} />
+                                              <div style={{fontSize:11, textAlign:'left'}}>
+                                                 <label style={{display:'block', cursor:'pointer'}}><input type="radio" checked={val==='skip'} onChange={()=>setDokSelection(p=>({...p, [key]:'skip'}))} /> 🚫 Lewati</label>
+                                                 <label style={{display:'block', cursor:'pointer'}}><input type="radio" checked={val==='0%'} onChange={()=>setDokSelection(p=>({...p, [key]:'0%'}))} /> 🟠 0%</label>
+                                                 <label style={{display:'block', cursor:'pointer'}}><input type="radio" checked={val==='50%'} onChange={()=>setDokSelection(p=>({...p, [key]:'50%'}))} /> 🟡 50%</label>
+                                                 <label style={{display:'block', cursor:'pointer'}}><input type="radio" checked={val==='100%'} onChange={()=>setDokSelection(p=>({...p, [key]:'100%'}))} /> 🟢 100%</label>
+                                              </div>
+                                          </div>
+                                      )
+                                   })}
+                                   <div style={{width:170, border: '2px dashed #ced4da', borderRadius: 8, padding: 15, display:'flex', alignItems:'center', justifyContent:'center', textAlign: 'center', cursor: 'pointer', background: '#f8f9fa'}} onClick={() => document.getElementById('up_dok_'+log.id).click()}>
+                                      <input type="file" id={'up_dok_'+log.id} multiple accept="image/*" style={{display:'none'}} onChange={(e)=>handleUploadTambahan(e, log.id, 'lapangan')} />
+                                      <div style={{fontSize:12, color:'#1e3a5f'}}>📤<br/><b>Upload foto lapangan susulan</b></div>
+                                   </div>
+                                </div>
+                              </div>
+                              </Fragment>
+                            )
+                         })}
+                      </div>
+                    </div>
+                  ))}
+               </div>
+               <div style={{padding:20, background:'#fff', borderTop:'1px solid #ddd', textAlign:'right'}}>
+                   <button className="btn btn-outline" style={{marginRight:10}} onClick={() => setDokModalOpen(false)}>Batal</button>
+                   <button className="btn btn-primary" onClick={executePrintDokumentasi}>🚀 Generate PDF</button>
+               </div>
+           </div>
+        </div>
+      )})()}
+
+      {/* ================= MODAL HOURMETER (PILIH & UPLOAD FOTO) ================= */}
+      {hmModalOpen && (() => {
+        const groups = getModalGroups();
+        return (
+        <div style={{position:'fixed', top:0, left:0, right:0, bottom:0, background:'rgba(0,0,0,0.6)', zIndex:999, display:'flex', alignItems:'center', justifyContent:'center'}}>
+           <div style={{background:'#fff', width:'85%', height:'85%', borderRadius:10, display:'flex', flexDirection:'column', overflow:'hidden', boxShadow:'0 10px 25px rgba(0,0,0,0.5)'}}>
+               <div style={{padding:20, background:'#1e3a5f', color:'#fff', display:'flex', justifyContent:'space-between', alignItems:'center'}}>
+                  <h3 style={{margin:0}}>Konfigurasi Foto Hourmeter</h3>
+                  <button onClick={() => setHmModalOpen(false)} style={{background:'transparent', border:'none', color:'#fff', cursor:'pointer', fontSize:20}}>✖</button>
+               </div>
+               <div style={{flex:1, overflowY:'auto', padding:20, background:'#f8f9fa'}}>
+                  <p style={{margin:'0 0 20px', color:'#555'}}>Tentukan foto "Before" dan "After" untuk dicetak ke arsip. Tambahkan foto manual jika perlu.</p>
+                  
+                  {Object.keys(groups).map((groupKey, gIdx) => (
+                    <div key={gIdx} style={{marginBottom: 20}}>
+                      <div style={{background:'#e2e8f0', padding:'10px 15px', fontWeight:'bold', borderRadius: '6px 6px 0 0', border:'1px solid #cbd5e1'}}>
+                        🗂️ {groupKey}
+                      </div>
+                      <div style={{background:'#fff', border:'1px solid #cbd5e1', borderTop:'none', borderRadius: '0 0 6px 6px', padding: 15}}>
+                         {groups[groupKey].map(log => {
+                            const urls = log.foto_hourmeter_urls ? log.foto_hourmeter_urls.split(',').filter(Boolean) : [];
+                            const curSel = hmSelection[log.id] || {before:'', after:''};
+                            
+                            return (
+                              <Fragment key={log.id}>
+                              <div style={{marginBottom: 20, paddingBottom: 15, borderBottom:'1px dashed #ccc', display:'flex', gap: 20}}>
+                                 {/* KIRI: Preview Selected */}
+                                 <div style={{flex:'0 0 320px', background:'#f8f9fa', padding:15, border:'1px solid #ddd', borderRadius:8}}>
+                                    <div style={{fontWeight:'bold', marginBottom:10, color:'#1e3a5f'}}>Tgl: {new Date(log.tanggal).toLocaleDateString('id-ID')}</div>
+                                    <div style={{display:'flex', gap:10}}>
+                                       <div style={{flex:1, textAlign:'center'}}>
+                                          <div style={{fontSize:10, fontWeight:'bold', marginBottom:4}}>HM AWAL</div>
+                                          <div style={{height:80, border:'2px dashed #bbb', background:'#fff', borderRadius:4, display:'flex', alignItems:'center', justifyContent:'center'}}>
+                                              {curSel.before ? <img src={curSel.before} style={{width:'100%',height:'100%',objectFit:'cover'}}/>:<span style={{fontSize:9, color:'#888'}}>Kosong</span>}
+                                          </div>
+                                       </div>
+                                       <div style={{flex:1, textAlign:'center'}}>
+                                          <div style={{fontSize:10, fontWeight:'bold', marginBottom:4}}>HM AKHIR</div>
+                                          <div style={{height:80, border:'2px dashed #bbb', background:'#fff', borderRadius:4, display:'flex', alignItems:'center', justifyContent:'center'}}>
+                                              {curSel.after ? <img src={curSel.after} style={{width:'100%',height:'100%',objectFit:'cover'}}/>:<span style={{fontSize:9, color:'#888'}}>Kosong</span>}
+                                          </div>
+                                       </div>
+                                    </div>
+                                 </div>
+                                 {/* KANAN: Foto Pilihan + Uploader */}
+                                 <div style={{flex:1}}>
+                                    <div style={{marginBottom:10, color:'#666', fontSize:12}}>Pilih dari foto yang dikirim operator atau upload manual:</div>
+                                    <div style={{display:'flex', gap:10, flexWrap:'wrap'}}>
+                                       {urls.map((url, uIdx) => (
+                                          <div key={uIdx} style={{border:'1px solid #eee', padding:5, borderRadius:6, width:130, textAlign:'center'}}>
+                                             <img src={url} style={{width:'100%', height:70, objectFit:'cover', borderRadius:4, marginBottom:5}}/>
+                                             <div style={{display:'flex', gap:5}}>
+                                                <button style={{flex:1, fontSize:10, padding:'3px 0', background:'#ffc107', border:'none', cursor:'pointer'}} onClick={()=>setHmSelection(p=>{const n={...p}; if(!n[log.id])n[log.id]={after:''}; n[log.id].before=url; return n;})}>Awal</button>
+                                                <button style={{flex:1, fontSize:10, padding:'3px 0', background:'#28a745', color:'#fff', border:'none', cursor:'pointer'}} onClick={()=>setHmSelection(p=>{const n={...p}; if(!n[log.id])n[log.id]={before:''}; n[log.id].after=url; return n;})}>Akhir</button>
+                                             </div>
+                                          </div>
+                                       ))}
+                                       <div style={{width:130, border: '2px dashed #ced4da', borderRadius: 6, display:'flex', alignItems:'center', justifyContent:'center', textAlign: 'center', cursor: 'pointer', background: '#f8f9fa'}} onClick={() => document.getElementById('up_hm_'+log.id).click()}>
+                                          <input type="file" id={'up_hm_'+log.id} multiple accept="image/*" style={{display:'none'}} onChange={(e)=>handleUploadTambahan(e, log.id, 'hourmeter')} />
+                                          <div style={{fontSize:11, color:'#1e3a5f'}}>📤<br/><b>Upload HM Tambahan</b></div>
+                                       </div>
+                                    </div>
+                                 </div>
+                              </div>
+                              </Fragment>
+                            )
+                         })}
+                      </div>
+                    </div>
+                  ))}
+               </div>
+               <div style={{padding:20, background:'#fff', borderTop:'1px solid #ddd', textAlign:'right'}}>
+                   <button className="btn btn-outline" style={{marginRight:10}} onClick={() => setHmModalOpen(false)}>Batal</button>
+                   <button className="btn btn-primary" onClick={executePrintHourmeter}>🚀 Generate PDF</button>
+               </div>
+           </div>
+        </div>
+      )})()}
+    </>
+  );
+}

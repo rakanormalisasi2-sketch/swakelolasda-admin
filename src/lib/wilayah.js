@@ -1,0 +1,33 @@
+// Kecamatan dan Desa Kabupaten Bojonegoro (Lengkap)
+const WILAYAH_BOJONEGORO = {
+  "BOJONEGORO": ["Banjarejo","Kadipaten","Mojokampung","Ngrowo","Klangon","Sumbang","Kauman","Jetak","Ledok Wetan","Ledok Kulon","Sukorejo","Kepatihan"],
+  "NGASEM": ["Ngasem","Butoh","Deru","Sumber","Ngraho","Hargomulyo","Kalirejo","Clangap","Growok","Setren","Bondol","Sudu","Mojodelik","Gayam","Ringintunggal"],
+  "PADANGAN": ["Padangan","Kuncen","Kebonagung","Banjarjo","Cengunglung","Ngeper","Sonorejo","Balongrejo","Kendung","Purwosari","Ngraho","Tebon"],
+  "PURWOSARI": ["Purwosari","Sidorejo","Pejok","Tinumpuk","Kendung","Puwosari","Jelu","Kacangan","Sumberbanyak","Kedungarum"],
+  "KASIMAN": ["Kasiman","Piyak","Tanjungharjo","Betet","Sekaran"],
+  "MALO": ["Malo","Sumuragung","Kedungsumber","Tambakromo","Tulungrejo","Sumberarum","Kalimati","Banaran"],
+  "TRUCUK": ["Trucuk","Sampang","Togahan","Talok","Guyung","Prunggahan Kulon","Prunggahan Wetan","Srirande","Sumbangtimun"],
+  "NGRAHO": ["Ngraho","Brabowan","Pengkol","Payaman","Jumprejo","Sumberarum","Genjor","Tanggungan","Tlesung Kidul","Tlesung Lor"],
+  "TAMBAKREJO": ["Tambakrejo","Pelem","Ngraho","Bakalan","Kalisumber","Ngujung","Gamongan","Napis","Mulyoagung","Sendang","Ngroh","Tanjung"],
+  "NGAMBON": ["Ngambon","Batokan","Sambongrejo","Deling","Setren"],
+  "SEKAR": ["Sekar","Meduri","Miyono","Deling","Klino","Kemiri","Bareng","Krajan","Ngrencak"],
+  "BUBULAN": ["Bubulan","Clebung","Ngrencak","Petak","Bareng","Sumbertlaseh"],
+  "GONDANG": ["Gondang","Pragelan","Supiturang","Klino","Nganti","Krondonan","Pandan","Sumberarum"],
+  "TEMAYANG": ["Temayang","Kedungsumber","Kadenganrejo","Balong","Papringan","Ngrojo","Kedungdowo","Soko"],
+  "SUGIHWARAS": ["Sugihwaras","Mencurek","Drenges","Wedilego","Pajaran","Wedoro","Panemon","Kepohkidul"],
+  "KEDEWAN": ["Kedewan","Beji","Kawengan","Hargomulyo","Wonocolo"],
+  "KEDUNGADEM": ["Kedungadem","Megale","Kedungadem","Kesongo","Kepoh","Drokilo","Babat","Babad","Ngrambang","Kendung"],
+  "KEPOHBARU": ["Kepohbaru","Sembung","Sumberrejo","Kedungsari","Sidomukti","Pejok","Kaliombo","Botoputih","Tondomulyo"],
+  "BAURENO": ["Baureno","Lebaksari","Bakalan","Blongsong","Trojalu","Gunungsari","Wolyo","Mojo","Sumuragung","Ngawen","Karangdayu","Pohbogo"],
+  "KANOR": ["Kanor","Temu","Piyak","Karangmangu","Cangaan","Drujugurit","Sarirejo","Pilang","Pasinan","Kabalan","Semambung","Sumberwangi","Gedongarum","Nguken","Mojosari","Kompol"],
+  "SUMBERREJO": ["Sumberrejo","Jatigede","Sukorejo","Talun","Mejuwet","Desa Nglareh","Pejok","Butoh","Tambahrejo","Ngumpakdalem","Dander","Prambatan"],
+  "BALEN": ["Balen","Simorejo","Suwaloh","Mulyorejo","Margomulyo","Sekaran","Lengkong","Growok","Sobontoro","Mojorejo","Wedi","Balongcabe"],
+  "SUKOSEWU": ["Sukosewu","Kalicilik","Panjatan","Putat","Pekuwon","Kesongo","Desa Kracak","Kaumrejo","Desa Kendung"],
+  "KAPAS": ["Kapas","Sembung","Mojodeso","Tikusan","Sambiroto","Tapelan","Klampok","Bangilan","Kedaton","Sukowati","Plesungan","Wotansari"],
+  "DANDER": ["Dander","Growok","Ngumpakdalem","Sumberarum","Ngulanan","Kunci","Mojoranu","Sendangharjo","Karangdayu","Sumbergatak","Subontoro","Sumberjo"],
+  "KALITIDU": ["Kalitidu","Ngraho","Sukoharjo","Sumengko","Mojo","Mojokampung","Selodakon","Banjarsari","Pungpungan","Leran","Mlaten"],
+  "GAYAM": ["Gayam","Mojodelik","Ringintunggal","Begadon","Beged","Sumberrejo"],
+  "NGASEM": ["Ngasem","Mojodelik","Deru","Sumber"],
+};
+
+export default WILAYAH_BOJONEGORO;

@@ -1,0 +1,122 @@
+'use client';
+import { useState } from 'react';
+import { useRouter } from 'next/navigation';
+import { supabase } from '@/lib/supabase';
+import styles from './login.module.css';
+
+export default function LoginPage() {
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+  const router = useRouter();
+
+  const handleLogin = async (e) => {
+    e.preventDefault();
+    setLoading(true);
+    setError('');
+
+    const { data, error: authError } = await supabase.auth.signInWithPassword({ email, password });
+    if (authError) {
+      setError('Email atau password salah. Hubungi Superadmin jika Anda belum memiliki akun.');
+      setLoading(false);
+      return;
+    }
+
+    // Fetch user profile to get role
+    const { data: profile } = await supabase
+      .from('user_profiles')
+      .select('role')
+      .eq('id', data.user.id)
+      .single();
+
+    const role = profile?.role;
+    if (role === 'superadmin') router.replace('/dashboard/superadmin');
+    else if (role === 'peralatan') router.replace('/dashboard/peralatan');
+    else if (role === 'operator') router.replace('/dashboard/operator');
+    else router.replace('/dashboard/seksi');
+
+    setLoading(false);
+  };
+
+  return (
+    <div className={styles.loginPage}>
+      <div className={styles.loginLeft}>
+        <div className={styles.loginBrand}>
+          <div className={styles.loginLogo}>
+            <svg fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M3.055 11H5a2 2 0 012 2v1a2 2 0 002 2 2 2 0 012 2v2.945M8 3.935V5.5A2.5 2.5 0 0010.5 8h.5a2 2 0 012 2 2 2 0 104 0 2 2 0 012-2h1.064M15 20.488V18a2 2 0 012-2h3.064" />
+            </svg>
+          </div>
+          <div>
+            <h2>SWAKELOLASDA</h2>
+            <p>Dinas PU Kabupaten Bojonegoro</p>
+          </div>
+        </div>
+        <h1 className={styles.loginHeadline}>Sistem Swakelola<br />Sumber Daya Air</h1>
+        <p className={styles.loginDesc}>Pantau posisi operator, ketersediaan alat berat, dan laporan pelaksanaan pekerjaan secara terpusat dan real-time.</p>
+        <div className={styles.featureList}>
+          {[
+            ['Manajemen Alat Berat & Status Real-time', 'M'],
+            ['Penugasan & Rekrutmen Operator Lapangan', 'P'],
+            ['Laporan Pelaksanaan Otomatis ke Google Sheets', 'L'],
+            ['Perencanaan dan Rekapitulasi Proposal', 'R'],
+          ].map(([label, ico]) => (
+            <div key={label} className={styles.featureItem}>
+              <div className={styles.featureIcon}>{ico}</div>
+              <span>{label}</span>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      <div className={styles.loginRight}>
+        <div className={styles.loginCard}>
+          <h2 className={styles.loginCardTitle}>Masuk ke Sistem</h2>
+          <p className={styles.loginCardSubtitle}>Gunakan email dan password yang diberikan oleh Superadmin.</p>
+
+          {error && (
+            <div className="alert alert-danger">
+              <svg fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z" />
+              </svg>
+              {error}
+            </div>
+          )}
+
+          <form onSubmit={handleLogin}>
+            <div className="form-group">
+              <label className="form-label" htmlFor="email">Email</label>
+              <input
+                id="email" type="email" className="form-control"
+                placeholder="email@contoh.com"
+                value={email} onChange={e => setEmail(e.target.value)}
+                required
+              />
+            </div>
+            <div className="form-group">
+              <label className="form-label" htmlFor="password">Password</label>
+              <input
+                id="password" type="password" className="form-control"
+                placeholder="••••••••"
+                value={password} onChange={e => setPassword(e.target.value)}
+                required
+              />
+            </div>
+            <button
+              type="submit" className="btn btn-primary w-full"
+              style={{ justifyContent: 'center', padding: '11px 16px', fontSize: '14px', marginTop: '4px' }}
+              disabled={loading}
+            >
+              {loading ? 'Memverifikasi...' : 'Masuk'}
+            </button>
+          </form>
+
+          <p className={styles.loginNote}>
+            Lupa password atau belum memiliki akun? Hubungi <strong>Superadmin</strong> untuk pengaturan.
+          </p>
+        </div>
+      </div>
+    </div>
+  );
+}

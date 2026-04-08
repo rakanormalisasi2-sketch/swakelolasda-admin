@@ -1,0 +1,252 @@
+'use client';
+import { useEffect, useState, useCallback } from 'react';
+import { supabase } from '@/lib/supabase';
+import { useAuth } from '@/context/AuthContext';
+import WILAYAH from '@/lib/wilayah';
+
+export default function PenugasanPage() {
+  const { profile } = useAuth();
+  const [operators, setOperators] = useState([]);
+  const [alat, setAlat] = useState([]);
+  const [assignments, setAssignments] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [showModal, setShowModal] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState('');
+  const [desaList, setDesaList] = useState([]);
+  const [form, setForm] = useState({
+    operator_id: '', helper_id: '', equipment_id: '',
+    job_type: 'normalisasi', job_sub_type: '', custom_job_description: '',
+    location_district: '', location_village: '',
+  });
+
+  // Cascading sub-pekerjaan berdasarkan jenis utama
+  const JOB_SUB_OPTIONS = {
+    normalisasi: [
+      { value: 'normalisasi_sungai', label: 'Normalisasi Sungai' },
+      { value: 'saluran_afvoer', label: 'Saluran Air / Afvoer' },
+    ],
+    embung: [
+      { value: 'normalisasi_embung', label: 'Normalisasi Embung' },
+      { value: 'pembangunan_embung', label: 'Pembangunan Embung' },
+    ],
+  };
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    const [{ data: ops }, { data: alatData }, { data: asgn }] = await Promise.all([
+      supabase.from('user_profiles').select('*').eq('role', 'operator').order('full_name'),
+      supabase.from('heavy_equipment').select('*').order('name'),
+      supabase.from('assignments').select(`
+        *,
+        operator:user_profiles!assignments_operator_id_fkey(full_name),
+        helper:user_profiles!assignments_helper_id_fkey(full_name),
+        equipment:heavy_equipment(name, status)
+      `).eq('status', 'active'),
+    ]);
+    setOperators(ops || []);
+    setAlat(alatData || []);
+    setAssignments(asgn || []);
+    setLoading(false);
+  }, []);
+
+  useEffect(() => { load(); }, [load]);
+
+  const busyIds = new Set([
+    ...assignments.map(a => a.operator_id),
+    ...assignments.map(a => a.helper_id).filter(Boolean),
+  ]);
+  const freeOperators = operators.filter(o => !busyIds.has(o.id));
+  const availableAlat = alat.filter(a => a.status === 'ready');
+
+  const handleDistrictChange = (kec) => {
+    setForm(f => ({ ...f, location_district: kec, location_village: '' }));
+    setDesaList(WILAYAH[kec] || []);
+  };
+
+  const handleSave = async (e) => {
+    e.preventDefault(); setSaving(true); setError('');
+    if (!form.operator_id || !form.equipment_id || !form.location_district || !form.location_village) {
+      setError('Harap lengkapi semua field yang wajib diisi.'); setSaving(false); return;
+    }
+    const insertData = {
+      operator_id: form.operator_id,
+      helper_id: form.helper_id || null,
+      equipment_id: form.equipment_id,
+      job_type: form.job_type,
+      job_sub_type: form.job_sub_type || null,
+      custom_job_description: form.job_type === 'lainnya' ? form.custom_job_description : null,
+      location_district: form.location_district,
+      location_village: form.location_village,
+      status: 'active',
+    };
+    const { error: asgnErr } = await supabase.from('assignments').insert(insertData);
+    if (asgnErr) { setError(asgnErr.message); setSaving(false); return; }
+    await supabase.from('heavy_equipment').update({ status: 'operating' }).eq('id', form.equipment_id);
+    setSaving(false); setShowModal(false); load();
+  };
+
+  const finishAssignment = async (a) => {
+    if (!confirm(`Selesaikan penugasan ${a.operator?.full_name}?`)) return;
+    await supabase.from('assignments').update({ status: 'finished', end_date: new Date().toISOString() }).eq('id', a.id);
+    await supabase.from('heavy_equipment').update({ status: 'ready' }).eq('id', a.equipment_id);
+    load();
+  };
+
+  const JOB_LABELS = { normalisasi: 'Normalisasi', embung: 'Embung', lainnya: 'Lainnya' };
+  const SUB_LABELS = { normalisasi_sungai: 'Normalisasi Sungai', saluran_afvoer: 'Saluran Air/Afvoer', normalisasi_embung: 'Normalisasi Embung', pembangunan_embung: 'Pembangunan Embung' };
+
+  return (
+    <>
+      <div className="header">
+        <div>
+          <div className="header-title">Penugasan Operator</div>
+          <div className="header-subtitle">Rekrut dan tugaskan operator ke pekerjaan lapangan</div>
+        </div>
+        <div className="header-right">
+          <button className="btn btn-primary" onClick={() => { setForm({ operator_id:'', helper_id:'', equipment_id:'', job_type:'normalisasi', job_sub_type:'', custom_job_description:'', location_district:'', location_village:'' }); setError(''); setShowModal(true); }}>
+            <svg fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24" style={{width:15,height:15}}><path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4"/></svg>
+            Tugaskan Operator
+          </button>
+        </div>
+      </div>
+
+      <div className="page-body">
+        <div className="card">
+          <div className="card-header">
+            <span className="card-title">Penugasan Aktif ({assignments.length})</span>
+          </div>
+          <div className="table-wrapper">
+            {loading ? (
+              <div style={{padding:40,textAlign:'center',color:'var(--text-muted)'}}>Memuat...</div>
+            ) : assignments.length === 0 ? (
+              <div className="empty-state"><svg fill="none" stroke="currentColor" strokeWidth={1.5} viewBox="0 0 24 24" style={{width:48,height:48}}><path strokeLinecap="round" strokeLinejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/></svg><h3>Belum ada penugasan aktif</h3><p>Klik "Tugaskan Operator" untuk membuat penugasan baru.</p></div>
+            ) : (
+              <table>
+                <thead><tr><th>Operator</th><th>Helper</th><th>Alat Berat</th><th>Pekerjaan</th><th>Lokasi</th><th>Tanggal Mulai</th><th>Aksi</th></tr></thead>
+                <tbody>
+                  {assignments.map(a => (
+                    <tr key={a.id}>
+                      <td className="font-semibold">{a.operator?.full_name||'—'}</td>
+                      <td className="text-muted">{a.helper?.full_name||'—'}</td>
+                      <td>{a.equipment?.name||'—'}</td>
+                      <td>
+                        <span className={`badge ${a.job_type==='normalisasi'?'badge-primary':a.job_type==='embung'?'badge-success':'badge-neutral'}`}>
+                          {JOB_LABELS[a.job_type]||a.job_type}
+                        </span>
+                        {a.job_sub_type && <div className="text-xs" style={{marginTop:3, color:'var(--primary)'}}>{SUB_LABELS[a.job_sub_type]||a.job_sub_type}</div>}
+                        {a.custom_job_description && <div className="text-xs text-muted" style={{marginTop:3}}>{a.custom_job_description}</div>}
+                      </td>
+                      <td>{a.location_village}, Kec. {a.location_district}</td>
+                      <td className="text-sm text-muted">{new Date(a.start_date).toLocaleDateString('id-ID',{day:'2-digit',month:'short',year:'numeric'})}</td>
+                      <td><button className="btn btn-sm btn-success" onClick={() => finishAssignment(a)}>Selesaikan</button></td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {showModal && (
+        <div className="modal-overlay" onClick={e=>e.target===e.currentTarget&&setShowModal(false)}>
+          <div className="modal" style={{maxWidth:560}}>
+            <div className="modal-header">
+              <h3 className="modal-title">Penugasan Operator Baru</h3>
+              <button className="btn-icon" onClick={()=>setShowModal(false)}>
+                <svg fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24" style={{width:18,height:18}}><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
+              </button>
+            </div>
+            <form onSubmit={handleSave}>
+              <div className="modal-body">
+                {error && <div className="alert alert-danger"><svg fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24" style={{width:16,height:16}}><path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01"/></svg>{error}</div>}
+
+                <div className="form-grid">
+                  <div className="form-group">
+                    <label className="form-label">Operator * <span className="text-xs text-muted">({freeOperators.length} tersedia)</span></label>
+                    <select className="form-control" required value={form.operator_id} onChange={e=>setForm({...form,operator_id:e.target.value})}>
+                      <option value="">— Pilih Operator —</option>
+                      {freeOperators.map(o=><option key={o.id} value={o.id}>{o.full_name}</option>)}
+                    </select>
+                  </div>
+                  <div className="form-group">
+                    <label className="form-label">Helper/Operator 2 <span className="text-xs text-muted">(opsional)</span></label>
+                    <select className="form-control" value={form.helper_id} onChange={e=>setForm({...form,helper_id:e.target.value})}>
+                      <option value="">— Tanpa Helper —</option>
+                      {freeOperators.filter(o=>o.id!==form.operator_id).map(o=><option key={o.id} value={o.id}>{o.full_name}</option>)}
+                    </select>
+                  </div>
+                </div>
+
+                <div className="form-group">
+                  <label className="form-label">Alat Berat * <span className="text-xs text-muted">({availableAlat.length} tersedia)</span></label>
+                  <select className="form-control" required value={form.equipment_id} onChange={e=>setForm({...form,equipment_id:e.target.value})}>
+                    <option value="">— Pilih Alat Berat —</option>
+                    {alat.map(a => (
+                      <option key={a.id} value={a.id} disabled={a.status!=='ready'}>
+                        {a.name}{a.merk_type?` (${a.merk_type})`:''} {a.status!=='ready'?`— ${a.status==='maintenance'?'⚠ Maintenance':'Beroperasi'}`:''}
+                      </option>
+                    ))}
+                  </select>
+                  <p className="text-xs text-muted" style={{marginTop:4}}>Alat berstatus Maintenance tidak dapat dipilih.</p>
+                </div>
+
+                <div className="form-grid">
+                  <div className="form-group">
+                    <label className="form-label">Jenis Pekerjaan *</label>
+                    <select className="form-control" value={form.job_type} onChange={e=>setForm({...form, job_type:e.target.value, job_sub_type:''})}>
+                      <option value="normalisasi">Normalisasi</option>
+                      <option value="embung">Embung</option>
+                      <option value="lainnya">Lainnya</option>
+                    </select>
+                  </div>
+
+                  {JOB_SUB_OPTIONS[form.job_type] && (
+                    <div className="form-group">
+                      <label className="form-label">Sub Pekerjaan *</label>
+                      <select className="form-control" required value={form.job_sub_type} onChange={e=>setForm({...form, job_sub_type:e.target.value})}>
+                        <option value="">— Pilih Sub Pekerjaan —</option>
+                        {JOB_SUB_OPTIONS[form.job_type].map(s => (
+                          <option key={s.value} value={s.value}>{s.label}</option>
+                        ))}
+                      </select>
+                    </div>
+                  )}
+                </div>
+
+                {form.job_type === 'lainnya' && (
+                  <div className="form-group">
+                    <label className="form-label">Keterangan Pekerjaan *</label>
+                    <input className="form-control" required value={form.custom_job_description} onChange={e=>setForm({...form,custom_job_description:e.target.value})} placeholder="Tuliskan jenis pekerjaan secara spesifik..." />
+                  </div>
+                )}
+
+                <div className="form-grid">
+                  <div className="form-group">
+                    <label className="form-label">Kecamatan *</label>
+                    <select className="form-control" required value={form.location_district} onChange={e=>handleDistrictChange(e.target.value)}>
+                      <option value="">— Pilih Kecamatan —</option>
+                      {Object.keys(WILAYAH).map(k=><option key={k} value={k}>{k}</option>)}
+                    </select>
+                  </div>
+                  <div className="form-group">
+                    <label className="form-label">Desa *</label>
+                    <select className="form-control" required value={form.location_village} onChange={e=>setForm({...form,location_village:e.target.value})} disabled={!form.location_district}>
+                      <option value="">— Pilih Desa —</option>
+                      {desaList.map(d=><option key={d} value={d}>{d}</option>)}
+                    </select>
+                  </div>
+                </div>
+              </div>
+              <div className="modal-footer">
+                <button type="button" className="btn btn-outline" onClick={()=>setShowModal(false)}>Batal</button>
+                <button type="submit" className="btn btn-primary" disabled={saving}>{saving?'Menyimpan...':'Tugaskan'}</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+    </>
+  );
+}
