@@ -39,11 +39,6 @@ export default function StatusOperasionalPage() {
         equipment:heavy_equipment(name, status)
       `).eq('status', 'active').order('start_date', { ascending: false });
 
-    // Non-superadmin hanya melihat tugas yang dibuat oleh role mereka sendiri
-    if (profile?.role && profile.role !== 'superadmin') {
-      asgnQuery = asgnQuery.eq('created_by_role', profile.role);
-    }
-
     const [asgnRes, opsRes, alatRes, logsRes] = await Promise.all([
       asgnQuery,
       supabase.from('user_profiles').select('*').eq('role', 'operator').order('full_name'),

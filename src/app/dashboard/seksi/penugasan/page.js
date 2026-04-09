@@ -61,7 +61,7 @@ export default function PenugasanPage() {
         operator:user_profiles!assignments_operator_id_fkey(full_name),
         helper:user_profiles!assignments_helper_id_fkey(full_name),
         equipment:heavy_equipment(name, status)
-      `).eq('status', 'active'),
+      `).eq('status', 'active').eq('created_by_role', profile?.role),
     ]);
     setOperators(ops || []);
     setAlat(alatData || []);
@@ -98,6 +98,7 @@ export default function PenugasanPage() {
       location_district: form.location_district,
       location_village: form.location_village,
       status: 'active',
+      created_by_role: profile.role,
     };
     const { error: asgnErr } = await supabase.from('assignments').insert(insertData);
     if (asgnErr) { setError(asgnErr.message); setSaving(false); return; }
