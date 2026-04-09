@@ -120,7 +120,14 @@ export default function PengaturanSeksiPage() {
   if (loading) return <div style={{padding:40, textAlign:'center'}}>Memuat pengaturan...</div>;
 
   const isConnected = !!settings.google_refresh_token;
-  const sectionName = profile.role === 'seksi_normalisasi' ? 'Seksi Normalisasi' : 'Seksi Embung';
+  const ROLE_NAMES = {
+    seksi_normalisasi: 'Seksi Normalisasi',
+    seksi_embung: 'Seksi Embung',
+    tim_peralatan: 'Tim Peralatan',
+    superadmin: 'Superadmin',
+  };
+  const sectionName = ROLE_NAMES[profile?.role] || profile?.role || '—';
+
 
   return (
     <>

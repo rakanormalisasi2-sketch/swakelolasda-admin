@@ -15,15 +15,14 @@ export default function PengaturanPeralatanPage() {
   const [disconnecting, setDisconnecting] = useState(false);
   const [showDisconnectConfirm, setShowDisconnectConfirm] = useState(false);
 
-  // Initialize DB row if it doesn't exist
-  const initDb = async () => {
-     if (profile?.role !== 'peralatan') return;
-     // The role in section_settings is 'tim_peralatan' based on migration 7
-     await supabase.from('section_settings').insert({ role: 'tim_peralatan' }).is('role', null);
-  };
-
   const loadSettings = useCallback(async () => {
     if (!profile?.role) return;
+
+    // Pastikan row tim_peralatan ada sebelum fetch (idempotent via ON CONFLICT)
+    await supabase
+      .from('section_settings')
+      .upsert({ role: 'tim_peralatan' }, { onConflict: 'role', ignoreDuplicates: true });
+
     const { data } = await supabase.from('section_settings').select('*').eq('role', 'tim_peralatan').single();
     if (data) {
       setSettings({
@@ -35,8 +34,9 @@ export default function PengaturanPeralatanPage() {
   }, [profile]);
 
   useEffect(() => {
-    initDb().then(() => loadSettings());
+    loadSettings();
   }, [loadSettings]);
+
 
   // Baca status gdrive dari URL setelah redirect OAuth
   useEffect(() => {

@@ -13,11 +13,27 @@ export async function GET(request) {
   const state = searchParams.get('state'); // role seksi, dikirim dari /login
   const error = searchParams.get('error');
 
-  const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
-  const redirectBase = `${baseUrl}/dashboard/seksi/pengaturan`;
+  // Derive baseUrl from the actual request URL — this is the ONLY way to guarantee
+  // the redirect_uri will exactly match what was sent in the login step.
+  // Using process.env.NEXT_PUBLIC_APP_URL is unreliable on Vercel runtime for server routes.
+  const requestUrl = new URL(request.url);
+  const baseUrl = `${requestUrl.protocol}//${requestUrl.host}`;
+
+  // Tentukan halaman redirect berdasarkan role yang dikirim di state
+  // Tim Peralatan punya path dashboard berbeda dari Seksi
+  const getRedirectBase = (role) => {
+    if (role === 'tim_peralatan') {
+      return `${baseUrl}/dashboard/peralatan/pengaturan`;
+    }
+    return `${baseUrl}/dashboard/seksi/pengaturan`;
+  };
+
+  const redirectBase = getRedirectBase(state);
 
   if (error) {
-    return NextResponse.redirect(`${redirectBase}?gdrive_status=cancelled`);
+    // Saat error, state mungkin belum ada — gunakan fallback seksi
+    const safeRedirect = state ? getRedirectBase(state) : `${baseUrl}/dashboard/seksi/pengaturan`;
+    return NextResponse.redirect(`${safeRedirect}?gdrive_status=cancelled`);
   }
 
   if (!code || !state) {
@@ -58,7 +74,9 @@ export async function GET(request) {
 
     return NextResponse.redirect(`${redirectBase}?gdrive_status=success`);
   } catch (err) {
-    console.error('OAuth exchange error:', err.message);
-    return NextResponse.redirect(`${redirectBase}?gdrive_status=error&msg=exchange_failed`);
+    // Expose the actual Google error code so it's easier to diagnose
+    const googleErrCode = err?.response?.data?.error || err?.code || err?.message || 'exchange_failed';
+    console.error('OAuth exchange error:', googleErrCode, err.message);
+    return NextResponse.redirect(`${redirectBase}?gdrive_status=error&msg=${encodeURIComponent(googleErrCode)}`);
   }
 }
