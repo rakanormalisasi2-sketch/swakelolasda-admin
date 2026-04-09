@@ -1,44 +1,52 @@
 'use client';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { supabase } from '@/lib/supabase';
+import { useAuth } from '@/context/AuthContext';
 import styles from './login.module.css';
 
 export default function LoginPage() {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
-  const [loading, setLoading] = useState(false);
+  const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const router = useRouter();
+  const { user, profile, loading, login } = useAuth();
+
+  // If already logged in, redirect to appropriate dashboard
+  useEffect(() => {
+    if (loading) return;
+    if (user && profile?.role) {
+      redirectByRole(profile.role);
+    }
+  }, [user, profile, loading]);
+
+  function redirectByRole(role) {
+    if (role === 'superadmin') router.replace('/dashboard/superadmin');
+    else if (role === 'peralatan') router.replace('/dashboard/peralatan');
+    else if (role === 'seksi_normalisasi' || role === 'seksi_embung') router.replace('/dashboard/seksi');
+  }
 
   const handleLogin = async (e) => {
     e.preventDefault();
-    setLoading(true);
+    setBusy(true);
     setError('');
 
     const loginEmail = username.includes('@') ? username : `${username.toLowerCase().trim()}@swakelolasda.com`;
 
-    const { data, error: authError } = await supabase.auth.signInWithPassword({ email: loginEmail, password });
-    if (authError) {
+    try {
+      // login() from AuthContext: sets user+profile in state BEFORE we navigate
+      const role = await login(loginEmail, password);
+
+      if (role === 'superadmin' || role === 'peralatan' || role === 'seksi_normalisasi' || role === 'seksi_embung') {
+        redirectByRole(role);
+      } else {
+        setError('Akun Anda tidak memiliki akses ke panel admin web.');
+        setBusy(false);
+      }
+    } catch (err) {
       setError('Username atau password salah. Hubungi Superadmin jika Anda belum memiliki akun.');
-      setLoading(false);
-      return;
+      setBusy(false);
     }
-
-    // Fetch user profile to get role
-    const { data: profile } = await supabase
-      .from('user_profiles')
-      .select('role')
-      .eq('id', data.user.id)
-      .single();
-
-    const role = profile?.role;
-    if (role === 'superadmin') router.replace('/dashboard/superadmin');
-    else if (role === 'peralatan') router.replace('/dashboard/peralatan');
-    else if (role === 'seksi_normalisasi' || role === 'seksi_embung') router.replace('/dashboard/seksi');
-    else { setError('Akun Anda tidak memiliki akses ke panel admin web.'); setLoading(false); return; }
-
-    setLoading(false);
   };
 
   return (
@@ -108,9 +116,9 @@ export default function LoginPage() {
             <button
               type="submit" className="btn btn-primary w-full"
               style={{ justifyContent: 'center', padding: '11px 16px', fontSize: '14px', marginTop: '4px' }}
-              disabled={loading}
+              disabled={busy}
             >
-              {loading ? 'Memverifikasi...' : 'Masuk'}
+              {busy ? 'Memverifikasi...' : 'Masuk'}
             </button>
           </form>
 

@@ -10,24 +10,16 @@ export default function RootPage() {
   useEffect(() => {
     if (loading) return;
 
-    // No user = go to login
-    if (!user) {
+    if (!user || !profile?.role) {
       router.replace('/login');
       return;
     }
 
-    // User exists but no profile = something wrong, go to login
-    if (!profile?.role) {
-      router.replace('/login');
-      return;
-    }
-
-    // Route based on role (NO operator – operators don't use web admin)
     const role = profile.role;
     if (role === 'superadmin') router.replace('/dashboard/superadmin');
     else if (role === 'peralatan') router.replace('/dashboard/peralatan');
     else if (role === 'seksi_normalisasi' || role === 'seksi_embung') router.replace('/dashboard/seksi');
-    else router.replace('/login'); // unknown role = back to login
+    else router.replace('/login');
   }, [user, profile, loading, router]);
 
   return (
