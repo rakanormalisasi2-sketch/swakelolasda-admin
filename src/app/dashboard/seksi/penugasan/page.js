@@ -20,17 +20,36 @@ export default function PenugasanPage() {
     location_district: '', location_village: '',
   });
 
-  // Cascading sub-pekerjaan berdasarkan jenis utama
+  // Job options berbasis role seksi
+  const isNormalisasi = profile?.role === 'seksi_normalisasi';
+
+  // Opsi utama: Seksi Normalisasi hanya lihat Normalisasi+Lainnya, Seksi Embung hanya Embung+Lainnya
+  const JOB_TYPE_OPTIONS = isNormalisasi
+    ? [
+        { value: 'normalisasi', label: 'Normalisasi' },
+        { value: 'lainnya', label: 'Lainnya' },
+      ]
+    : [
+        { value: 'embung', label: 'Embung' },
+        { value: 'lainnya', label: 'Lainnya' },
+      ];
+
+  // Sub-pekerjaan sesuai permintaan user:
+  // Normalisasi → Normalisasi Sungai | Normalisasi Saluran/Irigasi
+  // Embung → Rehabilitasi Embung | Pembangunan Embung
   const JOB_SUB_OPTIONS = {
     normalisasi: [
       { value: 'normalisasi_sungai', label: 'Normalisasi Sungai' },
-      { value: 'saluran_afvoer', label: 'Saluran Air / Afvoer' },
+      { value: 'normalisasi_saluran_irigasi', label: 'Normalisasi Saluran / Irigasi' },
     ],
     embung: [
-      { value: 'normalisasi_embung', label: 'Normalisasi Embung' },
+      { value: 'rehabilitasi_embung', label: 'Rehabilitasi Embung' },
       { value: 'pembangunan_embung', label: 'Pembangunan Embung' },
     ],
   };
+
+  // Default job_type berdasarkan role
+  const defaultJobType = isNormalisasi ? 'normalisasi' : 'embung';
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -94,7 +113,15 @@ export default function PenugasanPage() {
   };
 
   const JOB_LABELS = { normalisasi: 'Normalisasi', embung: 'Embung', lainnya: 'Lainnya' };
-  const SUB_LABELS = { normalisasi_sungai: 'Normalisasi Sungai', saluran_afvoer: 'Saluran Air/Afvoer', normalisasi_embung: 'Normalisasi Embung', pembangunan_embung: 'Pembangunan Embung' };
+  const SUB_LABELS = {
+    normalisasi_sungai: 'Normalisasi Sungai',
+    normalisasi_saluran_irigasi: 'Normalisasi Saluran / Irigasi',
+    rehabilitasi_embung: 'Rehabilitasi Embung',
+    pembangunan_embung: 'Pembangunan Embung',
+    // backward compat lama
+    saluran_afvoer: 'Saluran Air / Afvoer',
+    normalisasi_embung: 'Normalisasi Embung',
+  };
 
   return (
     <>
@@ -104,7 +131,7 @@ export default function PenugasanPage() {
           <div className="header-subtitle">Rekrut dan tugaskan operator ke pekerjaan lapangan</div>
         </div>
         <div className="header-right">
-          <button className="btn btn-primary" onClick={() => { setForm({ operator_id:'', helper_id:'', equipment_id:'', job_type:'normalisasi', job_sub_type:'', custom_job_description:'', location_district:'', location_village:'' }); setError(''); setShowModal(true); }}>
+          <button className="btn btn-primary" onClick={() => { setForm({ operator_id:'', helper_id:'', equipment_id:'', job_type: defaultJobType, job_sub_type:'', custom_job_description:'', location_district:'', location_village:'' }); setError(''); setShowModal(true); }}>
             <svg fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24" style={{width:15,height:15}}><path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4"/></svg>
             Tugaskan Operator
           </button>
@@ -195,18 +222,18 @@ export default function PenugasanPage() {
                 <div className="form-grid">
                   <div className="form-group">
                     <label className="form-label">Jenis Pekerjaan *</label>
-                    <select className="form-control" value={form.job_type} onChange={e=>setForm({...form, job_type:e.target.value, job_sub_type:''})}>
-                      <option value="normalisasi">Normalisasi</option>
-                      <option value="embung">Embung</option>
-                      <option value="lainnya">Lainnya</option>
+                    <select className="form-control" value={form.job_type} onChange={e => setForm({...form, job_type: e.target.value, job_sub_type: ''})}>
+                      {JOB_TYPE_OPTIONS.map(opt => (
+                        <option key={opt.value} value={opt.value}>{opt.label}</option>
+                      ))}
                     </select>
                   </div>
 
                   {JOB_SUB_OPTIONS[form.job_type] && (
                     <div className="form-group">
-                      <label className="form-label">Sub Pekerjaan *</label>
-                      <select className="form-control" required value={form.job_sub_type} onChange={e=>setForm({...form, job_sub_type:e.target.value})}>
-                        <option value="">— Pilih Sub Pekerjaan —</option>
+                      <label className="form-label">Rincian Pekerjaan *</label>
+                      <select className="form-control" required value={form.job_sub_type} onChange={e => setForm({...form, job_sub_type: e.target.value})}>
+                        <option value="">— Pilih Rincian Pekerjaan —</option>
                         {JOB_SUB_OPTIONS[form.job_type].map(s => (
                           <option key={s.value} value={s.value}>{s.label}</option>
                         ))}

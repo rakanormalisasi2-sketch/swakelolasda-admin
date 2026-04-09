@@ -166,9 +166,38 @@ export default function PeralatanPage() {
     
     const renderArray = (arr) => {
         if (!arr || arr.length === 0) return '<tr><td colspan="2" style="color:#666;">Dicadangkan (Belum Ada Data)</td></tr>';
-        return arr.map((item, i) => `<tr><td width="30" align="center">${i+1}</td><td>${item.text}</td></tr>`).join('');
+        return arr.map((item, i) => `<tr><td width="30" align="center">${i+1}</td><td>${item.text || item}</td></tr>`).join('');
     };
 
+    // === Bangun seksi foto per field ===
+    const buildPhotoSection = (arr, label) => {
+      if (!arr || arr.length === 0) return '';
+      const hasAnyPhoto = arr.some(item => item.fotos && item.fotos.length > 0);
+      if (!hasAnyPhoto) return '';
+      
+      let html = `<div style="margin-top:24px; page-break-before:auto;">`;
+      html += `<div style="font-weight:800; font-size:15px; color:#1e3a8a; border-bottom:2px solid #3b82f6; padding-bottom:6px; margin-bottom:14px; text-transform:uppercase">${label}</div>`;
+      
+      arr.forEach((item, i) => {
+        if (!item.fotos || item.fotos.length === 0) return;
+        html += `<div style="margin-bottom:16px">`;
+        html += `<div style="font-weight:700; font-size:13px; background:#f1f5f9; padding:7px 12px; border-radius:4px; margin-bottom:8px">${label} #${i+1}: ${item.text || '(tanpa keterangan)'}</div>`;
+        html += `<div style="display:flex; flex-wrap:wrap; gap:10px">`;
+        item.fotos.forEach(url => {
+          html += `<img src="${url}" style="width:240px; height:180px; object-fit:cover; border-radius:6px; border:1px solid #e2e8f0;"/>`;
+        });
+        html += `</div></div>`;
+      });
+      html += `</div>`;
+      return html;
+    };
+
+    const allPhotoSections = [
+      buildPhotoSection(mech.pekerjaan, 'Foto Pekerjaan Spesifik'),
+      buildPhotoSection(mech.temuan, 'Foto Temuan / Defek'),
+      buildPhotoSection(mech.tindakan, 'Foto Tindakan Korektif'),
+    ].filter(Boolean).join('<div style="margin:20px 0; border-top:1px dashed #e2e8f0;"></div>');
+    
     const details = {
       informasi: [
         { label: 'Nomor Lambung Fisik', value: alatObj.nomor_lambung || '—' },
@@ -200,18 +229,19 @@ export default function PeralatanPage() {
             .signature-table { margin-top: 50px; border:none; background: transparent; }
             .signature-table th, .signature-table td { border:none; background: transparent; text-align: center; }
             .signature-table td { height: 90px; vertical-align: bottom; font-weight: 600; width:33%; font-size: 15px; }
+            .foto-section-header { page-break-before: always; }
             @media print { body { background: white; -webkit-print-color-adjust: exact; } }
           </style>
         </head>
         <body>
-          <h1>FORMULIR LAPORAN KERUSAKAN & PERBAIKAN ALAT BERAT</h1>
+          <h1>FORMULIR LAPORAN KERUSAKAN &amp; PERBAIKAN ALAT BERAT</h1>
           <div class="meta-info">
             Waktu Laporan Masuk: ${new Date(log.reported_at).toLocaleDateString('id-ID', {day:'numeric', month:'long', year:'numeric', hour:'2-digit', minute:'2-digit'})}<br>
             Tahap Penanganan Akhir: <b style="color:#1e3a8a;">${log.progress_status.toUpperCase()}</b><br>
             Dikeluarkan pada tanggal: ${new Date().toLocaleDateString('id-ID', {day:'numeric', month:'long', year:'numeric'})}
           </div>
 
-          <div class="section-title">A. IDENTITAS & STATUS ALAT</div>
+          <div class="section-title">A. IDENTITAS &amp; STATUS ALAT</div>
           <table>
             ${details.informasi.map(item => `<tr><th width="35%">${item.label}</th><td>${item.value}</td></tr>`).join('')}
           </table>
@@ -233,11 +263,16 @@ export default function PeralatanPage() {
             ${renderArray(mech.temuan)}
           </table>
 
-          <div class="section-title">E. TINDAKAN KOREKTIF & SPAREPART</div>
+          <div class="section-title">E. TINDAKAN KOREKTIF &amp; SPAREPART</div>
           <table>
             <tr><th width="30" style="text-align:center;">No</th><th>Catatan Tindakan Pengerjaan / Saran ke Depan</th></tr>
             ${renderArray(mech.tindakan)}
           </table>
+
+          <div class="section-title">F. CATATAN UMUM</div>
+          <div style="border:1px solid #4a4a4a; padding:12px; background:#fff; min-height:40px; font-size:14px;">
+            ${details.catatan_umum.replace(/\n/g, '<br/>')}
+          </div>
 
           <table class="signature-table">
             <tr>
@@ -251,6 +286,9 @@ export default function PeralatanPage() {
               <td style="font-weight:normal; font-size:13px; color:#555;">Tim Peralatan SDA Bojonegoro</td>
             </tr>
           </table>
+
+          ${allPhotoSections ? `<div class="foto-section-header"><h2 style="font-family:'Merriweather',serif; color:#1e3a8a; font-size:18px; border-bottom:2px solid #3b82f6; padding-bottom:8px;">LAMPIRAN FOTO DOKUMENTASI MEKANIK</h2>${allPhotoSections}</div>` : ''}
+
         </body>
       </html>
     `);
@@ -258,6 +296,7 @@ export default function PeralatanPage() {
     printWin.focus();
     setTimeout(() => { printWin.print(); }, 800);
   };
+
 
 
   // ================= UTILS & EXPORT =================

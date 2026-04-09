@@ -31,12 +31,12 @@ export default function LaporanPelaksanaanPage() {
     const { data: sectionData } = await supabase.from('section_settings').select('*').eq('role', profile.role).single();
     if (sectionData) {
       setPdfConfig({
+        program: sectionData.pdf_program || 'PENGELOLAAN SUMBER DAYA AIR',
+        kegiatan: sectionData.pdf_kegiatan || 'PENGELOLAAN SDA DAN BANGUNAN PENGAMAN PANTAI PADA WILAYAH SUNGAI (WS) DALAM 1 (SATU) DAERAH KABUPATEN/KOTA',
         subKegiatan: sectionData.pdf_sub_kegiatan || 'NORMALISASI / RESTORASI SUNGAI',
         pekerjaanPrefix: sectionData.pdf_pekerjaan_prefix || 'NORMALISASI SUNGAI',
         namaStaf: sectionData.pdf_nama_staf || 'PANGESTU EKA DEWANTO W, A.Md.T',
         nipStaf: sectionData.pdf_nip_staf || '19980711 202204 1 001',
-        program: 'PENGELOLAAN SUMBER DAYA AIR',
-        kegiatan: 'PENGELOLAAN SDA DAN BANGUNAN PENGAMAN PANTAI PADA WILAYAH SUNGAI (WS) DALAM 1 (SATU) DAERAH KABUPATEN/KOTA'
       });
     }
 
@@ -253,10 +253,15 @@ export default function LaporanPelaksanaanPage() {
         .signature-table td { padding: 5px; vertical-align: top; border: 1px solid #000; border-top: none; font-size: 11px; }
       </style></head><body>`;
 
-    // Map sub_type ke label pekerjaan PDF
+    // Map sub_type ke label pekerjaan PDF (sesuai definisi resmi per seksi)
     const SUB_TYPE_MAP = {
-      normalisasi_sungai: 'NORMALISASI SUNGAI', saluran_afvoer: 'SALURAN AIR / AFVOER',
-      normalisasi_embung: 'NORMALISASI EMBUNG', pembangunan_embung: 'PEMBANGUNAN EMBUNG'
+      normalisasi_sungai: 'NORMALISASI SUNGAI',
+      normalisasi_saluran_irigasi: 'NORMALISASI SALURAN / IRIGASI',
+      rehabilitasi_embung: 'REHABILITASI EMBUNG',
+      pembangunan_embung: 'PEMBANGUNAN EMBUNG',
+      // backward compat nilai lama
+      saluran_afvoer: 'SALURAN AIR / AFVOER',
+      normalisasi_embung: 'NORMALISASI EMBUNG',
     };
 
     selectedData.forEach((log, idx) => {
@@ -404,10 +409,14 @@ export default function LaporanPelaksanaanPage() {
       nipStaf: '19980711 202204 1 001'
     };
 
-    // Map sub_type ke label pekerjaan PDF
+    // Map sub_type ke label pekerjaan PDF (sesuai definisi resmi per seksi)
     const SUB_TYPE_MAP = {
-      normalisasi_sungai: 'NORMALISASI SUNGAI', saluran_afvoer: 'SALURAN AIR / AFVOER',
-      normalisasi_embung: 'NORMALISASI EMBUNG', pembangunan_embung: 'PEMBANGUNAN EMBUNG'
+      normalisasi_sungai: 'NORMALISASI SUNGAI',
+      normalisasi_saluran_irigasi: 'NORMALISASI SALURAN / IRIGASI',
+      rehabilitasi_embung: 'REHABILITASI EMBUNG',
+      pembangunan_embung: 'PEMBANGUNAN EMBUNG',
+      saluran_afvoer: 'SALURAN AIR / AFVOER',
+      normalisasi_embung: 'NORMALISASI EMBUNG',
     };
 
     const grouped = {};
@@ -566,8 +575,12 @@ export default function LaporanPelaksanaanPage() {
       const tglStr = new Date(log.tanggal).toLocaleDateString('id-ID', {day:'numeric', month:'short', year:'numeric'}).toUpperCase();
       // Resolve pekerjaan dari job_sub_type per log
       const SUB_TYPE_MAP_DOK = {
-        normalisasi_sungai: 'NORMALISASI SUNGAI', saluran_afvoer: 'SALURAN AIR / AFVOER',
-        normalisasi_embung: 'NORMALISASI EMBUNG', pembangunan_embung: 'PEMBANGUNAN EMBUNG'
+        normalisasi_sungai: 'NORMALISASI SUNGAI',
+        normalisasi_saluran_irigasi: 'NORMALISASI SALURAN / IRIGASI',
+        rehabilitasi_embung: 'REHABILITASI EMBUNG',
+        pembangunan_embung: 'PEMBANGUNAN EMBUNG',
+        saluran_afvoer: 'SALURAN AIR / AFVOER',
+        normalisasi_embung: 'NORMALISASI EMBUNG',
       };
       const resolvedPekerjaan = SUB_TYPE_MAP_DOK[log.assignment?.job_sub_type] || config.pekerjaanPrefix;
 
@@ -627,8 +640,12 @@ export default function LaporanPelaksanaanPage() {
        const k = log.override_kecamatan || log.assignment?.location_district || '';
        // Resolve pekerjaan dari job_sub_type
        const SUB_TYPE_MAP_HM = {
-         normalisasi_sungai: 'NORMALISASI SUNGAI', saluran_afvoer: 'SALURAN AIR / AFVOER',
-         normalisasi_embung: 'NORMALISASI EMBUNG', pembangunan_embung: 'PEMBANGUNAN EMBUNG'
+         normalisasi_sungai: 'NORMALISASI SUNGAI',
+         normalisasi_saluran_irigasi: 'NORMALISASI SALURAN / IRIGASI',
+         rehabilitasi_embung: 'REHABILITASI EMBUNG',
+         pembangunan_embung: 'PEMBANGUNAN EMBUNG',
+         saluran_afvoer: 'SALURAN AIR / AFVOER',
+         normalisasi_embung: 'NORMALISASI EMBUNG',
        };
        const resolvedPek = SUB_TYPE_MAP_HM[log.assignment?.job_sub_type] || config.pekerjaanPrefix;
        const locStr = `DESA ${v} KECAMATAN ${k}`.toUpperCase();
