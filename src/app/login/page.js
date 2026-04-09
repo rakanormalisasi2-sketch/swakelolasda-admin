@@ -35,8 +35,8 @@ export default function LoginPage() {
     const role = profile?.role;
     if (role === 'superadmin') router.replace('/dashboard/superadmin');
     else if (role === 'peralatan') router.replace('/dashboard/peralatan');
-    else if (role === 'operator') router.replace('/dashboard/operator');
-    else router.replace('/dashboard/seksi');
+    else if (role === 'seksi_normalisasi' || role === 'seksi_embung') router.replace('/dashboard/seksi');
+    else { setError('Akun Anda tidak memiliki akses ke panel admin web.'); setLoading(false); return; }
 
     setLoading(false);
   };
