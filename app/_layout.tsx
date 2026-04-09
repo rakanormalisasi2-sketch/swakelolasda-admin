@@ -1,24 +1,24 @@
-import { DarkTheme, DefaultTheme, ThemeProvider } from '@react-navigation/native';
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
-import 'react-native-reanimated';
-
-import { useColorScheme } from '@/hooks/use-color-scheme';
-
-export const unstable_settings = {
-  anchor: '(tabs)',
-};
 
 export default function RootLayout() {
-  const colorScheme = useColorScheme();
-
   return (
-    <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
-      <Stack>
-        <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-        <Stack.Screen name="modal" options={{ presentation: 'modal', title: 'Modal' }} />
+    <>
+      <Stack
+        screenOptions={{
+          headerStyle: { backgroundColor: '#1e3a5f' },
+          headerTintColor: '#fff',
+          headerTitleStyle: { fontWeight: 'bold' },
+          contentStyle: { backgroundColor: '#edf2f7' },
+        }}
+      >
+        <Stack.Screen name="index" options={{ headerShown: false }} />
+        <Stack.Screen name="operator/index" options={{ title: 'Pilih Operator', headerShown: false }} />
+        <Stack.Screen name="operator/laporan" options={{ title: 'Laporan Harian Alat Berat' }} />
+        <Stack.Screen name="mekanik/index" options={{ title: 'Login Admin Mekanik', headerShown: false }} />
+        <Stack.Screen name="mekanik/form" options={{ title: 'Laporan Mekanik' }} />
       </Stack>
-      <StatusBar style="auto" />
-    </ThemeProvider>
+      <StatusBar style="light" />
+    </>
   );
 }
