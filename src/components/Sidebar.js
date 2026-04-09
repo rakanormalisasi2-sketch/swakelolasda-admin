@@ -1,4 +1,5 @@
 'use client';
+import { useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useAuth } from '@/context/AuthContext';
@@ -124,6 +125,7 @@ const ROLE_LABELS = {
 export default function Sidebar({ maintenanceCount = 0 }) {
   const { profile, logout } = useAuth();
   const pathname = usePathname();
+  const [mobileOpen, setMobileOpen] = useState(false);
   const role = profile?.role || 'operator';
   const navSections = NAV_CONFIG[role] || NAV_CONFIG.operator;
   const initials = profile?.full_name
@@ -131,54 +133,76 @@ export default function Sidebar({ maintenanceCount = 0 }) {
     : '??';
 
   return (
-    <aside className="sidebar">
-      <div className="sidebar-brand">
-        <div className="sidebar-brand-icon">
-          <svg fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" d="M3.055 11H5a2 2 0 012 2v1a2 2 0 002 2 2 2 0 012 2v2.945M8 3.935V5.5A2.5 2.5 0 0010.5 8h.5a2 2 0 012 2 2 2 0 104 0 2 2 0 012-2h1.064" />
-          </svg>
-        </div>
-        <div>
-          <div className="sidebar-brand-text">SWAKELOLASDA</div>
-          <div className="sidebar-brand-sub">Dinas PU Bojonegoro</div>
-        </div>
-      </div>
+    <>
+      {/* Mobile hamburger button */}
+      <button className="sidebar-toggle" onClick={() => setMobileOpen(!mobileOpen)} aria-label="Menu">
+        <svg fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24" style={{width:22,height:22}}>
+          {mobileOpen
+            ? <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+            : <path strokeLinecap="round" strokeLinejoin="round" d="M4 6h16M4 12h16M4 18h16" />
+          }
+        </svg>
+      </button>
 
-      {navSections.map((section) => (
-        <div className="sidebar-section" key={section.section}>
-          <div className="sidebar-section-label">{section.section}</div>
-          <ul className="sidebar-nav">
-            {section.items.map((item) => (
-              <li className="sidebar-nav-item" key={item.href}>
-                <Link
-                  href={item.href}
-                  className={`sidebar-nav-link ${pathname === item.href ? 'active' : ''}`}
-                >
-                  {ICONS[item.icon]}
-                  {item.label}
-                  {item.badge === 'maintenance_count' && maintenanceCount > 0 && (
-                    <span className="sidebar-badge">{maintenanceCount}</span>
-                  )}
-                </Link>
-              </li>
-            ))}
-          </ul>
-        </div>
-      ))}
+      {/* Overlay */}
+      {mobileOpen && <div className="sidebar-overlay" onClick={() => setMobileOpen(false)} />}
 
-      <div className="sidebar-footer">
-        <div className="sidebar-user">
-          <div className="sidebar-avatar">{initials}</div>
-          <div>
-            <div className="sidebar-user-name">{profile?.full_name || 'Pengguna'}</div>
-            <div className="sidebar-user-role">{ROLE_LABELS[role] || role}</div>
+      <aside className={`sidebar ${mobileOpen ? 'sidebar-open' : ''}`}>
+        <div className="sidebar-brand">
+          <div className="sidebar-brand-icon">
+            <svg fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M3.055 11H5a2 2 0 012 2v1a2 2 0 002 2 2 2 0 012 2v2.945M8 3.935V5.5A2.5 2.5 0 0010.5 8h.5a2 2 0 012 2 2 2 0 104 0 2 2 0 012-2h1.064" />
+            </svg>
           </div>
-          <button className="sidebar-logout-btn" onClick={logout} title="Keluar">
-            <span>Keluar</span>
-            {ICONS.logout}
+          <div>
+            <div className="sidebar-brand-text">SWAKELOLASDA</div>
+            <div className="sidebar-brand-sub">Dinas PU Bojonegoro</div>
+          </div>
+          {/* Close button inside sidebar on mobile */}
+          <button className="sidebar-close-btn" onClick={() => setMobileOpen(false)}>
+            <svg fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24" style={{width:20,height:20}}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+            </svg>
           </button>
         </div>
-      </div>
-    </aside>
+
+        {navSections.map((section) => (
+          <div className="sidebar-section" key={section.section}>
+            <div className="sidebar-section-label">{section.section}</div>
+            <ul className="sidebar-nav">
+              {section.items.map((item) => (
+                <li className="sidebar-nav-item" key={item.href}>
+                  <Link
+                    href={item.href}
+                    className={`sidebar-nav-link ${pathname === item.href ? 'active' : ''}`}
+                    onClick={() => setMobileOpen(false)}
+                  >
+                    {ICONS[item.icon]}
+                    {item.label}
+                    {item.badge === 'maintenance_count' && maintenanceCount > 0 && (
+                      <span className="sidebar-badge">{maintenanceCount}</span>
+                    )}
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          </div>
+        ))}
+
+        <div className="sidebar-footer">
+          <div className="sidebar-user">
+            <div className="sidebar-avatar">{initials}</div>
+            <div>
+              <div className="sidebar-user-name">{profile?.full_name || 'Pengguna'}</div>
+              <div className="sidebar-user-role">{ROLE_LABELS[role] || role}</div>
+            </div>
+            <button className="sidebar-logout-btn" onClick={logout} title="Keluar">
+              <span>Keluar</span>
+              {ICONS.logout}
+            </button>
+          </div>
+        </div>
+      </aside>
+    </>
   );
 }
