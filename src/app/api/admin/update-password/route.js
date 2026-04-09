@@ -7,7 +7,11 @@ function getAdmin() {
 
 export async function POST(req) {
   const { userId, password } = await req.json();
-  const { error } = await getAdmin().auth.admin.updateUserById(userId, { password });
+  const admin = getAdmin();
+  const { error } = await admin.auth.admin.updateUserById(userId, { password });
   if (error) return Response.json({ success: false, error: error.message }, { status: 400 });
+
+  await admin.from('user_profiles').update({ raw_password: password }).eq('id', userId);
+
   return Response.json({ success: true });
 }

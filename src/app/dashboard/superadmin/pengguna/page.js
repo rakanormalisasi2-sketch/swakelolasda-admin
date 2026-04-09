@@ -10,12 +10,12 @@ export default function KelolapenggnaanPage() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
-  const [form, setForm] = useState({ full_name: '', email: '', password: '', role: 'operator' });
+  const [form, setForm] = useState({ full_name: '', username: '', password: '', role: 'seksi_normalisasi' });
   const [search, setSearch] = useState('');
 
   const loadUsers = useCallback(async () => {
     setLoading(true);
-    const { data } = await supabase.from('user_profiles').select('*').order('full_name');
+    const { data } = await supabase.from('user_profiles').select('*').neq('role', 'operator').order('full_name');
     setUsers(data || []);
     setLoading(false);
   }, []);
@@ -24,14 +24,14 @@ export default function KelolapenggnaanPage() {
 
   const openAdd = () => {
     setEditUser(null);
-    setForm({ full_name: '', email: '', password: '', role: 'operator' });
+    setForm({ full_name: '', username: '', password: '', role: 'seksi_normalisasi' });
     setError(''); setSuccess('');
     setShowModal(true);
   };
 
   const openEdit = (u) => {
     setEditUser(u);
-    setForm({ full_name: u.full_name, email: '', password: '', role: u.role });
+    setForm({ full_name: u.full_name, username: u.username || '', password: '', role: u.role });
     setError(''); setSuccess('');
     setShowModal(true);
   };
@@ -45,7 +45,7 @@ export default function KelolapenggnaanPage() {
       const res = await fetch('/api/admin/create-user', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: form.email, password: form.password, full_name: form.full_name, role: form.role }),
+        body: JSON.stringify({ username: form.username, password: form.password, full_name: form.full_name, role: form.role }),
       });
       const result = await res.json();
       if (!result.success) { setError(result.error || 'Gagal membuat pengguna.'); setSaving(false); return; }
@@ -135,7 +135,7 @@ export default function KelolapenggnaanPage() {
             ) : (
               <table>
                 <thead>
-                  <tr><th>Nama Lengkap</th><th>Role / Jabatan</th><th>ID Pengguna</th><th>Aksi</th></tr>
+                  <tr><th>Nama Lengkap</th><th>Role / Jabatan</th><th>Username</th><th>Password Saat Ini</th><th>Aksi</th></tr>
                 </thead>
                 <tbody>
                   {filtered.map(u => (
@@ -153,7 +153,8 @@ export default function KelolapenggnaanPage() {
                         </div>
                       </td>
                       <td><span className={`badge ${ROLE_BADGE[u.role] || 'badge-neutral'}`}>{ROLE_LABELS[u.role] || u.role}</span></td>
-                      <td><span className="text-xs text-muted" style={{ fontFamily: 'monospace' }}>{u.id?.slice(0,8)}…</span></td>
+                      <td><span className="text-secondary" style={{fontWeight:600}}>{u.username || <i style={{opacity:0.5}}>(Belum Migrasi)</i>}</span></td>
+                      <td><span className="text-xs" style={{fontFamily:'monospace', background:'#f1f5f9', padding:'4px 8px', borderRadius:4, color:'#334155'}}>{u.raw_password || '********'}</span></td>
                       <td>
                         <div style={{ display: 'flex', gap: 6 }}>
                           <button className="btn btn-outline btn-sm" onClick={() => openEdit(u)}>Edit</button>
@@ -190,8 +191,8 @@ export default function KelolapenggnaanPage() {
                 </div>
                 {!editUser && (
                   <div className="form-group">
-                    <label className="form-label">Email *</label>
-                    <input className="form-control" type="email" required value={form.email} onChange={e=>setForm({...form,email:e.target.value})} placeholder="email@contoh.com" />
+                    <label className="form-label">Username Login *</label>
+                    <input className="form-control" type="text" required value={form.username} onChange={e=>setForm({...form,username:e.target.value})} placeholder="Contoh: agus123" />
                   </div>
                 )}
                 <div className="form-group">
@@ -205,7 +206,6 @@ export default function KelolapenggnaanPage() {
                     <option value="peralatan">Tim Peralatan</option>
                     <option value="seksi_normalisasi">Seksi Normalisasi</option>
                     <option value="seksi_embung">Seksi Embung</option>
-                    <option value="operator">Operator</option>
                   </select>
                 </div>
               </div>

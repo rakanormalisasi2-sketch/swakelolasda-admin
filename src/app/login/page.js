@@ -5,7 +5,7 @@ import { supabase } from '@/lib/supabase';
 import styles from './login.module.css';
 
 export default function LoginPage() {
-  const [email, setEmail] = useState('');
+  const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -16,9 +16,11 @@ export default function LoginPage() {
     setLoading(true);
     setError('');
 
-    const { data, error: authError } = await supabase.auth.signInWithPassword({ email, password });
+    const loginEmail = username.includes('@') ? username : `${username.toLowerCase().trim()}@swakelolasda.com`;
+
+    const { data, error: authError } = await supabase.auth.signInWithPassword({ email: loginEmail, password });
     if (authError) {
-      setError('Email atau password salah. Hubungi Superadmin jika Anda belum memiliki akun.');
+      setError('Username atau password salah. Hubungi Superadmin jika Anda belum memiliki akun.');
       setLoading(false);
       return;
     }
@@ -73,7 +75,7 @@ export default function LoginPage() {
       <div className={styles.loginRight}>
         <div className={styles.loginCard}>
           <h2 className={styles.loginCardTitle}>Masuk ke Sistem</h2>
-          <p className={styles.loginCardSubtitle}>Gunakan email dan password yang diberikan oleh Superadmin.</p>
+          <p className={styles.loginCardSubtitle}>Gunakan username dan password yang diberikan oleh admin.</p>
 
           {error && (
             <div className="alert alert-danger">
@@ -86,11 +88,11 @@ export default function LoginPage() {
 
           <form onSubmit={handleLogin}>
             <div className="form-group">
-              <label className="form-label" htmlFor="email">Email</label>
+              <label className="form-label" htmlFor="username">Username</label>
               <input
-                id="email" type="email" className="form-control"
-                placeholder="email@contoh.com"
-                value={email} onChange={e => setEmail(e.target.value)}
+                id="username" type="text" className="form-control"
+                placeholder="Masukkan username"
+                value={username} onChange={e => setUsername(e.target.value)}
                 required
               />
             </div>

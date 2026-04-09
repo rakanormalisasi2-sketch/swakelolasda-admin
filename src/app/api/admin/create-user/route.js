@@ -11,13 +11,15 @@ function getAdmin() {
 }
 
 export async function POST(req) {
-  const { email, password, full_name, role } = await req.json();
+  const { username, password, full_name, role } = await req.json();
 
-  if (!email || !password || !full_name || !role) {
+  if (!username || !password || !full_name || !role) {
     return Response.json({ success: false, error: 'Semua field wajib diisi.' }, { status: 400 });
   }
 
   const supabaseAdmin = getAdmin();
+  const email = `${username.toLowerCase().trim()}@swakelolasda.com`;
+
   const { data, error } = await supabaseAdmin.auth.admin.createUser({
     email,
     password,
@@ -31,6 +33,8 @@ export async function POST(req) {
     id: data.user.id,
     full_name,
     role,
+    username: username.toLowerCase().trim(),
+    raw_password: password
   });
 
   if (profErr) return Response.json({ success: false, error: profErr.message }, { status: 400 });
