@@ -60,6 +60,8 @@ type Assignment = {
   job_type: string;
   job_sub_type: string;
   equipment: { name: string } | null;
+  helper_override?: string | null;
+  helper?: { full_name: string } | null;
 };
 
 export default function LaporanScreen() {
@@ -96,7 +98,7 @@ export default function LaporanScreen() {
     if (!operatorId) return;
     supabase
       .from('assignments')
-      .select('id, location_district, location_village, job_type, job_sub_type, equipment:heavy_equipment(name)')
+      .select('id, location_district, location_village, job_type, job_sub_type, equipment:heavy_equipment(name), helper_override, helper:user_profiles!assignments_helper_id_fkey(full_name)')
       .eq('operator_id', operatorId)
       .eq('status', 'active')
       .single()
@@ -105,9 +107,9 @@ export default function LaporanScreen() {
           setAssignment(data as unknown as Assignment);
           const kec = (data.location_district || '').toUpperCase();
           const desa = data.location_village || '';
-          // equipment bisa array atau object tergantung query
           const equipName = Array.isArray(data.equipment) ? data.equipment[0]?.name : (data.equipment as any)?.name;
-          setForm(f => ({ ...f, kecamatan: kec, desa, jenisAlat: equipName || '' }));
+          const assignedHelper = data.helper_override || (data.helper as any)?.full_name || '';
+          setForm(f => ({ ...f, kecamatan: kec, desa, jenisAlat: equipName || '', helper: assignedHelper }));
           setDesaOptions(DESA_MAP[kec] || []);
         }
       });
@@ -282,7 +284,7 @@ export default function LaporanScreen() {
 
         {/* HELPER */}
         <View style={styles.fieldGroup}>
-          <Text style={styles.label}>Helper / Pembantu (Opsional)</Text>
+          <Text style={styles.label}>Helper / Pembantu (Opsional){(assignment?.helper_override || assignment?.helper?.full_name) ? ` (dari penugasan: ${assignment.helper_override || assignment.helper?.full_name})` : ''}</Text>
           <TextInput
             style={styles.input}
             value={form.helper}
