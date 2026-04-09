@@ -84,6 +84,16 @@ export default function PeralatanPage() {
     load();
   };
 
+  // ================= DELETE EQUIPMENT =================
+  const deleteEquipment = async (a) => {
+    if (!confirm(`Hapus unit "${a.name} (${a.nomor_lambung || '-'})"? Semua log maintenance terkait juga akan dihapus. Tindakan ini tidak dapat dibatalkan.`)) return;
+    await supabase.from('maintenance_logs').delete().eq('equipment_id', a.id);
+    await supabase.from('assignments').delete().eq('equipment_id', a.id);
+    const { error } = await supabase.from('heavy_equipment').delete().eq('id', a.id);
+    if (error) { alert('Gagal menghapus: ' + error.message); return; }
+    load();
+  };
+
   // ================= EDIT EQUIPMENT =================
   const openEdit = (a) => {
     setSelectedAlat(a);
@@ -443,7 +453,12 @@ export default function PeralatanPage() {
                                 </button>
                               ) : (<span className="text-xs text-muted">Belum ada</span>)}
                             </td>
-                            <td><button className="btn btn-outline btn-sm" onClick={()=>openEdit(a)}>⚙️ Edit Jeroan</button></td>
+                            <td>
+                              <div style={{display:'flex', gap:5}}>
+                                <button className="btn btn-outline btn-sm" onClick={()=>openEdit(a)}>⚙️ Edit</button>
+                                <button className="btn btn-sm" style={{background:'#fee2e2', color:'#dc2626', border:'none'}} onClick={()=>deleteEquipment(a)}>🗑️ Hapus</button>
+                              </div>
+                            </td>
                           </tr>
                         );
                       })}

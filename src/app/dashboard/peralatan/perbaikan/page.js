@@ -262,10 +262,9 @@ export default function RekapPerbaikanPage() {
                           </td>
                           <td onClick={e => e.stopPropagation()}>
                             <div style={{display:'flex', gap:4}}>
-                              {log.progress_status !== 'selesai' && (
-                                <button className="btn btn-sm btn-primary" style={{fontSize:10, padding:'3px 7px'}} onClick={() => openEdit(log)}>Olah</button>
-                              )}
+                              <button className="btn btn-sm btn-primary" style={{fontSize:10, padding:'3px 7px'}} onClick={() => openEdit(log)}>✏️ Edit</button>
                               <button className="btn btn-sm btn-outline" style={{fontSize:10, padding:'3px 7px'}} onClick={() => printSingleLog(log)}>PDF</button>
+                              <button className="btn btn-sm" style={{fontSize:10, padding:'3px 7px', background:'#fee2e2', color:'#dc2626', border:'none'}} onClick={() => deleteLog(log.id)}>🗑️</button>
                             </div>
                           </td>
                         </tr>
