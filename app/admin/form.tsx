@@ -8,7 +8,7 @@ import * as ImageManipulator from 'expo-image-manipulator';
 import { router } from 'expo-router';
 import { supabase } from '@/lib/supabase';
 
-const API_URL = 'https://swakelolasda-admin.vercel.app';
+const API_URL = 'https://swakelolasda.vercel.app';
 
 const JENIS_MAINTENANCE = [
   'Servis Rutin',
@@ -76,6 +76,29 @@ function DynamicField({
     onChange(updated);
   };
 
+  const takeFoto = async (itemIdx: number) => {
+    const perm = await ImagePicker.requestCameraPermissionsAsync();
+    if (!perm.granted) { Alert.alert('Izin Diperlukan', 'Izinkan akses kamera.'); return; }
+
+    const result = await ImagePicker.launchCameraAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      quality: 1,
+    });
+    if (result.canceled) return;
+
+    try {
+      const res = await ImageManipulator.manipulateAsync(
+        result.assets[0].uri,
+        [{ resize: { width: 800 } }],
+        { compress: 0.5, format: ImageManipulator.SaveFormat.JPEG, base64: true }
+      );
+      const updated = items.map((it, idx) =>
+        idx === itemIdx ? { ...it, fotos: [...it.fotos, { uri: res.uri, base64: res.base64 || '' }].slice(0, 5) } : it
+      );
+      onChange(updated);
+    } catch (_) {}
+  };
+
   return (
     <View style={dStyles.wrapper}>
       <View style={dStyles.titleRow}>
@@ -104,13 +127,22 @@ function DynamicField({
 
           {/* Foto untuk item ini */}
           <View style={dStyles.fotoSection}>
-            <TouchableOpacity
-              style={dStyles.fotoAddBtn}
-              onPress={() => addFoto(i)}
-              disabled={item.fotos.length >= 5}
-            >
-              <Text style={dStyles.fotoAddText}>📷 Foto {title} #{i + 1}</Text>
-            </TouchableOpacity>
+            <View style={{ flexDirection: 'row', gap: 8, marginBottom: 8 }}>
+              <TouchableOpacity
+                style={[dStyles.fotoAddBtn, { flex: 1, marginBottom: 0 }]}
+                onPress={() => addFoto(i)}
+                disabled={item.fotos.length >= 5}
+              >
+                <Text style={dStyles.fotoAddText}>🖼️ Galeri</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[dStyles.fotoAddBtn, { flex: 1, marginBottom: 0, backgroundColor: '#3182ce' }]}
+                onPress={() => takeFoto(i)}
+                disabled={item.fotos.length >= 5}
+              >
+                <Text style={[dStyles.fotoAddText, { color: '#fff' }]}>📷 Kamera</Text>
+              </TouchableOpacity>
+            </View>
             <View style={dStyles.fotoGrid}>
               {item.fotos.map((f, fi) => (
                 <View key={fi} style={dStyles.fotoThumb}>
@@ -260,7 +292,7 @@ export default function MekanikFormScreen() {
       Alert.alert(
         '✅ Laporan Tersimpan!',
         'Data laporan mekanik berhasil dikirim dan dapat dilihat di web admin.',
-        [{ text: 'OK', onPress: () => router.replace('/mekanik') }]
+        [{ text: 'OK', onPress: () => router.replace('/admin') }]
       );
     } catch (e: any) {
       Alert.alert('❌ Gagal', e.message || 'Gagal menyimpan laporan.');

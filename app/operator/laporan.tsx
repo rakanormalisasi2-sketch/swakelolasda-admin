@@ -50,7 +50,7 @@ const ALAT_LIST = [
   'Wheel Excavator',
 ];
 
-const API_URL = 'https://swakelolasda-admin.vercel.app';
+const API_URL = 'https://swakelolasda.vercel.app';
 
 type Photo = { uri: string; base64: string; };
 type Assignment = {
@@ -152,7 +152,35 @@ export default function LaporanScreen() {
         compressed.push({ uri: res.uri, base64: res.base64 || '' });
       } catch (_) {}
     }
-    setPhotos(p => [...p, ...compressed]);
+    setPhotos(p => [...p, ...compressed].slice(0, MAX));
+  };
+
+  const takePhoto = async () => {
+    const perm = await ImagePicker.requestCameraPermissionsAsync();
+    if (!perm.granted) {
+      Alert.alert('Izin Diperlukan', 'Izinkan akses kamera untuk mengambil foto.');
+      return;
+    }
+    const MAX = 6;
+    if (photos.length >= MAX) {
+      Alert.alert('Batas Foto', `Maksimal ${MAX} foto per laporan.`);
+      return;
+    }
+
+    const result = await ImagePicker.launchCameraAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      quality: 1,
+    });
+    if (result.canceled) return;
+
+    try {
+      const res = await ImageManipulator.manipulateAsync(
+        result.assets[0].uri,
+        [{ resize: { width: 800 } }],
+        { compress: 0.5, format: ImageManipulator.SaveFormat.JPEG, base64: true }
+      );
+      setPhotos(p => [...p, { uri: res.uri, base64: res.base64 || '' }].slice(0, MAX));
+    } catch (_) {}
   };
 
   const removePhoto = (i: number) => {
@@ -404,9 +432,14 @@ export default function LaporanScreen() {
           <View style={styles.hintBox}>
             <Text style={styles.hintText}>📸 Upload foto progress & HM layar monitor. Foto dikompres otomatis.</Text>
           </View>
-          <TouchableOpacity style={styles.photoAddBtn} onPress={pickPhotos} disabled={photos.length >= 6}>
-            <Text style={styles.photoAddText}>📷 Pilih Foto dari Galeri</Text>
-          </TouchableOpacity>
+          <View style={{ flexDirection: 'row', gap: 10, marginBottom: 12 }}>
+            <TouchableOpacity style={[styles.photoAddBtn, { flex: 1, marginBottom: 0 }]} onPress={pickPhotos} disabled={photos.length >= 6}>
+              <Text style={styles.photoAddText}>🖼️ Dari Galeri</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={[styles.photoAddBtn, { flex: 1, marginBottom: 0, backgroundColor: '#3182ce' }]} onPress={takePhoto} disabled={photos.length >= 6}>
+              <Text style={styles.photoAddText}>📷 Kamera</Text>
+            </TouchableOpacity>
+          </View>
 
           <View style={styles.photoGrid}>
             {photos.map((p, i) => (
