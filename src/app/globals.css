@@ -495,6 +495,13 @@ tbody tr:hover { background: var(--bg-base); }
 .color-warning { color: var(--warning); }
 .w-full { width: 100%; }
 
+/* Status Operasional 2-column layout */
+.status-grid-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 300px;
+  gap: 20px;
+}
+
 /* ============================================
    MOBILE: Hamburger Toggle Button
    ============================================ */
@@ -685,6 +692,25 @@ tbody tr:hover { background: var(--bg-base); }
   .sidebar-user {
     flex-wrap: wrap;
     gap: 8px;
+  }
+
+  /* ---- Page-level grid layouts ---- */
+  .status-grid-layout {
+    grid-template-columns: 1fr;
+  }
+
+  /* ---- Step tracker (maintenance progress) ---- */
+  .step-tracker {
+    flex-wrap: wrap;
+    gap: 4px;
+  }
+  .step-item { font-size: 10px; }
+  .step-circle { width: 24px; height: 24px; font-size: 10px; }
+
+  /* ---- Inline detail grids ---- */
+  [style*="gridTemplateColumns: '1fr 1fr'"],
+  [style*="grid-template-columns"] {
+    grid-template-columns: 1fr !important;
   }
 }
 
