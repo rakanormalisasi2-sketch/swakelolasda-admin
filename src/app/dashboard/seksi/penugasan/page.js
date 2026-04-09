@@ -19,6 +19,8 @@ export default function PenugasanPage() {
     job_type: 'normalisasi', job_sub_type: '', custom_job_description: '',
     location_district: '', location_village: '',
   });
+  const [editId, setEditId] = useState(null);
+  const [originalEquipmentId, setOriginalEquipmentId] = useState(null);
 
   // Job options berbasis role seksi
   const isNormalisasi = profile?.role === 'seksi_normalisasi';
@@ -83,12 +85,30 @@ export default function PenugasanPage() {
     setDesaList(WILAYAH[kec] || []);
   };
 
+  const handleEdit = (a) => {
+    setEditId(a.id);
+    setOriginalEquipmentId(a.equipment_id);
+    setForm({
+      operator_id: a.operator_id || '',
+      helper_id: a.helper_id || '',
+      equipment_id: a.equipment_id || '',
+      job_type: a.job_type || 'normalisasi',
+      job_sub_type: a.job_sub_type || '',
+      custom_job_description: a.custom_job_description || '',
+      location_district: a.location_district || '',
+      location_village: a.location_village || '',
+    });
+    setDesaList(WILAYAH[a.location_district] || []);
+    setError('');
+    setShowModal(true);
+  };
+
   const handleSave = async (e) => {
     e.preventDefault(); setSaving(true); setError('');
     if (!form.operator_id || !form.equipment_id || !form.location_district || !form.location_village) {
       setError('Harap lengkapi semua field yang wajib diisi.'); setSaving(false); return;
     }
-    const insertData = {
+    const dataToSave = {
       operator_id: form.operator_id,
       helper_id: form.helper_id || null,
       equipment_id: form.equipment_id,
@@ -100,9 +120,21 @@ export default function PenugasanPage() {
       status: 'active',
       created_by_role: profile.role,
     };
-    const { error: asgnErr } = await supabase.from('assignments').insert(insertData);
-    if (asgnErr) { setError(asgnErr.message); setSaving(false); return; }
-    await supabase.from('heavy_equipment').update({ status: 'operating' }).eq('id', form.equipment_id);
+
+    if (editId) {
+       const { error: asgnErr } = await supabase.from('assignments').update(dataToSave).eq('id', editId);
+       if (asgnErr) { setError(asgnErr.message); setSaving(false); return; }
+       if (originalEquipmentId && originalEquipmentId !== form.equipment_id) {
+          // Revert old eq to ready, set new eq to operating
+          await supabase.from('heavy_equipment').update({ status: 'ready' }).eq('id', originalEquipmentId);
+          await supabase.from('heavy_equipment').update({ status: 'operating' }).eq('id', form.equipment_id);
+       }
+    } else {
+       const { error: asgnErr } = await supabase.from('assignments').insert(dataToSave);
+       if (asgnErr) { setError(asgnErr.message); setSaving(false); return; }
+       await supabase.from('heavy_equipment').update({ status: 'operating' }).eq('id', form.equipment_id);
+    }
+    
     setSaving(false); setShowModal(false); load();
   };
 
@@ -132,7 +164,7 @@ export default function PenugasanPage() {
           <div className="header-subtitle">Rekrut dan tugaskan operator ke pekerjaan lapangan</div>
         </div>
         <div className="header-right">
-          <button className="btn btn-primary" onClick={() => { setForm({ operator_id:'', helper_id:'', equipment_id:'', job_type: defaultJobType, job_sub_type:'', custom_job_description:'', location_district:'', location_village:'' }); setError(''); setShowModal(true); }}>
+          <button className="btn btn-primary" onClick={() => { setEditId(null); setOriginalEquipmentId(null); setForm({ operator_id:'', helper_id:'', equipment_id:'', job_type: defaultJobType, job_sub_type:'', custom_job_description:'', location_district:'', location_village:'' }); setError(''); setShowModal(true); }}>
             <svg fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24" style={{width:15,height:15}}><path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4"/></svg>
             Tugaskan Operator
           </button>
@@ -167,7 +199,12 @@ export default function PenugasanPage() {
                       </td>
                       <td>{a.location_village}, Kec. {a.location_district}</td>
                       <td className="text-sm text-muted">{new Date(a.start_date).toLocaleDateString('id-ID',{day:'2-digit',month:'short',year:'numeric'})}</td>
-                      <td><button className="btn btn-sm btn-success" onClick={() => finishAssignment(a)}>Selesaikan</button></td>
+                      <td>
+                        <div style={{display:'flex', gap:6}}>
+                          <button className="btn btn-sm btn-outline" style={{padding:'4px 8px'}} onClick={() => handleEdit(a)}>Ubah</button>
+                          <button className="btn btn-sm btn-success" style={{padding:'4px 8px'}} onClick={() => finishAssignment(a)}>Selesaikan</button>
+                        </div>
+                      </td>
                     </tr>
                   ))}
                 </tbody>
@@ -181,7 +218,7 @@ export default function PenugasanPage() {
         <div className="modal-overlay" onClick={e=>e.target===e.currentTarget&&setShowModal(false)}>
           <div className="modal" style={{maxWidth:560}}>
             <div className="modal-header">
-              <h3 className="modal-title">Penugasan Operator Baru</h3>
+              <h3 className="modal-title">{editId ? 'Ubah Penugasan Operator' : 'Penugasan Operator Baru'}</h3>
               <button className="btn-icon" onClick={()=>setShowModal(false)}>
                 <svg fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24" style={{width:18,height:18}}><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
               </button>
@@ -195,14 +232,15 @@ export default function PenugasanPage() {
                     <label className="form-label">Operator * <span className="text-xs text-muted">({freeOperators.length} tersedia)</span></label>
                     <select className="form-control" required value={form.operator_id} onChange={e=>setForm({...form,operator_id:e.target.value})}>
                       <option value="">— Pilih Operator —</option>
-                      {freeOperators.map(o=><option key={o.id} value={o.id}>{o.full_name}</option>)}
+                      {/* For edit mode, we must include the current operator even if busy */}
+                      {operators.filter(o => !busyIds.has(o.id) || o.id === form.operator_id).map(o=><option key={o.id} value={o.id}>{o.full_name}</option>)}
                     </select>
                   </div>
                   <div className="form-group">
                     <label className="form-label">Helper/Operator 2 <span className="text-xs text-muted">(opsional)</span></label>
                     <select className="form-control" value={form.helper_id} onChange={e=>setForm({...form,helper_id:e.target.value})}>
                       <option value="">— Tanpa Helper —</option>
-                      {freeOperators.filter(o=>o.id!==form.operator_id).map(o=><option key={o.id} value={o.id}>{o.full_name}</option>)}
+                      {operators.filter(o => (!busyIds.has(o.id) || o.id === form.helper_id) && o.id !== form.operator_id).map(o=><option key={o.id} value={o.id}>{o.full_name}</option>)}
                     </select>
                   </div>
                 </div>
@@ -212,8 +250,8 @@ export default function PenugasanPage() {
                   <select className="form-control" required value={form.equipment_id} onChange={e=>setForm({...form,equipment_id:e.target.value})}>
                     <option value="">— Pilih Alat Berat —</option>
                     {alat.map(a => (
-                      <option key={a.id} value={a.id} disabled={a.status!=='ready'}>
-                        {a.name}{a.merk_type?` (${a.merk_type})`:''} {a.status!=='ready'?`— ${a.status==='maintenance'?'⚠ Maintenance':'Beroperasi'}`:''}
+                      <option key={a.id} value={a.id} disabled={a.status!=='ready' && a.id !== form.equipment_id}>
+                        {a.name}{a.merk_type?` (${a.merk_type})`:''} {a.status!=='ready' && a.id !== form.equipment_id ?`— ${a.status==='maintenance'?'⚠ Maintenance':'Beroperasi'}`:''}
                       </option>
                     ))}
                   </select>
