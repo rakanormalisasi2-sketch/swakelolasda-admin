@@ -38,13 +38,13 @@ export default function SplashScreen() {
 
         <TouchableOpacity
           style={[styles.roleCard, styles.mekanikCard]}
-          onPress={() => router.push('/mekanik')}
+          onPress={() => router.push('/admin')}
           activeOpacity={0.85}
         >
           <Text style={styles.roleIcon}>🔧</Text>
           <View style={styles.roleTextBox}>
-            <Text style={styles.roleTitle}>Admin Mekanik</Text>
-            <Text style={styles.roleDesc}>Laporan perbaikan & maintenance alat berat</Text>
+            <Text style={styles.roleTitle}>Admin</Text>
+            <Text style={styles.roleDesc}>Akses untuk Mekanik, Gudang, dan fitur khusus lainnya</Text>
           </View>
           <Text style={styles.arrow}>›</Text>
         </TouchableOpacity>

@@ -6,7 +6,7 @@ import {
 import { router } from 'expo-router';
 import { supabase } from '@/lib/supabase';
 
-type Operator = { id: string; full_name: string; hasAssignment: boolean; };
+type Operator = { id: string; full_name: string; };
 
 export default function PilihOperatorScreen() {
   const [operators, setOperators] = useState<Operator[]>([]);
@@ -31,17 +31,12 @@ export default function PilihOperatorScreen() {
       .eq('role', 'operator')
       .order('full_name');
 
-    const { data: asgns } = await supabase
-      .from('assignments')
-      .select('operator_id')
-      .eq('status', 'active');
-
-    const activeSet = new Set((asgns || []).map(a => a.operator_id));
-    const list: Operator[] = (ops || []).map(o => ({
-      id: o.id,
-      full_name: o.full_name,
-      hasAssignment: activeSet.has(o.id),
-    }));
+    const list: Operator[] = (ops || [])
+      .filter(o => o.full_name.toLowerCase() !== 'operator test')
+      .map(o => ({
+        id: o.id,
+        full_name: o.full_name,
+      }));
 
     setOperators(list);
     setFiltered(list);
@@ -58,7 +53,7 @@ export default function PilihOperatorScreen() {
 
   const renderItem = ({ item }: { item: Operator }) => (
     <TouchableOpacity
-      style={[styles.card, item.hasAssignment && styles.cardActive]}
+      style={styles.card}
       onPress={() => handlePilih(item)}
       activeOpacity={0.8}
     >
@@ -69,11 +64,6 @@ export default function PilihOperatorScreen() {
       </View>
       <View style={styles.nameBox}>
         <Text style={styles.opName}>{item.full_name}</Text>
-        {item.hasAssignment ? (
-          <Text style={styles.badgeActive}>● Penugasan Aktif</Text>
-        ) : (
-          <Text style={styles.badgeIdle}>○ Tidak Ada Penugasan</Text>
-        )}
       </View>
       <Text style={styles.arrowIcon}>›</Text>
     </TouchableOpacity>
@@ -162,7 +152,6 @@ const styles = StyleSheet.create({
     borderColor: '#e2e8f0',
     elevation: 1,
   },
-  cardActive: { borderColor: '#38a169', borderWidth: 1.5, backgroundColor: '#f0fff4' },
   avatarBox: {
     width: 44,
     height: 44,
@@ -174,9 +163,7 @@ const styles = StyleSheet.create({
   },
   avatarText: { color: '#fff', fontWeight: '700', fontSize: 18 },
   nameBox: { flex: 1 },
-  opName: { fontSize: 15, fontWeight: '700', color: '#1a202c' },
-  badgeActive: { fontSize: 12, color: '#38a169', marginTop: 3, fontWeight: '600' },
-  badgeIdle: { fontSize: 12, color: '#a0aec0', marginTop: 3 },
+  opName: { fontSize: 16, fontWeight: '700', color: '#1a202c' },
   arrowIcon: { fontSize: 26, color: '#cbd5e0' },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   loadingText: { marginTop: 12, color: '#718096', fontSize: 14 },

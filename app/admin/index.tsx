@@ -7,7 +7,7 @@ import { router } from 'expo-router';
 
 const PASSWORD = 'mekanik';
 
-export default function MekanikPasswordScreen() {
+export default function AdminPasswordScreen() {
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [showPass, setShowPass] = useState(false);
@@ -17,10 +17,15 @@ export default function MekanikPasswordScreen() {
     setLoading(true);
     setTimeout(() => {
       setLoading(false);
-      if (password === PASSWORD) {
-        router.replace('/mekanik/form');
+      const pass = password.toLowerCase().trim();
+      
+      if (pass === 'mekanik') {
+        router.replace('/admin/form');
+      } else if (pass === 'gudang') {
+        Alert.alert('⏳ Segera Hadir', 'Halaman Gudang akan segera tersedia pada pengembangan selanjutnya.');
+        setPassword('');
       } else {
-        Alert.alert('❌ Salah', 'Password tidak tepat. Hubungi admin.');
+        Alert.alert('❌ Akses Ditolak', 'Password tidak dikenali. Hubungi operator sistem.');
         setPassword('');
       }
     }, 600);
@@ -34,14 +39,14 @@ export default function MekanikPasswordScreen() {
         <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
           <Text style={styles.backText}>‹ Kembali</Text>
         </TouchableOpacity>
-        <Text style={styles.icon}>🔧</Text>
-        <Text style={styles.title}>Admin Mekanik</Text>
-        <Text style={styles.subtitle}>Laporan Maintenance Alat Berat</Text>
+        <Text style={styles.icon}>🔐</Text>
+        <Text style={styles.title}>Portal Admin</Text>
+        <Text style={styles.subtitle}>Akses Fitur Khusus E-Monitoring</Text>
       </View>
 
       <View style={styles.card}>
-        <Text style={styles.cardTitle}>Masukkan Password</Text>
-        <Text style={styles.cardSub}>Akses terbatas untuk Tim Mekanik</Text>
+        <Text style={styles.cardTitle}>Masukkan Kredensial</Text>
+        <Text style={styles.cardSub}>Akses akan menyesuaikan dengan password Anda</Text>
 
         <View style={styles.passRow}>
           <TextInput
