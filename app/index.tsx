@@ -38,7 +38,7 @@ export default function SplashScreen() {
 
         <TouchableOpacity
           style={[styles.roleCard, styles.mekanikCard]}
-          onPress={() => router.push('/admin')}
+          onPress={() => router.push('/admin/' as any)}
           activeOpacity={0.85}
         >
           <Text style={styles.roleIcon}>🔧</Text>

@@ -102,7 +102,11 @@ export default function LaporanScreen() {
       .eq('operator_id', operatorId)
       .eq('status', 'active')
       .single()
-      .then(({ data }) => {
+      .then(({ data, error }) => {
+        if (error) {
+          console.warn('Gagal memuat detail penugasan:', error.message);
+          return;
+        }
         if (data) {
           setAssignment(data as unknown as Assignment);
           const kec = (data.location_district || '').toUpperCase();

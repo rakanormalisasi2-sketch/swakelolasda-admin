@@ -292,7 +292,7 @@ export default function MekanikFormScreen() {
       Alert.alert(
         '✅ Laporan Tersimpan!',
         'Data laporan mekanik berhasil dikirim dan dapat dilihat di web admin.',
-        [{ text: 'OK', onPress: () => router.replace('/admin') }]
+        [{ text: 'OK', onPress: () => router.replace('/admin/' as any) }]
       );
     } catch (e: any) {
       Alert.alert('❌ Gagal', e.message || 'Gagal menyimpan laporan.');

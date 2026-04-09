@@ -20,27 +20,34 @@ export default function PilihOperatorScreen() {
 
   useEffect(() => {
     const q = search.toLowerCase();
-    setFiltered(operators.filter(o => o.full_name.toLowerCase().includes(q)));
+    setFiltered(operators.filter(o => o.full_name && o.full_name.toLowerCase().includes(q)));
   }, [search, operators]);
 
   const loadOperators = async () => {
-    setLoading(true);
-    const { data: ops } = await supabase
-      .from('user_profiles')
-      .select('id, full_name')
-      .eq('role', 'operator')
-      .order('full_name');
+    try {
+      setLoading(true);
+      const { data: ops, error } = await supabase
+        .from('user_profiles')
+        .select('id, full_name')
+        .eq('role', 'operator')
+        .order('full_name');
 
-    const list: Operator[] = (ops || [])
-      .filter(o => o.full_name.toLowerCase() !== 'operator test')
-      .map(o => ({
-        id: o.id,
-        full_name: o.full_name,
-      }));
+      if (error) throw error;
 
-    setOperators(list);
-    setFiltered(list);
-    setLoading(false);
+      const list: Operator[] = (ops || [])
+        .filter(o => o.full_name && o.full_name.toLowerCase() !== 'operator test')
+        .map(o => ({
+          id: o.id,
+          full_name: o.full_name,
+        }));
+
+      setOperators(list);
+      setFiltered(list);
+    } catch (err: any) {
+      alert('Gagal memuat daftar operator: ' + err.message);
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handlePilih = (op: Operator) => {
@@ -59,7 +66,7 @@ export default function PilihOperatorScreen() {
     >
       <View style={styles.avatarBox}>
         <Text style={styles.avatarText}>
-          {item.full_name.charAt(0).toUpperCase()}
+          {(item.full_name || '?').charAt(0).toUpperCase()}
         </Text>
       </View>
       <View style={styles.nameBox}>
