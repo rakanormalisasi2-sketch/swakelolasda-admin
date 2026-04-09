@@ -1,19 +1,32 @@
 'use client';
 import { useAuth } from '@/context/AuthContext';
 import { useRouter } from 'next/navigation';
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import Sidebar from '@/components/Sidebar';
 import styles from './dashboard.module.css';
 
 export default function DashboardLayout({ children }) {
-  const { user, profile, loading } = useAuth();
+  const { user, loading } = useAuth();
   const router = useRouter();
+  const [timedOut, setTimedOut] = useState(false);
+
+  // Safety: if loading takes more than 6 seconds, redirect to login
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      if (loading) {
+        setTimedOut(true);
+      }
+    }, 6000);
+    return () => clearTimeout(timer);
+  }, [loading]);
 
   useEffect(() => {
-    if (!loading && !user) router.replace('/login');
-  }, [user, loading]);
+    if (timedOut || (!loading && !user)) {
+      router.replace('/login');
+    }
+  }, [timedOut, user, loading, router]);
 
-  if (loading) {
+  if (loading && !timedOut) {
     return (
       <div className={styles.loadingScreen}>
         <div className={styles.loadingSpinner} />

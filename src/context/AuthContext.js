@@ -1,78 +1,79 @@
 'use client';
-import { createContext, useContext, useEffect, useState } from 'react';
+import { createContext, useContext, useEffect, useState, useRef } from 'react';
 import { supabase } from '@/lib/supabase';
-import { useRouter, usePathname } from 'next/navigation';
+import { useRouter } from 'next/navigation';
 
 const AuthContext = createContext(null);
+
+// Maximum time (ms) to wait for auth before giving up
+const AUTH_TIMEOUT = 5000;
 
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
   const [profile, setProfile] = useState(null);
   const [loading, setLoading] = useState(true);
   const router = useRouter();
-  const pathname = usePathname();
+  const resolved = useRef(false);
+
+  // Helper: mark loading as done (only once)
+  const finishLoading = () => {
+    if (!resolved.current) {
+      resolved.current = true;
+      setLoading(false);
+    }
+  };
+
+  // Helper: fetch user profile from DB
+  const fetchProfile = async (userId) => {
+    try {
+      const { data } = await supabase
+        .from('user_profiles')
+        .select('*')
+        .eq('id', userId)
+        .single();
+      return data;
+    } catch {
+      return null;
+    }
+  };
 
   useEffect(() => {
-    let mounted = true;
-
-    async function initializeAuth() {
-      try {
-        const { data: { session }, error } = await supabase.auth.getSession();
-        if (mounted) {
-          if (session?.user) {
-            setUser(session.user);
-            const { data: prof } = await supabase
-              .from('user_profiles')
-              .select('*')
-              .eq('id', session.user.id)
-              .single();
-            setProfile(prof);
-          } else {
-            setUser(null);
-            setProfile(null);
-          }
-          setLoading(false);
-        }
-      } catch (err) {
-        console.error('Auth initialization error:', err);
-        if (mounted) setLoading(false);
+    // SAFETY NET: If auth takes too long, force-finish loading.
+    // This guarantees the app NEVER stays stuck on "Memuat sistem..."
+    const safetyTimer = setTimeout(() => {
+      if (!resolved.current) {
+        console.warn('[Auth] Safety timeout reached – forcing loading to finish');
+        finishLoading();
       }
-    }
-    
-    initializeAuth();
+    }, AUTH_TIMEOUT);
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
-      if (!mounted) return;
-      if (event === 'INITIAL_SESSION') return; // already handled by getSession
-      
-      if (session?.user) {
-        setUser(session.user);
-        try {
-          const { data: prof } = await supabase
-            .from('user_profiles')
-            .select('*')
-            .eq('id', session.user.id)
-            .single();
+    // Use ONLY onAuthStateChange – this is Supabase's recommended approach.
+    // It fires INITIAL_SESSION on mount with the cached session (or null).
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(
+      async (event, session) => {
+        if (session?.user) {
+          setUser(session.user);
+          const prof = await fetchProfile(session.user.id);
           setProfile(prof);
-        } catch (e) {
-          console.error('Error fetching profile:', e);
+          finishLoading();
+        } else {
+          setUser(null);
+          setProfile(null);
+          finishLoading();
         }
-        setLoading(false);
-      } else {
-        setUser(null);
-        setProfile(null);
-        setLoading(false);
       }
-    });
+    );
 
     return () => {
-      mounted = false;
+      clearTimeout(safetyTimer);
       subscription.unsubscribe();
     };
   }, []);
 
   const logout = async () => {
     await supabase.auth.signOut();
+    setUser(null);
+    setProfile(null);
     router.replace('/login');
   };
 
