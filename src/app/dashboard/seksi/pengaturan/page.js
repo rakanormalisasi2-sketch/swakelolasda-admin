@@ -96,6 +96,23 @@ export default function PengaturanSeksiPage() {
     window.location.href = `/api/auth/google/login?role=${profile.role}`;
   };
 
+  // Auto-extract folder ID dari full Google Drive URL
+  // Mendukung: /drive/folders/ID, /open?id=ID, ?id=ID, dsb.
+  const extractFolderId = (input) => {
+    const trimmed = input.trim();
+    // Coba parse sebagai URL Google Drive
+    const patterns = [
+      /\/folders\/([a-zA-Z0-9_-]+)/,   // drive.google.com/drive/folders/ID
+      /[?&]id=([a-zA-Z0-9_-]+)/,        // ?id=ID atau &id=ID
+      /\/open\?id=([a-zA-Z0-9_-]+)/,   // drive.google.com/open?id=ID
+    ];
+    for (const pattern of patterns) {
+      const match = trimmed.match(pattern);
+      if (match) return match[1];
+    }
+    return trimmed; // Jika bukan URL, kembalikan apa adanya (sudah berupa ID)
+  };
+
   const handleDisconnect = async () => {
     setDisconnecting(true);
     setShowDisconnectConfirm(false);
@@ -239,9 +256,9 @@ export default function PengaturanSeksiPage() {
               <input
                 type="text"
                 className="form-control"
-                placeholder="Contoh: 1uTVJiJ1pX1e... (dari URL Drive Anda)"
+                placeholder="Contoh: 1uTVJiJ1pX1e... atau paste full link Google Drive"
                 value={settings.google_root_folder_id}
-                onChange={e => setSettings({...settings, google_root_folder_id: e.target.value})}
+                onChange={e => setSettings({...settings, google_root_folder_id: extractFolderId(e.target.value)})}
               />
               <div className="text-xs text-muted mt-2">
                 Folder utama tempat semua foto operator ini disimpan. Ambil dari URL Google Drive: 
