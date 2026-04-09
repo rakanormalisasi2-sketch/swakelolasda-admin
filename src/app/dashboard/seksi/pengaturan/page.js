@@ -286,10 +286,6 @@ export default function PengaturanSeksiPage() {
           <div className="card-header"><span className="card-title">Kredensial Penampung Data — {sectionName}</span></div>
           <div className="card-body">
             
-            <div style={{background: 'var(--primary-light)', color: 'var(--primary-dark)', padding: 16, borderRadius: 8, marginBottom: 24, fontSize: 13.5, lineHeight: 1.6}}>
-              <strong>Info Sistem:</strong> Web Admin ini telah dimodifikasi ulang untuk mendukung pencetakan mutlak (Cetak PDF) secara langsung di Browser, menghindari beban loading Google Script. Namun, data mentah Laporan Harian Operator (Jam Kerja, Progress, Foto) tetap akan dicadangkan ke Spreadsheet dan Folder Google Drive yang Anda tugaskan di bawah ini.
-            </div>
-
             {message && <div style={{padding: 12, marginBottom: 20, background: message.includes('Gagal') || message.includes('❌') ? '#fee2e2' : message.includes('⚠️') ? '#fef9c3' : '#dcfce7', color: message.includes('Gagal') || message.includes('❌') ? '#991b1b' : message.includes('⚠️') ? '#713f12' : '#166534', borderRadius: 6}}>{message}</div>}
 
             <form onSubmit={saveSettings}>
@@ -316,8 +312,7 @@ export default function PengaturanSeksiPage() {
                 />
               </div>
 
-              <div style={{display:'flex', gap:20, marginTop:10}}>
-                <div className="form-group" style={{flex:1}}>
+              <div className="form-group" style={{marginTop:10}}>
                   <label className="form-label" style={{fontWeight:600}}>Kepala Sub Kegiatan (Cetak PDF)</label>
                   <input 
                     type="text" 
@@ -326,17 +321,6 @@ export default function PengaturanSeksiPage() {
                     value={settings.pdf_sub_kegiatan}
                     onChange={e => setSettings({...settings, pdf_sub_kegiatan: e.target.value})}
                   />
-                </div>
-                <div className="form-group" style={{flex:1}}>
-                  <label className="form-label" style={{fontWeight:600}}>Prefix Pekerjaan (Cetak PDF)</label>
-                  <input 
-                    type="text" 
-                    className="form-control" 
-                    placeholder="Contoh: NORMALISASI SUNGAI / REHABILITASI EMBUNG"
-                    value={settings.pdf_pekerjaan_prefix}
-                    onChange={e => setSettings({...settings, pdf_pekerjaan_prefix: e.target.value})}
-                  />
-                </div>
               </div>
 
               <div style={{display:'flex', gap:20, marginTop:10}}>
@@ -359,34 +343,6 @@ export default function PengaturanSeksiPage() {
                     value={settings.pdf_nip_staf}
                     onChange={e => setSettings({...settings, pdf_nip_staf: e.target.value})}
                   />
-                </div>
-              </div>
-
-              <div className="form-group" style={{marginTop:24}}>
-                <label className="form-label" style={{fontWeight:600}}>Google Spreadsheet ID Baru</label>
-                <input 
-                  type="text" 
-                  className="form-control" 
-                  placeholder="Contoh: 10WcZShjXTwi1yW38P4..."
-                  value={settings.spreadsheet_id}
-                  onChange={e => setSettings({...settings, spreadsheet_id: e.target.value})}
-                />
-                <div className="text-xs text-muted mt-2">
-                  ID ini bisa Anda dapatkan pada URL Spreadsheet Anda di antara <code style={{background:'#eee', padding:'2px 4px', borderRadius:3}}>/d/</code> dan <code style={{background:'#eee', padding:'2px 4px', borderRadius:3}}>/edit</code>.
-                </div>
-              </div>
-
-              <div className="form-group" style={{marginTop:15}}>
-                <label className="form-label" style={{fontWeight:600}}>Google Drive Folder ID (Penampung Manual / Foto Mentah)</label>
-                <input 
-                  type="text" 
-                  className="form-control" 
-                  placeholder="Contoh: 1xclwO40trzKZoqDgE..."
-                  value={settings.gdrive_folder_id}
-                  onChange={e => setSettings({...settings, gdrive_folder_id: e.target.value})}
-                />
-                <div className="text-xs text-muted mt-2">
-                  Folder peninggalan dari Sistem lama. Folder ID diambil dari URL Google Drive Anda pada segment terakhir URL setelah <code style={{background:'#eee', padding:'2px 4px', borderRadius:3}}>/folders/</code>.
                 </div>
               </div>
 
