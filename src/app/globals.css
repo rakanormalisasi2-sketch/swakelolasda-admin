@@ -494,3 +494,72 @@ tbody tr:hover { background: var(--bg-base); }
 .color-success { color: var(--success); }
 .color-warning { color: var(--warning); }
 .w-full { width: 100%; }
+
+/* ============================================
+   RESPONSIVE DESIGN (MOBILE)
+   ============================================ */
+@media (max-width: 768px) {
+  :root {
+    --sidebar-width: 100%;
+  }
+  .app-shell {
+    flex-direction: column;
+  }
+  .sidebar {
+    position: static;
+    height: auto;
+    border-bottom: 2px solid var(--primary);
+  }
+  .sidebar-section {
+    padding: 10px;
+  }
+  .sidebar-nav {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+  .sidebar-nav-item {
+    margin-bottom: 0;
+  }
+  .sidebar-brand {
+    justify-content: center;
+    border-bottom: 1px solid rgba(255,255,255,0.1);
+  }
+  .main-content {
+    margin-left: 0;
+  }
+  .stats-grid {
+    grid-template-columns: 1fr;
+  }
+  .form-grid, .form-grid-3 {
+    grid-template-columns: 1fr;
+  }
+  .header {
+    height: auto;
+    padding: 15px 20px;
+    flex-wrap: wrap;
+    gap: 10px;
+  }
+  .card-header {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+  .tabs {
+    overflow-x: auto;
+    white-space: nowrap;
+    padding-bottom: 5px;
+    margin-bottom: 15px;
+  }
+  .modal {
+    max-width: 95%;
+    margin: 10px;
+  }
+  table {
+    min-width: 600px; /* enables horizontal scrolling inside .table-wrapper */
+  }
+  .sidebar-user {
+    justify-content: center;
+    flex-wrap: wrap;
+  }
+}
+

@@ -30,7 +30,6 @@ export function AuthProvider({ children }) {
           } else {
             setUser(null);
             setProfile(null);
-            if (pathname !== '/login') router.replace('/login');
           }
           setLoading(false);
         }
@@ -63,7 +62,6 @@ export function AuthProvider({ children }) {
         setUser(null);
         setProfile(null);
         setLoading(false);
-        if (pathname !== '/login') router.replace('/login');
       }
     });
 
@@ -71,7 +69,7 @@ export function AuthProvider({ children }) {
       mounted = false;
       subscription.unsubscribe();
     };
-  }, [pathname, router]);
+  }, []);
 
   const logout = async () => {
     await supabase.auth.signOut();

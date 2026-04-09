@@ -135,6 +135,23 @@ export default function PeralatanPage() {
     setShowDetailModal(true);
   };
 
+  const handleEditLog = (log) => {
+    openDetail({
+      id: log.equipment_id,
+      name: log.equipment?.name,
+      nomor_lambung: log.equipment?.nomor_lambung,
+      merk_type: log.equipment?.merk_type,
+    });
+  };
+
+  const handleDeleteLog = async (logId) => {
+    if (!confirm('Yakin ingin menghapus data arsip log ini? Tindakan ini tidak dapat dibatalkan.')) return;
+    setSaving(true);
+    await supabase.from('maintenance_logs').delete().eq('id', logId);
+    setSaving(false);
+    load();
+  };
+
   const updateLogData = async (logId, equipId, newStatus, newNotes, mechanicDetails) => {
     await supabase.from('maintenance_logs').update({
       progress_status: newStatus,
@@ -456,7 +473,8 @@ export default function PeralatanPage() {
                            <th style={{width:220}}>Gejala Awal</th>
                            <th style={{width:220}}>Catatan Tahap (Terbuka Publik)</th>
                            <th>Status</th>
-                           <th style={{width:130}}>Akses PDF Penuh</th>
+                           <th style={{width:100}}>Akses Form</th>
+                           <th style={{width:100}}>Aksi Admin</th>
                         </tr>
                      </thead>
                      <tbody>
@@ -469,7 +487,13 @@ export default function PeralatanPage() {
                              <td style={{color:'#991b1b'}}>{log.damage_description || '-'}</td>
                              <td style={{color:'#0f172a'}}>{log.repair_notes || '-'}</td>
                              <td><span className={`badge ${log.progress_status==='selesai'?'badge-success':'badge-warning'}`}>{log.progress_status.toUpperCase()}</span></td>
-                             <td><button className="btn btn-outline btn-sm" style={{fontSize:11, padding:'6px 10px', width:'100%', borderColor:'#1e3a8a', color:'#1e3a8a'}} onClick={()=>printLog(log, log.equipment)}>🖨️ Cetak Form</button></td>
+                             <td><button className="btn btn-outline btn-sm" style={{fontSize:11, padding:'6px 8px', width:'100%', borderColor:'#1e3a8a', color:'#1e3a8a'}} onClick={()=>printLog(log, log.equipment)}>🖨️ Cetak</button></td>
+                             <td>
+                               <div style={{display:'flex', gap:5}}>
+                                 <button className="btn btn-outline btn-sm" title="Edit Log" style={{padding:'4px 8px'}} onClick={()=>handleEditLog(log)}>✏️</button>
+                                 <button className="btn btn-danger btn-sm" title="Hapus Log" style={{padding:'4px 8px'}} onClick={()=>handleDeleteLog(log.id)}>🗑️</button>
+                               </div>
+                             </td>
                           </tr>
                         ))}
                      </tbody>
