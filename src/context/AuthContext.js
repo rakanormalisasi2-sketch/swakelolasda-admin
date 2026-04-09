@@ -13,24 +13,65 @@ export function AuthProvider({ children }) {
   const pathname = usePathname();
 
   useEffect(() => {
+    let mounted = true;
+
+    async function initializeAuth() {
+      try {
+        const { data: { session }, error } = await supabase.auth.getSession();
+        if (mounted) {
+          if (session?.user) {
+            setUser(session.user);
+            const { data: prof } = await supabase
+              .from('user_profiles')
+              .select('*')
+              .eq('id', session.user.id)
+              .single();
+            setProfile(prof);
+          } else {
+            setUser(null);
+            setProfile(null);
+            if (pathname !== '/login') router.replace('/login');
+          }
+          setLoading(false);
+        }
+      } catch (err) {
+        console.error('Auth initialization error:', err);
+        if (mounted) setLoading(false);
+      }
+    }
+    
+    initializeAuth();
+
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+      if (!mounted) return;
+      if (event === 'INITIAL_SESSION') return; // already handled by getSession
+      
       if (session?.user) {
         setUser(session.user);
-        const { data: prof } = await supabase
-          .from('user_profiles')
-          .select('*')
-          .eq('id', session.user.id)
-          .single();
-        setProfile(prof);
+        try {
+          const { data: prof } = await supabase
+            .from('user_profiles')
+            .select('*')
+            .eq('id', session.user.id)
+            .single();
+          setProfile(prof);
+        } catch (e) {
+          console.error('Error fetching profile:', e);
+        }
+        setLoading(false);
       } else {
         setUser(null);
         setProfile(null);
+        setLoading(false);
         if (pathname !== '/login') router.replace('/login');
       }
-      setLoading(false);
     });
-    return () => subscription.unsubscribe();
-  }, []);
+
+    return () => {
+      mounted = false;
+      subscription.unsubscribe();
+    };
+  }, [pathname, router]);
 
   const logout = async () => {
     await supabase.auth.signOut();

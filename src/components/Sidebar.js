@@ -21,6 +21,7 @@ const NAV_CONFIG = {
         { href: '/dashboard/peralatan', label: 'Status Alat Berat', icon: 'truck' },
         { href: '/dashboard/peralatan/perbaikan', label: 'Rekap Perbaikan', icon: 'tool', badge: 'maintenance_count' },
         { href: '/dashboard/status-operasional', label: 'Status Operasional', icon: 'clipboard' },
+        { href: '/dashboard/peralatan/pengaturan', label: 'Pengaturan Sistem', icon: 'settings' },
       ],
     },
   ],
