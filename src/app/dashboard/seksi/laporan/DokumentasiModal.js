@@ -20,28 +20,6 @@ function toView(url) {
   const id = extractDriveId(url.trim());
   return id ? `https://drive.google.com/file/d/${id}/view` : url.trim();
 }
-'use client';
-import { useState, useMemo } from 'react';
-import React from 'react';
-
-function extractDriveId(url) {
-  if (!url) return null;
-  const m = url.match(/\/d\/([a-zA-Z0-9_-]{25,})/)
-    || url.match(/id=([a-zA-Z0-9_-]{25,})/);
-  return m ? m[1] : null;
-}
-
-function toImg(url) {
-  if (!url) return null;
-  const id = extractDriveId(url.trim());
-  return id ? `https://drive.google.com/thumbnail?id=${id}&sz=w800` : url.trim();
-}
-
-function toView(url) {
-  if (!url) return null;
-  const id = extractDriveId(url.trim());
-  return id ? `https://drive.google.com/file/d/${id}/view` : url.trim();
-}
 
 const PROGRESS_OPTS = ['0%', '50%', '100%'];
 const PROGRESS_COLOR = { '0%': '#f97316', '50%': '#eab308', '100%': '#22c55e' };
@@ -387,7 +365,9 @@ export default function DokumentasiModal({ logs, onClose, pdfConfig, handleUploa
               <div style={{ flex:1, display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', color:'#94a3b8' }}>
                 <div style={{ fontSize:48, marginBottom:12 }}>👈</div>
                 <div style={{ fontSize:15, fontWeight:600, color:'#64748b' }}>Pilih baris dari panel kiri</div>
-                <div style={{ fontSize:13, marginTop:6 }}>untuk melihat dan menandai foto progress</div>
+                <div style={{ fontSize:13, marginTop:6 }}>untuk memantau dan menandai foto progress</div>
+              </div>
+            ) : (
               <>
                 {/* Info bar + quick action */}
                 <div style={{ padding:'12px 20px', borderBottom:'1px solid #e2e8f0', background:'#fff', display:'flex', alignItems:'center', justifyContent:'space-between', flexShrink:0 }}>
