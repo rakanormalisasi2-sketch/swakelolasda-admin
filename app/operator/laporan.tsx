@@ -93,6 +93,10 @@ export default function LaporanScreen() {
   const [helperOpen, setHelperOpen] = useState(false);
   const [operatorList, setOperatorList] = useState<{ id: string; full_name: string }[]>([]);
 
+  const [keteranganKategori, setKeteranganKategori] = useState<'Kerusakan'|'Cuaca'|'Lainnya'|''>('');
+  const [kateOpen, setKateOpen] = useState(false);
+  const KATEGORI_OPTIONS = ['Kerusakan', 'Cuaca', 'Lainnya'];
+
   const [form, setForm] = useState({
     tanggal: new Date().toISOString().split('T')[0],
     helper: '',
@@ -100,7 +104,7 @@ export default function LaporanScreen() {
     desa: '',
     jenisAlat: '',
     progress: '',
-    keterangan: '',
+    keteranganDetail: '',
     hmAwal: '',
     hmAkhir: '',
     panjangPekerjaan: '',
@@ -309,7 +313,7 @@ export default function LaporanScreen() {
         override_kecamatan: form.kecamatan !== assignment?.location_district ? form.kecamatan : null,
         override_desa: form.desa !== assignment?.location_village ? form.desa : null,
         progress_pekerjaan: form.progress,
-        keterangan_tambahan: form.keterangan || null,
+        keterangan_tambahan: keteranganKategori ? `[${keteranganKategori}] ${form.keteranganDetail}`.trim() : (form.keteranganDetail || null),
         hm_awal: hmAwal,
         hm_akhir: hmAkhir,
         jam_kerja: jamKerja ? parseFloat(jamKerja) : null,
@@ -321,6 +325,18 @@ export default function LaporanScreen() {
       });
 
       if (error) throw new Error(error.message);
+
+      // Jika kategori Kerusakan → set equipment maintenance + buat maintenance_log
+      if (keteranganKategori === 'Kerusakan' && assignment?.equipment_id) {
+        await supabase.from('heavy_equipment').update({ status: 'maintenance' }).eq('id', assignment.equipment_id);
+        await supabase.from('maintenance_logs').insert({
+          equipment_id: assignment.equipment_id,
+          reported_by: operatorId,
+          damage_description: `[Laporan Operator: ${operatorName}] ${form.keteranganDetail}`,
+          progress_status: 'pelaporan',
+          mechanic_details: {},
+        });
+      }
 
       Alert.alert(
         '✅ Berhasil!',
@@ -519,17 +535,50 @@ export default function LaporanScreen() {
           </View>
         </View>
 
-        {/* KETERANGAN */}
+        {/* KETERANGAN — Kategori + Detail */}
         <View style={styles.fieldGroup}>
           <Text style={styles.label}>Keterangan Tambahan</Text>
-          <TextInput
-            style={[styles.input, styles.textarea]}
-            value={form.keterangan}
-            onChangeText={v => set('keterangan', v)}
-            placeholder="Keterangan tambahan..."
-            multiline
-            numberOfLines={3}
-          />
+          {/* Dropdown Kategori */}
+          <TouchableOpacity style={styles.selectBtn} onPress={() => setKateOpen(v => !v)}>
+            <Text style={keteranganKategori ? styles.selectVal : styles.selectPlaceholder}>
+              {keteranganKategori || '— Pilih Kategori (Opsional) —'}
+            </Text>
+            <Text style={styles.chevron}>{kateOpen ? '▲' : '▼'}</Text>
+          </TouchableOpacity>
+          {kateOpen && (
+            <View style={styles.dropdownBox}>
+              <TouchableOpacity style={styles.dropdownItem} onPress={() => { setKeteranganKategori(''); setKateOpen(false); }}>
+                <Text style={[styles.dropdownText, { color: '#a0aec0', fontStyle: 'italic' }]}>— Tidak Ada Kategori —</Text>
+              </TouchableOpacity>
+              {KATEGORI_OPTIONS.map(opt => (
+                <TouchableOpacity key={opt} style={styles.dropdownItem} onPress={() => { setKeteranganKategori(opt as any); setKateOpen(false); }}>
+                  <Text style={[styles.dropdownText, keteranganKategori === opt && styles.dropdownActive,
+                    opt === 'Kerusakan' && { color: '#e53e3e', fontWeight: '700' }]}>
+                    {opt === 'Kerusakan' ? '🔴 Kerusakan Alat' : opt === 'Cuaca' ? '🌧️ Cuaca' : '📝 Lainnya'}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+          )}
+          {/* Warning jika Kerusakan */}
+          {keteranganKategori === 'Kerusakan' && (
+            <View style={{ marginTop: 8, padding: 10, backgroundColor: '#fff5f5', borderLeftWidth: 4, borderLeftColor: '#e53e3e', borderRadius: 6 }}>
+              <Text style={{ color: '#c53030', fontSize: 12, fontWeight: '700' }}>⚠️ Laporan kerusakan akan dikirim ke Tim Peralatan</Text>
+              <Text style={{ color: '#c53030', fontSize: 11, marginTop: 2 }}>Status alat akan berubah ke MAINTENANCE otomatis</Text>
+            </View>
+          )}
+          {/* Text input detail — muncul setelah pilih kategori */}
+          {keteranganKategori !== '' && (
+            <TextInput
+              style={[styles.input, styles.textarea, { marginTop: 8 }]}
+              value={form.keteranganDetail}
+              onChangeText={v => set('keteranganDetail', v)}
+              placeholder={keteranganKategori === 'Kerusakan' ? 'Jelaskan gejala kerusakan...' :
+                keteranganKategori === 'Cuaca' ? 'Contoh: Hujan dari jam 8-16...' : 'Keterangan tambahan...'}
+              multiline
+              numberOfLines={3}
+            />
+          )}
         </View>
 
         {/* HOURMETER ROW */}
