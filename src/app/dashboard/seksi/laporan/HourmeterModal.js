@@ -21,7 +21,6 @@ function toView(url) {
 
 export default function HourmeterModal({ logs, onClose, pdfConfig, handleUploadTambahan }) {
   const [hmSelection, setHmSelection] = useState({}); // { [logId]: { before: url, after: url } }
-  const [customPekerjaan, setCustomPekerjaan] = useState('');
   const [hmLastAfter, setHmLastAfter] = useState(null);
   const [activeLogId, setActiveLogId] = useState(null);
   const [viewHmMode, setViewHmMode] = useState('flat'); // 'flat' | 'grouped'
@@ -35,7 +34,7 @@ export default function HourmeterModal({ logs, onClose, pdfConfig, handleUploadT
     saluran_afvoer: 'SALURAN AIR / AFVOER',
     normalisasi_embung: 'NORMALISASI EMBUNG',
   };
-  const getHmJobLabel = (log) => SUB_MAP_HM[log.assignment?.job_sub_type] || log.assignment?.job_sub_type || 'Pekerjaan Lainnya';
+  const getHmJobLabel = (log) => log.custom_pekerjaan || SUB_MAP_HM[log.assignment?.job_sub_type] || log.assignment?.job_sub_type || 'Pekerjaan Lainnya';
 
   // Build rows sorted by date
   const rows = useMemo(() =>

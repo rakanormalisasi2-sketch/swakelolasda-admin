@@ -20,6 +20,28 @@ function toView(url) {
   const id = extractDriveId(url.trim());
   return id ? `https://drive.google.com/file/d/${id}/view` : url.trim();
 }
+'use client';
+import { useState, useMemo } from 'react';
+import React from 'react';
+
+function extractDriveId(url) {
+  if (!url) return null;
+  const m = url.match(/\/d\/([a-zA-Z0-9_-]{25,})/)
+    || url.match(/id=([a-zA-Z0-9_-]{25,})/);
+  return m ? m[1] : null;
+}
+
+function toImg(url) {
+  if (!url) return null;
+  const id = extractDriveId(url.trim());
+  return id ? `https://drive.google.com/thumbnail?id=${id}&sz=w800` : url.trim();
+}
+
+function toView(url) {
+  if (!url) return null;
+  const id = extractDriveId(url.trim());
+  return id ? `https://drive.google.com/file/d/${id}/view` : url.trim();
+}
 
 const PROGRESS_OPTS = ['0%', '50%', '100%'];
 const PROGRESS_COLOR = { '0%': '#f97316', '50%': '#eab308', '100%': '#22c55e' };
@@ -28,7 +50,6 @@ const PROGRESS_BG   = { '0%': '#fff7ed', '50%': '#fefce8', '100%': '#f0fdf4' };
 export default function DokumentasiModal({ logs, onClose, pdfConfig, handleUploadTambahan }) {
   const [selectedLog, setSelectedLog]   = useState(null);
   const [dokSelection, setDokSelection] = useState({});
-  const [customPekerjaan, setCustomPekerjaan] = useState('');
   const [filter, setFilter]             = useState('all');
   const [search, setSearch]             = useState('');
   const [groupExpanded, setGroupExpanded] = useState({});
@@ -42,7 +63,7 @@ export default function DokumentasiModal({ logs, onClose, pdfConfig, handleUploa
     saluran_afvoer: 'SALURAN AIR / AFVOER',
     normalisasi_embung: 'NORMALISASI EMBUNG',
   };
-  const getJobLabel = (log) => SUB_MAP_DOK[log.assignment?.job_sub_type] || log.assignment?.job_sub_type || 'Pekerjaan Lainnya';
+  const getJobLabel = (log) => log.custom_pekerjaan || SUB_MAP_DOK[log.assignment?.job_sub_type] || log.assignment?.job_sub_type || 'Pekerjaan Lainnya';
 
   const rows = useMemo(() => logs.map(log => {
     const urls = log.foto_lapangan_urls
@@ -54,16 +75,6 @@ export default function DokumentasiModal({ logs, onClose, pdfConfig, handleUploa
     }).length;
     return { log, urls, selectedCount };
   }), [logs, dokSelection]);
-
-  const SUB_MAP_DOK = {
-    normalisasi_sungai: 'NORMALISASI SUNGAI',
-    normalisasi_saluran_irigasi: 'NORMALISASI SALURAN / IRIGASI',
-    rehabilitasi_embung: 'REHABILITASI EMBUNG',
-    pembangunan_embung: 'PEMBANGUNAN EMBUNG',
-    saluran_afvoer: 'SALURAN AIR / AFVOER',
-    normalisasi_embung: 'NORMALISASI EMBUNG',
-  };
-  const getJobLabel = (log) => SUB_MAP_DOK[log.assignment?.job_sub_type] || log.assignment?.job_sub_type || 'Pekerjaan Lainnya';
 
   // Group rows by pekerjaan
   const groupedRows = useMemo(() => {
@@ -108,32 +119,6 @@ export default function DokumentasiModal({ logs, onClose, pdfConfig, handleUploa
 
   const totalSelected = Object.values(dokSelection).filter(v => v && v !== 'skip').length;
 
-  // Grouped rows for 'Per Pekerjaan' mode
-  const groupedRows = useMemo(() => {
-    const groups = {};
-    rows.forEach(r => {
-      const key = getJobLabel(r.log);
-      if (!groups[key]) groups[key] = [];
-      groups[key].push(r);
-    });
-    return groups;
-  }, [rows]);
-
-  const selectAllGroup = (groupKey, val) => {
-    setDokSelection(prev => {
-      const next = { ...prev };
-      groupedRows[groupKey].forEach(({ log, urls }) =>
-        urls.forEach((_, i) => { next[log.id + '_' + i] = val; })
-      );
-      return next;
-    });
-  };
-  const isGroupAllSelected = (groupKey) => {
-    return groupedRows[groupKey].every(({ log, urls }) =>
-      urls.every((_, i) => { const v = dokSelection[log.id + '_' + i]; return v && v !== 'skip'; })
-    );
-  };
-
   const selectedUrls = selectedLog
     ? (selectedLog.foto_lapangan_urls || '').split(',').map(u => u.trim()).filter(Boolean)
     : [];
@@ -149,22 +134,11 @@ export default function DokumentasiModal({ logs, onClose, pdfConfig, handleUploa
     });
 
   // ─── CETAK PDF ────────────────────────────────────────────────────────────
-  // Kertas: Legal portrait (8.5in x 14in) = 215.9mm x 355.6mm
-  // Setiap BARIS = 1 HALAMAN (foto 0%/50%/100% dipaksa masuk 1 halaman)
-  // Antar baris = page-break
   const execPrint = () => {
     const config = pdfConfig || {
       program: 'PENGELOLAAN SUMBER DAYA AIR',
       kegiatan: '',
       pekerjaanPrefix: 'NORMALISASI SUNGAI',
-    };
-    const SUB_MAP = {
-      normalisasi_sungai:           'NORMALISASI SUNGAI',
-      normalisasi_saluran_irigasi:  'NORMALISASI SALURAN / IRIGASI',
-      rehabilitasi_embung:          'REHABILITASI EMBUNG',
-      pembangunan_embung:           'PEMBANGUNAN EMBUNG',
-      saluran_afvoer:               'SALURAN AIR / AFVOER',
-      normalisasi_embung:           'NORMALISASI EMBUNG',
     };
 
     const printWin = window.open('', '_blank');
@@ -172,103 +146,26 @@ export default function DokumentasiModal({ logs, onClose, pdfConfig, handleUploa
 <style>
   * { margin:0; padding:0; box-sizing:border-box; }
   body { font-family:Arial,sans-serif; font-size:11px; color:#000; }
-
-  /* Legal portrait: 8.5in x 14in, margin 12mm atas-bawah, 15mm kiri-kanan */
   @page { size: legal portrait; margin: 12mm 15mm; }
-
-  /*
-   * Setiap .hal = 1 halaman legal.
-   * Tinggi konten = 14in - 12mm*2 = 355.6mm - 24mm = 331.6mm ≈ 307mm
-   * (Browser biasanya agak berbeda; 307mm adalah nilai aman)
-   */
-  .hal {
-    width: 100%;
-    height: 307mm;
-    display: flex;
-    flex-direction: column;
-    page-break-after: always;
-    overflow: hidden;
-  }
+  .hal { width: 100%; height: 307mm; display: flex; flex-direction: column; page-break-after: always; overflow: hidden; }
   .hal:last-child { page-break-after: auto; }
-
-  /* Header judul */
-  .hdr-title {
-    font-size: 14px; font-weight: bold; text-align: center;
-    letter-spacing: 2px; border-bottom: 2px solid #000;
-    padding-bottom: 5px; margin-bottom: 7px; flex-shrink: 0;
-  }
-
-  /* Tabel info */
+  .hdr-title { font-size: 14px; font-weight: bold; text-align: center; letter-spacing: 2px; border-bottom: 2px solid #000; padding-bottom: 5px; margin-bottom: 7px; flex-shrink: 0; }
   .info-tbl { width:100%; border-collapse:collapse; margin-bottom:7px; flex-shrink:0; }
   .info-tbl td { padding:2px 5px; font-size:10.5px; vertical-align:top; line-height:1.4; }
   .info-tbl td:first-child { width:115px; font-weight:bold; white-space:nowrap; }
   .info-tbl td:nth-child(2) { width:10px; }
-
-  /*
-   * Area foto: mengisi sisa tinggi halaman.
-   * Semua foto dalam 1 baris log dibagi rata tingginya (flex:1 per row).
-   */
-  .foto-area {
-    flex: 1;
-    display: flex;
-    flex-direction: column;
-    border: 1.5px solid #000;
-    overflow: hidden;
-    min-height: 0;
-  }
-
-  /* Satu baris foto → flex:1 supaya semua baris berbagi tinggi sama */
-  .foto-baris {
-    flex: 1;
-    display: flex;
-    border-bottom: 1px solid #000;
-    min-height: 0;
-    overflow: hidden;
-  }
+  .foto-area { flex: 1; display: flex; flex-direction: column; border: 1.5px solid #000; overflow: hidden; min-height: 0; }
+  .foto-baris { flex: 1; display: flex; border-bottom: 1px solid #000; min-height: 0; overflow: hidden; }
   .foto-baris:last-child { border-bottom: none; }
-
-  /* Kolom gambar 62% */
-  .foto-img {
-    flex: 0 0 62%;
-    border-right: 1px solid #000;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    padding: 6px;
-    overflow: hidden;
-  }
-  .foto-img img {
-    max-width: 100%;
-    max-height: 100%;
-    object-fit: contain;
-    display: block;
-  }
-
-  /* Kolom keterangan 38% */
-  .foto-caption {
-    flex: 0 0 38%;
-    display: flex;
-    flex-direction: column;
-    justify-content: center;
-    padding: 10px 14px;
-  }
+  .foto-img { flex: 0 0 62%; border-right: 1px solid #000; display: flex; align-items: center; justify-content: center; padding: 6px; overflow: hidden; }
+  .foto-img img { max-width: 100%; max-height: 100%; object-fit: contain; display: block; }
+  .foto-caption { flex: 0 0 38%; display: flex; flex-direction: column; justify-content: center; padding: 10px 14px; }
   .caption-lbl { font-weight:bold; font-size:10.5px; margin-bottom:3px; }
-  .badge {
-    display: inline-block;
-    padding: 3px 12px;
-    border-radius: 12px;
-    font-weight: bold;
-    font-size: 11px;
-    margin-top: 7px;
-    width: fit-content;
-  }
+  .badge { display: inline-block; padding: 3px 12px; border-radius: 12px; font-weight: bold; font-size: 11px; margin-top: 7px; width: fit-content; }
   .p0   { background:#fed7aa; color:#9a3412; }
   .p50  { background:#fde68a; color:#92400e; }
   .p100 { background:#bbf7d0; color:#14532d; }
-
-  @media print {
-    body { -webkit-print-color-adjust:exact; print-color-adjust:exact; }
-  }
+  @media print { body { -webkit-print-color-adjust:exact; print-color-adjust:exact; } }
 </style>
 </head><body>`;
 
@@ -287,13 +184,12 @@ export default function DokumentasiModal({ logs, onClose, pdfConfig, handleUploa
 
       const desa = (log.override_desa || log.assignment?.location_village || '').toUpperCase();
       const kec  = (log.override_kecamatan || log.assignment?.location_district || '').toUpperCase();
-      const pek  = (customPekerjaan||"").trim().toUpperCase() || SUB_MAP[log.assignment?.job_sub_type] || config.pekerjaanPrefix;
+      const pek  = log.custom_pekerjaan || SUB_MAP_DOK[log.assignment?.job_sub_type] || config.pekerjaanPrefix;
       const tgl  = new Date(log.tanggal)
         .toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })
         .toUpperCase();
       const tahun = new Date(log.tanggal).getFullYear();
 
-      // Satu halaman legal per baris log
       html += `<div class="hal">
   <div class="hdr-title">FOTO DOKUMENTASI</div>
   <table class="info-tbl">
@@ -306,7 +202,6 @@ export default function DokumentasiModal({ logs, onClose, pdfConfig, handleUploa
   </table>
   <div class="foto-area">`;
 
-      // Semua foto (0%,50%,100%) dalam 1 halaman — flex:1 per baris
       selected.forEach(item => {
         const cls   = item.prog === '100%' ? 'p100' : item.prog === '50%' ? 'p50' : 'p0';
         const label = item.prog === '0%' ? 'PROGRESS 0%'
@@ -333,7 +228,6 @@ export default function DokumentasiModal({ logs, onClose, pdfConfig, handleUploa
     setTimeout(() => printWin.print(), 1500);
     onClose();
   };
-  // ─────────────────────────────────────────────────────────────────────────
 
   return (
     <div style={{ position:'fixed', inset:0, background:'rgba(15,23,42,0.75)', zIndex:1000, display:'flex', alignItems:'center', justifyContent:'center', backdropFilter:'blur(4px)' }}>
@@ -494,17 +388,6 @@ export default function DokumentasiModal({ logs, onClose, pdfConfig, handleUploa
                 <div style={{ fontSize:48, marginBottom:12 }}>👈</div>
                 <div style={{ fontSize:15, fontWeight:600, color:'#64748b' }}>Pilih baris dari panel kiri</div>
                 <div style={{ fontSize:13, marginTop:6 }}>untuk melihat dan menandai foto progress</div>
-              <div style={{ marginTop:8, display:'flex', alignItems:'center', gap:6, flexWrap:'wrap' }}>
-                <span style={{ fontSize:12, color:'rgba(255,255,255,0.85)', whiteSpace:'nowrap' }}>✏️ Custom Pekerjaan:</span>
-                <input value={customPekerjaan} onChange={e=>setCustomPekerjaan(e.target.value)}
-                  placeholder="Kosongkan = nama pekerjaan default per baris"
-                  style={{flex:1, minWidth:200, padding:'5px 8px', borderRadius:6, border:'1px solid rgba(255,255,255,0.3)', background:'rgba(255,255,255,0.15)', color:'#fff', fontSize:12, outline:'none'}} />
-              </div>
-                <div style={{ marginTop:16, fontSize:12, color:'#94a3b8', background:'#f1f5f9', padding:'8px 16px', borderRadius:8 }}>
-                  💡 Setiap baris laporan akan dicetak pada 1 halaman Legal
-                </div>
-              </div>
-            ) : (
               <>
                 {/* Info bar + quick action */}
                 <div style={{ padding:'12px 20px', borderBottom:'1px solid #e2e8f0', background:'#fff', display:'flex', alignItems:'center', justifyContent:'space-between', flexShrink:0 }}>

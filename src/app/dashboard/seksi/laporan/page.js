@@ -246,6 +246,20 @@ export default function LaporanPelaksanaanPage() {
       mainTableGroups[gId].push(log);
   });
 
+  const handleCustomPekerjaanApply = async (gId, customVal) => {
+    if(!confirm(`Terapkan label pekerjaan khusus "${customVal || '(Default)'}" ke seluruh baris pada kelompok ini (${mainTableGroups[gId].length} baris)?`)) return;
+    setSaving(true);
+    const targetIds = mainTableGroups[gId].map(l => l.id);
+    const { error } = await supabase.from('operator_logs').update({ custom_pekerjaan: customVal || null }).in('id', targetIds);
+    if(error){
+      alert("Gagal terapkan: " + error.message);
+    } else {
+      setLogs(prev => prev.map(l => targetIds.includes(l.id) ? {...l, custom_pekerjaan: customVal || null} : l));
+    }
+    setSaving(false);
+  };
+
+
 
   // ============ MODAL SELECTION LOGIC ============
   const openPrintModal = (type) => {
@@ -361,8 +375,8 @@ export default function LaporanPelaksanaanPage() {
       const alatName = (log.override_alat || log.equipment?.name || '').toUpperCase();
       const helperName = (log.assignment?.helper_override || log.assignment?.helper?.full_name || '').toUpperCase();
       const tglStr = new Date(log.tanggal).toLocaleDateString('id-ID', {day:'numeric', month:'long', year:'numeric'}).toUpperCase();
-      // Resolve pekerjaan: custom override > job_sub_type > config.pekerjaanPrefix
-      const resolvedPekerjaan = overridePekerjaan || SUB_TYPE_MAP[log.assignment?.job_sub_type] || config.pekerjaanPrefix;
+      // Resolve pekerjaan: log.custom_pekerjaan > custom override > job_sub_type > config.pekerjaanPrefix
+      const resolvedPekerjaan = log.custom_pekerjaan || overridePekerjaan || SUB_TYPE_MAP[log.assignment?.job_sub_type] || config.pekerjaanPrefix;
 
       html += `<div class="header">LAPORAN HARIAN</div>
         <table class="sub-header">
@@ -550,7 +564,7 @@ export default function LaporanPelaksanaanPage() {
       const g = grouped[key];
       g.rows.sort((a, b) => new Date(a.tanggal) - new Date(b.tanggal));
       
-      const resolvedPekerjaan = overridePekerjaan || SUB_TYPE_MAP[g.subType] || config.pekerjaanPrefix;
+      const resolvedPekerjaan = g.rows[0]?.custom_pekerjaan || overridePekerjaan || SUB_TYPE_MAP[g.subType] || config.pekerjaanPrefix;
 
       html += `<div class="header">REKAPITULASI KEGIATAN</div>
         <table class="sub-header">
@@ -735,7 +749,7 @@ export default function LaporanPelaksanaanPage() {
          saluran_afvoer: 'SALURAN AIR / AFVOER',
          normalisasi_embung: 'NORMALISASI EMBUNG',
        };
-       const resolvedPek = SUB_TYPE_MAP_HM[log.assignment?.job_sub_type] || config.pekerjaanPrefix;
+       const resolvedPek = log.custom_pekerjaan || SUB_TYPE_MAP_HM[log.assignment?.job_sub_type] || config.pekerjaanPrefix;
        const locStr = `DESA ${v} KECAMATAN ${k}`.toUpperCase();
        const key = `${resolvedPek} ${locStr}`;
        if(!groupedHM[key]) groupedHM[key] = [];
@@ -812,6 +826,7 @@ export default function LaporanPelaksanaanPage() {
                     <th style={{padding:'8px 12px', border:'1px solid #ccc', fontWeight:'bold', textAlign:'center'}}>Aksi</th>
                     <th style={{padding:'8px 12px', border:'1px solid #ccc', fontWeight:'bold'}}>Timestamp</th>
                     <th style={{padding:'8px 12px', border:'1px solid #ccc', fontWeight:'bold'}}>Tanggal</th>
+                    <th style={{padding:'8px 12px', border:'1px solid #ccc', fontWeight:'bold', background:'#fef9c3'}} title="⚠️ OPSIONAL: Biarkan kosong untuk otomatis sistem. Isi hanya jika baris / kelompok pekerjaan ini memiliki pengecualian / butuh penamaan laporan spesifik.">Custom Nama Pekerjaan ℹ️</th>
                     <th style={{padding:'8px 12px', border:'1px solid #ccc', fontWeight:'bold'}}>Nama Operator</th>
                     <th style={{padding:'8px 12px', border:'1px solid #ccc', fontWeight:'bold'}}>Nama Helper</th>
                     <th style={{padding:'8px 12px', border:'1px solid #ccc', fontWeight:'bold'}}>Kecamatan</th>
@@ -838,7 +853,7 @@ export default function LaporanPelaksanaanPage() {
                   {Object.keys(mainTableGroups).map(gId => (
                      <Fragment key={gId}>
                         <tr className="group-header">
-                           <td colSpan={15 + customColumns.length} style={{background:'#e2e8f0', color:'#1e3a5f', padding:'10px 15px', fontWeight:'bold', border:'1px solid #ccc', fontSize:14}}>🗂️ {gId}</td>
+                           <td colSpan={16 + customColumns.length} style={{background:'#e2e8f0', color:'#1e3a5f', padding:'10px 15px', fontWeight:'bold', border:'1px solid #ccc', fontSize:14}}>🗂️ {gId}</td>
                         </tr>
                         {mainTableGroups[gId].map(log => {
                            const helper = log.assignment?.helper_override || log.assignment?.helper?.full_name || '';
@@ -857,6 +872,20 @@ export default function LaporanPelaksanaanPage() {
                                   <input type="date" style={inputStyle} value={log.tanggal || ''} 
                                          onChange={e => handleInlineEdit(log.id, 'tanggal', e.target.value)} 
                                          onBlur={e => handleBlurSave(log.id, 'tanggal', e.target.value)} />
+                               </td>
+
+                               <td style={{padding:'2px', border:'1px solid rgba(0,0,0,0.1)', background:'#fef9c3', minWidth:160}}>
+                                  <div style={{display:'flex', alignItems:'center', gap:4}}>
+                                     <input type="text" placeholder="Default otomatis..." style={{flex:1, border:'1px solid #d1d5db', borderRadius:4, padding:'4px 6px', fontSize:11}}
+                                            value={log.custom_pekerjaan || ''}
+                                            onChange={e => handleInlineEdit(log.id, 'custom_pekerjaan', e.target.value)}
+                                            onBlur={e => handleBlurSave(log.id, 'custom_pekerjaan', e.target.value)} />
+                                     {(log.custom_pekerjaan && log.custom_pekerjaan.trim() !== '') && (
+                                        <button onClick={() => handleCustomPekerjaanApply(gId, log.custom_pekerjaan)} 
+                                                title="Terapkan custom pekerjaan ini ke seluruh grup di atas" 
+                                                style={{background:'#059669', color:'white', border:'none', borderRadius:4, padding:'4px 6px', cursor:'pointer', fontSize:10}}>👇</button>
+                                     )}
+                                  </div>
                                </td>
 
                                {/* OVERRIDE FIELDS — urutan: Operator, Helper, Kecamatan, Desa, Alat */}
