@@ -68,10 +68,13 @@ export default function LaporanPelaksanaanPage() {
   const [printSelectedIds, setPrintSelectedIds] = useState([]);
   
   const [dokModalOpen, setDokModalOpen] = useState(false);
-  const [dokSelection, setDokSelection] = useState({});
-  
+  const [dokSelection, setDokSelection] = useState({}); // { [logId+'_'+fotoIdx]: '0%'|'50%'|'100%'|'skip' }
+  const [dokAccordion, setDokAccordion] = useState(null); // logId yang sedang terbuka
+
   const [hmModalOpen, setHmModalOpen] = useState(false);
-  const [hmSelection, setHmSelection] = useState({});
+  const [hmSelection, setHmSelection] = useState({});   // { [logId]: { before: url, after: url } }
+  const [hmLastAfter, setHmLastAfter] = useState(null);  // last after url untuk auto-fill before berikutnya
+  const [hmAccordion, setHmAccordion] = useState(null);
 
   const loadData = useCallback(async () => {
     setLoading(true);
@@ -615,7 +618,7 @@ export default function LaporanPelaksanaanPage() {
     setTimeout(() => { printWin.print(); }, 800);
   };
 
-  const openDokumentasi = () => { setDokSelection({}); setDokModalOpen(true); };
+  const openDokumentasi = () => { setDokSelection({}); setDokAccordion(null); setDokModalOpen(true); };
   const executePrintDokumentasi = () => {
     // Gunakan pdfConfig global
     const config = pdfConfig || {
@@ -641,7 +644,7 @@ export default function LaporanPelaksanaanPage() {
     let hasPage = false;
     logs.forEach((log) => {
       if(!log.foto_lapangan_urls) return;
-      const urls = log.foto_lapangan_urls.split(',');
+      const urls = log.foto_lapangan_urls.split(',').map(u=>u.trim()).filter(Boolean);
       const selectedForThisLog = urls.map((url, idx) => {
          const prog = dokSelection[log.id + '_' + idx];
          return prog && prog !== 'skip' ? { url, prog } : null;
@@ -692,7 +695,7 @@ export default function LaporanPelaksanaanPage() {
     setDokModalOpen(false);
   };
 
-  const openHourmeter = () => { setHmSelection({}); setHmModalOpen(true); };
+  const openHourmeter = () => { setHmSelection({}); setHmLastAfter(null); setHmAccordion(null); setHmModalOpen(true); };
   const executePrintHourmeter = () => {
     // Gunakan pdfConfig global
     const config = pdfConfig || {
@@ -716,8 +719,8 @@ export default function LaporanPelaksanaanPage() {
 
     const groupedHM = {};
     logs.forEach(log => {
-       const hasSelection = hmSelection[log.id] && (hmSelection[log.id].before || hmSelection[log.id].after);
-       if (!hasSelection) return;
+       const selection = hmSelection[log.id];
+       if (!selection || !selection.before || !selection.after) return;
        const v = log.override_desa || log.assignment?.location_village || '';
        const k = log.override_kecamatan || log.assignment?.location_district || '';
        // Resolve pekerjaan dari job_sub_type
@@ -1048,53 +1051,84 @@ export default function LaporanPelaksanaanPage() {
                   <button onClick={() => setDokModalOpen(false)} style={{background:'transparent', border:'none', color:'#fff', cursor:'pointer', fontSize:20}}>✖</button>
                </div>
                <div style={{flex:1, overflowY:'auto', padding:20, background:'#f8f9fa'}}>
-                  <p style={{margin:'0 0 20px', color:'#555'}}>Tentukan persentase progres untuk dicetak. Jika operator gagal kirim foto, klik "Upload foto lapangan susulan" untuk menambahkannya.</p>
-                  
-                  {Object.keys(groups).map((groupKey, gIdx) => (
-                    <div key={gIdx} style={{marginBottom: 20}}>
-                      <div style={{background:'#e2e8f0', padding:'10px 15px', fontWeight:'bold', borderRadius: '6px 6px 0 0', border:'1px solid #cbd5e1'}}>
-                        🗂️ {groupKey}
-                      </div>
-                      <div style={{background:'#fff', border:'1px solid #cbd5e1', borderTop:'none', borderRadius: '0 0 6px 6px', padding: 15}}>
-                         {groups[groupKey].map(log => {
-                            const urls = log.foto_lapangan_urls ? log.foto_lapangan_urls.split(',').filter(Boolean) : [];
-                            return (
-                              <Fragment key={log.id}>
-                              <div style={{marginBottom: 20, paddingBottom: 15, borderBottom:'1px dashed #ccc'}}>
-                                <div style={{fontWeight:'bold', color:'#333', marginBottom:10}}>▶ Tanggal: {new Date(log.tanggal).toLocaleDateString('id-ID')} | {log.progress_pekerjaan}</div>
-                                <div style={{display:'flex', gap:15, flexWrap:'wrap', marginLeft: 20}}>
-                                   {urls.map((url, uIdx) => {
-                                      const key = log.id + '_' + uIdx;
-                                      const val = dokSelection[key] || 'skip';
-                                      return (
-                                          <div key={uIdx} style={{border:'1px solid #dee2e6', borderRadius:6, padding:8, width: 170, textAlign:'center'}}>
-                                              <img src={url} style={{width:'100%', height:100, objectFit:'cover', borderRadius:4, marginBottom:5}} />
-                                              <div style={{fontSize:11, textAlign:'left'}}>
-                                                 <label style={{display:'block', cursor:'pointer'}}><input type="radio" checked={val==='skip'} onChange={()=>setDokSelection(p=>({...p, [key]:'skip'}))} /> 🚫 Lewati</label>
-                                                 <label style={{display:'block', cursor:'pointer'}}><input type="radio" checked={val==='0%'} onChange={()=>setDokSelection(p=>({...p, [key]:'0%'}))} /> 🟠 0%</label>
-                                                 <label style={{display:'block', cursor:'pointer'}}><input type="radio" checked={val==='50%'} onChange={()=>setDokSelection(p=>({...p, [key]:'50%'}))} /> 🟡 50%</label>
-                                                 <label style={{display:'block', cursor:'pointer'}}><input type="radio" checked={val==='100%'} onChange={()=>setDokSelection(p=>({...p, [key]:'100%'}))} /> 🟢 100%</label>
-                                              </div>
-                                          </div>
-                                      )
-                                   })}
-                                   <div style={{width:170, border: '2px dashed #ced4da', borderRadius: 8, padding: 15, display:'flex', alignItems:'center', justifyContent:'center', textAlign: 'center', cursor: 'pointer', background: '#f8f9fa'}} onClick={() => document.getElementById('up_dok_'+log.id).click()}>
-                                      <input type="file" id={'up_dok_'+log.id} multiple accept="image/*" style={{display:'none'}} onChange={(e)=>handleUploadTambahan(e, log.id, 'lapangan')} />
-                                      <div style={{fontSize:12, color:'#1e3a5f'}}>📤<br/><b>Upload foto lapangan susulan</b></div>
+                   <p style={{margin:'0 0 15px', color:'#555', fontSize:13}}>Klik baris untuk expand foto. Tandai setiap foto dengan progres sebelum mencetak.</p>
+                   {/* Counter */}
+                   {(() => { const total = Object.values(dokSelection).filter(v=>v&&v!=='skip').length; return total > 0 && <div style={{background:'#d1fae5', border:'1px solid #6ee7b7', borderRadius:6, padding:'8px 14px', marginBottom:12, fontSize:13, fontWeight:600, color:'#065f46'}}>✅ {total} foto ditandai untuk dicetak</div>; })()}
+                   {Object.keys(groups).map((groupKey, gIdx) => (
+                     <div key={gIdx} style={{marginBottom: 20}}>
+                       <div style={{background:'#1e3a5f', color:'#fff', padding:'10px 15px', fontWeight:'bold', borderRadius: '6px 6px 0 0', fontSize:13}}>
+                         🗂️ {groupKey}
+                       </div>
+                       <div style={{background:'#fff', border:'1px solid #cbd5e1', borderTop:'none', borderRadius: '0 0 6px 6px'}}>
+                          {groups[groupKey].map(log => {
+                             const urls = log.foto_lapangan_urls ? log.foto_lapangan_urls.split(',').map(u=>u.trim()).filter(Boolean) : [];
+                             const tglStr = new Date(log.tanggal).toLocaleDateString('id-ID');
+                             const selectedCount = urls.filter((_,uIdx) => dokSelection[log.id+'_'+uIdx] && dokSelection[log.id+'_'+uIdx]!=='skip').length;
+                             const isOpen = dokAccordion === log.id;
+                             return (
+                               <Fragment key={log.id}>
+                               {/* Header baris (accordion toggle) */}
+                               <div onClick={()=>setDokAccordion(isOpen ? null : log.id)}
+                                 style={{display:'flex', alignItems:'center', justifyContent:'space-between', padding:'10px 15px', cursor:'pointer', borderBottom:'1px solid #e2e8f0', background: isOpen ? '#eff6ff' : '#fff', transition:'background 0.2s'}}>
+                                 <div>
+                                   <span style={{fontWeight:600, color:'#1e3a5f'}}>📅 {tglStr}</span>
+                                   <span style={{marginLeft:12, fontSize:12, color:'#555'}}>{log.override_operator || log.operator?.full_name || log.operator_name || '-'}</span>
+                                   <span style={{marginLeft:8, fontSize:11, background:'#e2e8f0', padding:'2px 8px', borderRadius:10}}>{urls.length} 📷</span>
+                                   {selectedCount > 0 && <span style={{marginLeft:8, fontSize:11, background:'#d1fae5', color:'#065f46', padding:'2px 8px', borderRadius:10}}>✅ {selectedCount} dipilih</span>}
+                                 </div>
+                                 <span style={{fontSize:18, color:'#999'}}>{isOpen ? '▲' : '▼'}</span>
+                               </div>
+                               {/* Accordion content */}
+                               {isOpen && (
+                               <div style={{padding:15, background:'#f8fafc', borderBottom:'1px solid #e2e8f0'}}>
+                                 {urls.length === 0 ? (
+                                   <div style={{color:'#856404', background:'#fef9c3', padding:10, borderRadius:6, fontSize:12}}>⚠️ Tidak ada foto dari operator. Upload manual di bawah.</div>
+                                 ) : (
+                                   <div style={{display:'flex', gap:12, flexWrap:'wrap', marginBottom:12}}>
+                                     {urls.map((url, uIdx) => {
+                                       const key = log.id + '_' + uIdx;
+                                       const val = dokSelection[key] || 'skip';
+                                       const colors = {'0%':'#fed7aa','50%':'#fde68a','100%':'#bbf7d0','skip':'#f1f5f9'};
+                                       const labels = {'0%':'🟠 0%','50%':'🟡 50%','100%':'🟢 100%','skip':'⬜ Lewati'};
+                                       return (
+                                         <div key={uIdx} style={{border: `2px solid ${val!=='skip'?'#3b82f6':'#e2e8f0'}`, borderRadius:8, padding:8, width:155, textAlign:'center', background: colors[val]||'#f9fafb', transition:'all 0.2s'}}>
+                                           <img src={driveUrlToImg(url)} onError={e=>{e.target.src='data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTAwIiBoZWlnaHQ9IjcwIiB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciPjxyZWN0IHdpZHRoPSIxMDAiIGhlaWdodD0iNzAiIGZpbGw9IiNlMmU4ZjAiLz48dGV4dCB4PSI1MCIgeT0iMzUiIGZvbnQtc2l6ZT0iMTIiIHRleHQtYW5jaG9yPSJtaWRkbGUiIGZpbGw9IiM5Y2EzYWYiPkZvdG8ge3VJZHgrMX08L3RleHQ+PC9zdmc+'}} style={{width:'100%', height:90, objectFit:'cover', borderRadius:5, marginBottom:6}}/>
+                                           <div style={{fontSize:11, fontWeight:600,color:'#334155',marginBottom:5}}>{labels[val]}</div>
+                                           <div style={{fontSize:11, display:'flex', flexDirection:'column', gap:2}}>
+                                             {['skip','0%','50%','100%'].map(opt=>(
+                                               <label key={opt} style={{cursor:'pointer', display:'flex', alignItems:'center', gap:4, padding:'2px 4px', borderRadius:4, background: val===opt?'rgba(59,130,246,0.1)':'transparent'}}>
+                                                 <input type="radio" name={'dok_'+key} checked={val===opt} onChange={()=>setDokSelection(p=>({...p,[key]:opt}))} style={{accentColor:'#3b82f6'}}/>
+                                                 {opt==='skip'?'Lewati':opt}
+                                               </label>
+                                             ))}
+                                           </div>
+                                         </div>
+                                       );
+                                     })}
+                                     {/* Upload tambahan */}
+                                     <div style={{width:155, border:'2px dashed #93c5fd', borderRadius:8, display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', padding:10, cursor:'pointer', background:'#eff6ff'}} onClick={()=>document.getElementById('up_dok_'+log.id).click()}>
+                                       <input type="file" id={'up_dok_'+log.id} multiple accept="image/*" style={{display:'none'}} onChange={(e)=>handleUploadTambahan(e, log.id, 'lapangan')}/>
+                                       <span style={{fontSize:22}}>📤</span>
+                                       <span style={{fontSize:11, color:'#1d4ed8', fontWeight:600, marginTop:4}}>Upload Susulan</span>
+                                     </div>
                                    </div>
-                                </div>
-                              </div>
-                              </Fragment>
-                            )
-                         })}
-                      </div>
+                                 )}
+                               </div>
+                               )}
+                               </Fragment>
+                             );
+                          })}
+                       </div>
+                     </div>
+                   ))}
+                </div>
+                <div style={{padding:'14px 20px', background:'#fff', borderTop:'1px solid #ddd', display:'flex', justifyContent:'space-between', alignItems:'center'}}>
+                    <span style={{fontSize:13, color:'#555'}}>{Object.values(dokSelection).filter(v=>v&&v!=='skip').length} foto akan dicetak</span>
+                    <div>
+                      <button className="btn btn-outline" style={{marginRight:10}} onClick={() => setDokModalOpen(false)}>Batal</button>
+                      <button className="btn btn-primary" onClick={executePrintDokumentasi} disabled={Object.values(dokSelection).filter(v=>v&&v!=='skip').length===0}>🖨️ Cetak PDF</button>
                     </div>
-                  ))}
-               </div>
-               <div style={{padding:20, background:'#fff', borderTop:'1px solid #ddd', textAlign:'right'}}>
-                   <button className="btn btn-outline" style={{marginRight:10}} onClick={() => setDokModalOpen(false)}>Batal</button>
-                   <button className="btn btn-primary" onClick={executePrintDokumentasi}>🚀 Generate PDF</button>
-               </div>
+                </div>
            </div>
         </div>
       )})()}
@@ -1110,70 +1144,96 @@ export default function LaporanPelaksanaanPage() {
                   <button onClick={() => setHmModalOpen(false)} style={{background:'transparent', border:'none', color:'#fff', cursor:'pointer', fontSize:20}}>✖</button>
                </div>
                <div style={{flex:1, overflowY:'auto', padding:20, background:'#f8f9fa'}}>
-                  <p style={{margin:'0 0 20px', color:'#555'}}>Tentukan foto "Before" dan "After" untuk dicetak ke arsip. Tambahkan foto manual jika perlu.</p>
-                  
-                  {Object.keys(groups).map((groupKey, gIdx) => (
-                    <div key={gIdx} style={{marginBottom: 20}}>
-                      <div style={{background:'#e2e8f0', padding:'10px 15px', fontWeight:'bold', borderRadius: '6px 6px 0 0', border:'1px solid #cbd5e1'}}>
-                        🗂️ {groupKey}
-                      </div>
-                      <div style={{background:'#fff', border:'1px solid #cbd5e1', borderTop:'none', borderRadius: '0 0 6px 6px', padding: 15}}>
-                         {groups[groupKey].map(log => {
-                            const urls = log.foto_hourmeter_urls ? log.foto_hourmeter_urls.split(',').filter(Boolean) : [];
-                            const curSel = hmSelection[log.id] || {before:'', after:''};
-                            
-                            return (
-                              <Fragment key={log.id}>
-                              <div style={{marginBottom: 20, paddingBottom: 15, borderBottom:'1px dashed #ccc', display:'flex', gap: 20}}>
-                                 {/* KIRI: Preview Selected */}
-                                 <div style={{flex:'0 0 320px', background:'#f8f9fa', padding:15, border:'1px solid #ddd', borderRadius:8}}>
-                                    <div style={{fontWeight:'bold', marginBottom:10, color:'#1e3a5f'}}>Tgl: {new Date(log.tanggal).toLocaleDateString('id-ID')}</div>
-                                    <div style={{display:'flex', gap:10}}>
-                                       <div style={{flex:1, textAlign:'center'}}>
-                                          <div style={{fontSize:10, fontWeight:'bold', marginBottom:4}}>HM AWAL</div>
-                                          <div style={{height:80, border:'2px dashed #bbb', background:'#fff', borderRadius:4, display:'flex', alignItems:'center', justifyContent:'center'}}>
-                                              {curSel.before ? <img src={curSel.before} style={{width:'100%',height:'100%',objectFit:'cover'}}/>:<span style={{fontSize:9, color:'#888'}}>Kosong</span>}
-                                          </div>
-                                       </div>
-                                       <div style={{flex:1, textAlign:'center'}}>
-                                          <div style={{fontSize:10, fontWeight:'bold', marginBottom:4}}>HM AKHIR</div>
-                                          <div style={{height:80, border:'2px dashed #bbb', background:'#fff', borderRadius:4, display:'flex', alignItems:'center', justifyContent:'center'}}>
-                                              {curSel.after ? <img src={curSel.after} style={{width:'100%',height:'100%',objectFit:'cover'}}/>:<span style={{fontSize:9, color:'#888'}}>Kosong</span>}
-                                          </div>
-                                       </div>
-                                    </div>
+                   <p style={{margin:'0 0 15px', color:'#555', fontSize:13}}>Klik baris untuk expand foto. Pilih 1 foto sebagai <b>Before (HM Awal)</b> dan 1 sebagai <b>After (HM Akhir)</b>. Before baris berikutnya otomatis diisi dari After sebelumnya.</p>
+                   {/* Counter */}
+                   {(() => { const total = Object.values(hmSelection).filter(s=>s?.before&&s?.after).length; return total > 0 && <div style={{background:'#d1fae5', border:'1px solid #6ee7b7', borderRadius:6, padding:'8px 14px', marginBottom:12, fontSize:13, fontWeight:600, color:'#065f46'}}>✅ {total} pasang Before/After siap cetak</div>; })()}
+                   {Object.keys(groups).map((groupKey, gIdx) => (
+                     <div key={gIdx} style={{marginBottom: 20}}>
+                       <div style={{background:'#1e3a5f', color:'#fff', padding:'10px 15px', fontWeight:'bold', borderRadius: '6px 6px 0 0', fontSize:13}}>
+                         🗂️ {groupKey}
+                       </div>
+                       <div style={{background:'#fff', border:'1px solid #cbd5e1', borderTop:'none', borderRadius: '0 0 6px 6px'}}>
+                          {groups[groupKey].map(log => {
+                             // Gunakan foto_lapangan_urls sebagai sumber foto hourmeter (APK hanya upload ke sini)
+                             const urls = log.foto_lapangan_urls ? log.foto_lapangan_urls.split(',').map(u=>u.trim()).filter(Boolean) : [];
+                             const curSel = hmSelection[log.id] || {before: hmLastAfter||'', after:''};
+                             const tglStr = new Date(log.tanggal).toLocaleDateString('id-ID');
+                             const isOpen = hmAccordion === log.id;
+                             const isPaired = curSel.before && curSel.after;
+                             return (
+                               <Fragment key={log.id}>
+                               {/* Header baris accordion */}
+                               <div onClick={()=>setHmAccordion(isOpen ? null : log.id)}
+                                 style={{display:'flex', alignItems:'center', justifyContent:'space-between', padding:'10px 15px', cursor:'pointer', borderBottom:'1px solid #e2e8f0', background: isOpen ? '#eff6ff': '#fff'}}>
+                                 <div style={{display:'flex', alignItems:'center', gap:10}}>
+                                   <span style={{fontWeight:600, color:'#1e3a5f'}}>📅 {tglStr}</span>
+                                   <span style={{fontSize:12, color:'#555'}}>{log.override_operator || log.operator?.full_name || log.operator_name || '-'}</span>
+                                   <span style={{fontSize:11, background:'#e2e8f0', padding:'2px 8px', borderRadius:10}}>{urls.length} 📷</span>
+                                   {isPaired && <span style={{fontSize:11, background:'#d1fae5', color:'#065f46', padding:'2px 8px', borderRadius:10}}>✅ Lengkap</span>}
+                                   {curSel.before && !curSel.after && <span style={{fontSize:11, background:'#fef9c3', color:'#854d0e', padding:'2px 8px', borderRadius:10}}>⚠️ Belum ada After</span>}
                                  </div>
-                                 {/* KANAN: Foto Pilihan + Uploader */}
-                                 <div style={{flex:1}}>
-                                    <div style={{marginBottom:10, color:'#666', fontSize:12}}>Pilih dari foto yang dikirim operator atau upload manual:</div>
-                                    <div style={{display:'flex', gap:10, flexWrap:'wrap'}}>
+                                 <span style={{fontSize:18, color:'#999'}}>{isOpen ? '▲' : '▼'}</span>
+                               </div>
+                               {isOpen && (
+                               <div style={{padding:15, background:'#f8fafc', borderBottom:'1px solid #e2e8f0'}}>
+                                 {/* Preview Before/After */}
+                                 <div style={{display:'flex', gap:15, marginBottom:15}}>
+                                   <div style={{flex:1, background:'#fff7ed', border:'2px solid #fed7aa', borderRadius:8, padding:12, textAlign:'center'}}>
+                                     <div style={{fontSize:12, fontWeight:700, color:'#c2410c', marginBottom:8}}>📷 BEFORE (HM Awal)</div>
+                                     <div style={{height:100, display:'flex', alignItems:'center', justifyContent:'center', background:'#fff', borderRadius:6, overflow:'hidden'}}>
+                                       {curSel.before ? <img src={driveUrlToImg(curSel.before)} style={{maxWidth:'100%', maxHeight:'100%', objectFit:'contain'}}/> : <span style={{color:'#aaa', fontSize:12}}>Belum dipilih</span>}
+                                     </div>
+                                   </div>
+                                   <div style={{flex:1, background:'#f0fdf4', border:'2px solid #bbf7d0', borderRadius:8, padding:12, textAlign:'center'}}>
+                                     <div style={{fontSize:12, fontWeight:700, color:'#15803d', marginBottom:8}}>📷 AFTER (HM Akhir)</div>
+                                     <div style={{height:100, display:'flex', alignItems:'center', justifyContent:'center', background:'#fff', borderRadius:6, overflow:'hidden'}}>
+                                       {curSel.after ? <img src={driveUrlToImg(curSel.after)} style={{maxWidth:'100%', maxHeight:'100%', objectFit:'contain'}}/> : <span style={{color:'#aaa', fontSize:12}}>Belum dipilih</span>}
+                                     </div>
+                                   </div>
+                                 </div>
+                                 {/* Grid foto pilihan */}
+                                 {urls.length === 0 ? (
+                                   <div style={{color:'#856404', background:'#fef9c3', padding:10, borderRadius:6, fontSize:12}}>⚠️ Tidak ada foto dari operator. Upload manual di bawah.</div>
+                                 ) : (
+                                   <div>
+                                     <div style={{fontSize:12, color:'#555', marginBottom:8}}>Pilih foto untuk Before/After:</div>
+                                     <div style={{display:'flex', gap:10, flexWrap:'wrap'}}>
                                        {urls.map((url, uIdx) => (
-                                          <div key={uIdx} style={{border:'1px solid #eee', padding:5, borderRadius:6, width:130, textAlign:'center'}}>
-                                             <img src={url} style={{width:'100%', height:70, objectFit:'cover', borderRadius:4, marginBottom:5}}/>
-                                             <div style={{display:'flex', gap:5}}>
-                                                <button style={{flex:1, fontSize:10, padding:'3px 0', background:'#ffc107', border:'none', cursor:'pointer'}} onClick={()=>setHmSelection(p=>{const n={...p}; if(!n[log.id])n[log.id]={after:''}; n[log.id].before=url; return n;})}>Awal</button>
-                                                <button style={{flex:1, fontSize:10, padding:'3px 0', background:'#28a745', color:'#fff', border:'none', cursor:'pointer'}} onClick={()=>setHmSelection(p=>{const n={...p}; if(!n[log.id])n[log.id]={before:''}; n[log.id].after=url; return n;})}>Akhir</button>
-                                             </div>
-                                          </div>
+                                         <div key={uIdx} style={{border:'1px solid #e2e8f0', borderRadius:8, padding:8, width:140, textAlign:'center', background:'#fff'}}>
+                                           <img src={driveUrlToImg(url)} onError={e=>{e.target.src='data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTAwIiBoZWlnaHQ9IjcwIiB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciPjxyZWN0IHdpZHRoPSIxMDAiIGhlaWdodD0iNzAiIGZpbGw9IiNlMmU4ZjAiLz48dGV4dCB4PSI1MCIgeT0iMzUiIGZvbnQtc2l6ZT0iMTIiIHRleHQtYW5jaG9yPSJtaWRkbGUiIGZpbGw9IiM5Y2EzYWYiPkZvdG88L3RleHQ+PC9zdmc+'}} style={{width:'100%', height:80, objectFit:'cover', borderRadius:5, marginBottom:6}}/>
+                                           <div style={{display:'flex', gap:4}}>
+                                             <button style={{flex:1, fontSize:10, padding:'4px 2px', background: curSel.before===url?'#f97316':'#fed7aa', color: curSel.before===url?'#fff':'#7c2d12', border:'none', borderRadius:4, cursor:'pointer', fontWeight:600}}
+                                               onClick={()=>{ setHmSelection(p=>{const n={...p,[log.id]:{...curSel, before:url}}; return n;}); }}>⬅ Before</button>
+                                             <button style={{flex:1, fontSize:10, padding:'4px 2px', background: curSel.after===url?'#16a34a':'#bbf7d0', color: curSel.after===url?'#fff':'#14532d', border:'none', borderRadius:4, cursor:'pointer', fontWeight:600}}
+                                               onClick={()=>{ setHmSelection(p=>{const n={...p,[log.id]:{...curSel, after:url}}; return n;}); setHmLastAfter(url); }}>After ➡</button>
+                                           </div>
+                                         </div>
                                        ))}
-                                       <div style={{width:130, border: '2px dashed #ced4da', borderRadius: 6, display:'flex', alignItems:'center', justifyContent:'center', textAlign: 'center', cursor: 'pointer', background: '#f8f9fa'}} onClick={() => document.getElementById('up_hm_'+log.id).click()}>
-                                          <input type="file" id={'up_hm_'+log.id} multiple accept="image/*" style={{display:'none'}} onChange={(e)=>handleUploadTambahan(e, log.id, 'hourmeter')} />
-                                          <div style={{fontSize:11, color:'#1e3a5f'}}>📤<br/><b>Upload HM Tambahan</b></div>
+                                       {/* Upload manual */}
+                                       <div style={{width:140, border:'2px dashed #93c5fd', borderRadius:8, display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', padding:10, cursor:'pointer', background:'#eff6ff'}} onClick={()=>document.getElementById('up_hm_'+log.id).click()}>
+                                         <input type="file" id={'up_hm_'+log.id} multiple accept="image/*" style={{display:'none'}} onChange={(e)=>handleUploadTambahan(e, log.id, 'lapangan')}/>
+                                         <span style={{fontSize:22}}>📤</span>
+                                         <span style={{fontSize:11, color:'#1d4ed8', fontWeight:600, marginTop:4}}>Upload Manual</span>
                                        </div>
-                                    </div>
-                                 </div>
-                              </div>
-                              </Fragment>
-                            )
-                         })}
-                      </div>
+                                     </div>
+                                   </div>
+                                 )}
+                               </div>
+                               )}
+                               </Fragment>
+                             );
+                          })}
+                       </div>
+                     </div>
+                   ))}
+                </div>
+                <div style={{padding:'14px 20px', background:'#fff', borderTop:'1px solid #ddd', display:'flex', justifyContent:'space-between', alignItems:'center'}}>
+                    <span style={{fontSize:13, color:'#555'}}>{Object.values(hmSelection).filter(s=>s?.before&&s?.after).length} pasang siap cetak</span>
+                    <div>
+                      <button className="btn btn-outline" style={{marginRight:10}} onClick={() => setHmModalOpen(false)}>Batal</button>
+                      <button className="btn btn-primary" onClick={executePrintHourmeter} disabled={Object.values(hmSelection).filter(s=>s?.before&&s?.after).length===0}>🖨️ Cetak PDF</button>
                     </div>
-                  ))}
-               </div>
-               <div style={{padding:20, background:'#fff', borderTop:'1px solid #ddd', textAlign:'right'}}>
-                   <button className="btn btn-outline" style={{marginRight:10}} onClick={() => setHmModalOpen(false)}>Batal</button>
-                   <button className="btn btn-primary" onClick={executePrintHourmeter}>🚀 Generate PDF</button>
-               </div>
+                </div>
            </div>
         </div>
       )})()}
