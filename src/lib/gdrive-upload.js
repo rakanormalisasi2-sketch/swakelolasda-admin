@@ -109,6 +109,9 @@ export async function uploadPhotoToDrive({ sectionRole, operatorName, village, d
     requestBody: { role: 'reader', type: 'anyone' },
   });
 
-  // 6. Return URL view langsung (bisa dibuka di browser)
-  return `https://drive.google.com/file/d/${fileId}/view`;
+  // 6. Return dua format URL:
+  //    - thumbnail: untuk dipakai sebagai <img src> di cetak dokumentasi/hourmeter
+  //    - view: untuk dibuka user di browser
+  // Simpan keduanya? Cukup simpan thumbnail format karena bisa derive view dari ID
+  return `https://drive.google.com/thumbnail?id=${fileId}&sz=w800`;
 }

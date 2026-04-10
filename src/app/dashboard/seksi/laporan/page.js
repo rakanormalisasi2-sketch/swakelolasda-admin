@@ -30,6 +30,28 @@ function evaluateFormula(formula, log) {
   } catch { return ''; }
 }
 
+// ─── Ekstrak Google Drive File ID dari berbagai format URL ────────────
+function extractDriveFileId(url) {
+  if (!url) return null;
+  const m = url.match(/\/d\/([a-zA-Z0-9_-]{25,})/)       // /file/d/{id}/view
+    || url.match(/id=([a-zA-Z0-9_-]{25,})/)               // uc?export=view&id= atau thumbnail?id=
+    || url.match(/\/([a-zA-Z0-9_-]{25,})\?/);             // format lain
+  return m ? m[1] : null;
+}
+
+// Konversi URL ke format yang bisa dipakai sebagai <img src> (untuk cetak)
+function driveUrlToImg(url) {
+  const id = extractDriveFileId(url.trim());
+  return id ? `https://drive.google.com/thumbnail?id=${id}&sz=w800` : url.trim();
+}
+
+// Konversi URL ke format view yang bisa dibuka di tab baru (untuk link tabel)
+function driveUrlToView(url) {
+  const id = extractDriveFileId(url.trim());
+  return id ? `https://drive.google.com/file/d/${id}/view` : url.trim();
+}
+
+
 export default function LaporanPelaksanaanPage() {
   const { profile } = useAuth();
   const [logs, setLogs] = useState([]);
@@ -658,7 +680,7 @@ export default function LaporanPelaksanaanPage() {
       selectedForThisLog.sort((a,b) => { const ord = {'0%':0, '50%':1, '100%':2}; return ord[a.prog] - ord[b.prog]; });
       selectedForThisLog.forEach(item => {
         html += `<table class="photo-table"><tr>
-          <td width="60%"><div class="img-container"><img src="${item.url.trim()}" /></div></td>
+          <td width="60%"><div class="img-container"><img src="${driveUrlToImg(item.url)}" /></div></td>
           <td width="40%"><b>KETERANGAN :</b><br/><br/>FOTO PROSES PELAKSANAAN<br/>${item.prog}</td>
         </tr></table>`;
       });
@@ -726,8 +748,8 @@ export default function LaporanPelaksanaanPage() {
          const tgl = new Date(log.tanggal).toLocaleDateString('id-ID', {day:'2-digit', month:'short', year:'numeric'}).toUpperCase();
          html += `<tr><td colspan="2" style="padding:15px; font-size: 14px;"><b>${idx + 1}. &nbsp;&nbsp;&nbsp; ${tgl}</b></td></tr>
           <tr>
-            <td class="img-cell">${selection.before ? '<img src="' + selection.before.trim() + '" />' : '<i>Belum ada foto</i>'}</td>
-            <td class="img-cell">${selection.after ? '<img src="' + selection.after.trim() + '" />' : '<i>Belum ada foto</i>'}</td>
+            <td class="img-cell">${selection.before ? '<img src="' + driveUrlToImg(selection.before) + '" />' : '<i>Belum ada foto</i>'}</td>
+            <td class="img-cell">${selection.after ? '<img src="' + driveUrlToImg(selection.after) + '" />' : '<i>Belum ada foto</i>'}</td>
           </tr>`;
       });
       html += `</table>`;
@@ -889,21 +911,15 @@ export default function LaporanPelaksanaanPage() {
                                          onBlur={e => handleBlurSave(log.id, 'jam_kerja', e.target.value)} />
                                </td>
 
-                               {/* Foto — semua URL ditampilkan sebagai link */}
+                               {/* Foto — link view untuk dibuka di tab baru */}
                                <td style={{padding:'4px 8px', border:'1px solid rgba(0,0,0,0.1)', maxWidth: 140}}>
                                  {log.foto_lapangan_urls ? (
                                    <div style={{display:'flex', flexDirection:'column', gap:2}}>
                                      {log.foto_lapangan_urls.split(',').map((url, fi) => {
                                        const trimmed = url.trim();
                                        if (!trimmed) return null;
-                                       // Extract file ID dari berbagai format URL Drive
-                                       const idMatch = trimmed.match(/\/d\/([a-zA-Z0-9_-]{25,})/)
-                                         || trimmed.match(/id=([a-zA-Z0-9_-]{25,})/);
-                                       const viewUrl = idMatch
-                                         ? `https://drive.google.com/file/d/${idMatch[1]}/view`
-                                         : trimmed;
                                        return (
-                                         <a key={fi} href={viewUrl} target="_blank" rel="noreferrer"
+                                         <a key={fi} href={driveUrlToView(trimmed)} target="_blank" rel="noreferrer"
                                            style={{color:'#1a0dab', textDecoration:'underline', fontSize:11, whiteSpace:'nowrap'}}>
                                            📷 Foto {fi + 1}
                                          </a>
