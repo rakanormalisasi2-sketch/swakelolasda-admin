@@ -9,6 +9,7 @@ export default function PenugasanPage() {
   const [operators, setOperators] = useState([]);
   const [alat, setAlat] = useState([]);
   const [assignments, setAssignments] = useState([]);
+  const [busyIdsAll, setBusyIdsAll] = useState(new Set()); // semua seksi
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -55,7 +56,7 @@ export default function PenugasanPage() {
 
   const load = useCallback(async () => {
     setLoading(true);
-    const [{ data: ops }, { data: alatData }, { data: asgn }] = await Promise.all([
+    const [{ data: ops }, { data: alatData }, { data: asgn }, { data: allActiveAsgn }] = await Promise.all([
       supabase.from('user_profiles').select('*').eq('role', 'operator').order('full_name'),
       supabase.from('heavy_equipment').select('*').order('name'),
       supabase.from('assignments').select(`
@@ -64,20 +65,30 @@ export default function PenugasanPage() {
         helper:user_profiles!assignments_helper_id_fkey(full_name),
         equipment:heavy_equipment(name, status)
       `).eq('status', 'active').eq('created_by_role', profile?.role),
+      // Ambil SEMUA assignment aktif (lintas seksi) hanya untuk cek busyIds
+      supabase.from('assignments').select('operator_id, helper_id').eq('status', 'active'),
     ]);
     setOperators(ops || []);
     setAlat(alatData || []);
     setAssignments(asgn || []);
+    // busyIds dihitung dari semua seksi agar tidak bisa assign operator yang sudah aktif di seksi lain
+    const allBusy = new Set([
+      ...(allActiveAsgn || []).map(a => a.operator_id),
+      ...(allActiveAsgn || []).map(a => a.helper_id).filter(Boolean),
+    ]);
+    setBusyIdsAll(allBusy);
     setLoading(false);
   }, []);
 
   useEffect(() => { load(); }, [load]);
 
+  // busyIds dari seksi sendiri (untuk edit mode — tetap include operator saat ini)
   const busyIds = new Set([
     ...assignments.map(a => a.operator_id),
     ...assignments.map(a => a.helper_id).filter(Boolean),
   ]);
-  const freeOperators = operators.filter(o => !busyIds.has(o.id));
+  // busyIdsAll: lintas seksi (untuk filter dropdown)
+  const freeOperators = operators.filter(o => !busyIdsAll.has(o.id));
   const availableAlat = alat.filter(a => a.status === 'ready');
 
   const handleDistrictChange = (kec) => {
@@ -233,14 +244,14 @@ export default function PenugasanPage() {
                     <select className="form-control" required value={form.operator_id} onChange={e=>setForm({...form,operator_id:e.target.value})}>
                       <option value="">— Pilih Operator —</option>
                       {/* For edit mode, we must include the current operator even if busy */}
-                      {operators.filter(o => !busyIds.has(o.id) || o.id === form.operator_id).map(o=><option key={o.id} value={o.id}>{o.full_name}</option>)}
+                      {operators.filter(o => !busyIdsAll.has(o.id) || o.id === form.operator_id).map(o=><option key={o.id} value={o.id}>{o.full_name}</option>)}
                     </select>
                   </div>
                   <div className="form-group">
                     <label className="form-label">Helper/Operator 2 <span className="text-xs text-muted">(opsional)</span></label>
                     <select className="form-control" value={form.helper_id} onChange={e=>setForm({...form,helper_id:e.target.value})}>
                       <option value="">— Tanpa Helper —</option>
-                      {operators.filter(o => (!busyIds.has(o.id) || o.id === form.helper_id) && o.id !== form.operator_id).map(o=><option key={o.id} value={o.id}>{o.full_name}</option>)}
+                      {operators.filter(o => (!busyIdsAll.has(o.id) || o.id === form.helper_id) && o.id !== form.operator_id).map(o=><option key={o.id} value={o.id}>{o.full_name}</option>)}
                     </select>
                   </div>
                 </div>

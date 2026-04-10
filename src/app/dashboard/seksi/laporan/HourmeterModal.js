@@ -21,6 +21,7 @@ function toView(url) {
 
 export default function HourmeterModal({ logs, onClose, pdfConfig, handleUploadTambahan }) {
   const [hmSelection, setHmSelection] = useState({}); // { [logId]: { before: url, after: url } }
+  const [customPekerjaan, setCustomPekerjaan] = useState('');
   const [hmLastAfter, setHmLastAfter] = useState(null);
   const [activeLogId, setActiveLogId] = useState(null);
 
@@ -81,7 +82,7 @@ export default function HourmeterModal({ logs, onClose, pdfConfig, handleUploadT
       if (!sel.before || !sel.after) return;
       const desa = (log.override_desa || log.assignment?.location_village || '').toUpperCase();
       const kec  = (log.override_kecamatan || log.assignment?.location_district || '').toUpperCase();
-      const pek  = SUB_MAP[log.assignment?.job_sub_type] || config.pekerjaanPrefix;
+      const pek  = (customPekerjaan||"").trim().toUpperCase() || SUB_MAP[log.assignment?.job_sub_type] || config.pekerjaanPrefix;
       const key  = `${pek}|${desa}|${kec}`;
       if (!groups[key]) groups[key] = { pek, desa, kec, items: [] };
       groups[key].items.push({ log, sel });
@@ -131,6 +132,12 @@ export default function HourmeterModal({ logs, onClose, pdfConfig, handleUploadT
             <div>
               <div style={{ fontWeight:700, fontSize:16 }}>Konfigurasi Cetak Hourmeter</div>
               <div style={{ fontSize:12, opacity:0.8 }}>Pilih foto Before & After untuk setiap hari kerja</div>
+              <div style={{ marginTop:8, display:'flex', alignItems:'center', gap:6, flexWrap:'wrap' }}>
+                <span style={{ fontSize:12, color:'rgba(255,255,255,0.85)', whiteSpace:'nowrap' }}>✏️ Custom Pekerjaan:</span>
+                <input value={customPekerjaan} onChange={e=>setCustomPekerjaan(e.target.value)}
+                  placeholder="Kosongkan = nama pekerjaan default per baris"
+                  style={{flex:1, minWidth:200, padding:'5px 8px', borderRadius:6, border:'1px solid rgba(255,255,255,0.3)', background:'rgba(255,255,255,0.15)', color:'#fff', fontSize:12, outline:'none'}} />
+              </div>
             </div>
           </div>
           <div style={{display:'flex',gap:12,alignItems:'center'}}>

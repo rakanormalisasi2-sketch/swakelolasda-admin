@@ -68,6 +68,7 @@ export default function LaporanPelaksanaanPage() {
   const [filterTab, setFilterTab] = useState('semua');
   const [printModalInfo, setPrintModalInfo] = useState({ open: false, type: '' });
   const [printSelectedIds, setPrintSelectedIds] = useState([]);
+  const [customPrintPekerjaan, setCustomPrintPekerjaan] = useState('');
   
   const [dokModalOpen, setDokModalOpen] = useState(false);
   const [dokSelection, setDokSelection] = useState({}); // { [logId+'_'+fotoIdx]: '0%'|'50%'|'100%'|'skip' }
@@ -249,6 +250,7 @@ export default function LaporanPelaksanaanPage() {
   // ============ MODAL SELECTION LOGIC ============
   const openPrintModal = (type) => {
     setPrintSelectedIds([]);
+    setCustomPrintPekerjaan('');
     setPrintModalInfo({ open: true, type });
   };
 
@@ -310,13 +312,13 @@ export default function LaporanPelaksanaanPage() {
     const selectedData = logs.filter(l => printSelectedIds.includes(l.id));
     if (selectedData.length === 0) return alert('Pilih minimal 1 baris.');
     
-    if (printModalInfo.type === 'harian') printHarianLogic(selectedData);
-    if (printModalInfo.type === 'mingguan') printMingguanLogic(selectedData);
+    if (printModalInfo.type === 'harian') printHarianLogic(selectedData, customPrintPekerjaan.trim().toUpperCase() || null);
+    if (printModalInfo.type === 'mingguan') printMingguanLogic(selectedData, customPrintPekerjaan.trim().toUpperCase() || null);
     
     setPrintModalInfo({ open: false, type: '' });
   };
 
-  const printHarianLogic = (selectedData) => {
+  const printHarianLogic = (selectedData, overridePekerjaan) => {
     // Gunakan pdfConfig global atau fallback Default
     const config = pdfConfig || {
       subKegiatan: 'NORMALISASI / RESTORASI SUNGAI',
@@ -359,8 +361,8 @@ export default function LaporanPelaksanaanPage() {
       const alatName = (log.override_alat || log.equipment?.name || '').toUpperCase();
       const helperName = (log.assignment?.helper_override || log.assignment?.helper?.full_name || '').toUpperCase();
       const tglStr = new Date(log.tanggal).toLocaleDateString('id-ID', {day:'numeric', month:'long', year:'numeric'}).toUpperCase();
-      // Resolve pekerjaan: job_sub_type > config.pekerjaanPrefix > fallback
-      const resolvedPekerjaan = SUB_TYPE_MAP[log.assignment?.job_sub_type] || config.pekerjaanPrefix;
+      // Resolve pekerjaan: custom override > job_sub_type > config.pekerjaanPrefix
+      const resolvedPekerjaan = overridePekerjaan || SUB_TYPE_MAP[log.assignment?.job_sub_type] || config.pekerjaanPrefix;
 
       html += `<div class="header">LAPORAN HARIAN</div>
         <table class="sub-header">
@@ -488,7 +490,7 @@ export default function LaporanPelaksanaanPage() {
     setTimeout(() => { printWin.print(); }, 800);
   };
 
-  const printMingguanLogic = (selectedData) => {
+  const printMingguanLogic = (selectedData, overridePekerjaan) => {
     // Gunakan pdfConfig global 
     const config = pdfConfig || {
       subKegiatan: 'NORMALISASI / RESTORASI SUNGAI',
@@ -548,16 +550,13 @@ export default function LaporanPelaksanaanPage() {
       const g = grouped[key];
       g.rows.sort((a, b) => new Date(a.tanggal) - new Date(b.tanggal));
       
-      const resolvedPekerjaan = SUB_TYPE_MAP[g.subType] || config.pekerjaanPrefix;
+      const resolvedPekerjaan = overridePekerjaan || SUB_TYPE_MAP[g.subType] || config.pekerjaanPrefix;
 
       html += `<div class="header">REKAPITULASI KEGIATAN</div>
-        <table class="header-info">
-          <tr><td width="15%">SUB KEGIATAN</td><td width="2%">:</td><td width="48%">${config.subKegiatan}</td>
-              <td width="15%" style="text-align:right;">MODEL/TYPE ALAT BERAT</td><td width="2%">:</td><td width="18%"></td></tr>
-          <tr><td>PEKERJAAN</td><td>:</td><td>${resolvedPekerjaan}</td>
-              <td></td><td>:</td><td rowspan="2" style="font-size:12px;">${(g.alat || '').toUpperCase()}</td></tr>
-          <tr><td>LOKASI</td><td>:</td><td>DESA ${(g.desa || '').toUpperCase()} KECAMATAN ${(g.kec || '').toUpperCase()}</td>
-              <td colspan="2"></td></tr>
+        <table class="sub-header">
+          <tr><td width="15%">SUB KEGIATAN</td><td width="2%">:</td><td width="53%"><span style="background-color:yellow;">${config.subKegiatan}</span></td><td width="30%">CATATAN HARIAN :</td></tr>
+          <tr><td>PEKERJAAN</td><td>:</td><td colspan="2">${resolvedPekerjaan} DESA ${(g.desa || '').toUpperCase()} KECAMATAN ${(g.kec || '').toUpperCase()}</td></tr>
+          <tr><td>LOKASI</td><td>:</td><td colspan="2">DESA ${(g.desa || '').toUpperCase()} KECAMATAN ${(g.kec || '').toUpperCase()}</td></tr>
         </table>
         
         <table class="data">
@@ -1003,7 +1002,16 @@ export default function LaporanPelaksanaanPage() {
                   <button onClick={() => setPrintModalInfo({open:false, type:''})} style={{background:'transparent', border:'none', color:'#fff', cursor:'pointer', fontSize:20}}>✖</button>
                </div>
                <div style={{flex:1, overflowY:'auto', padding:20, background:'#f8f9fa'}}>
-                  <p style={{marginTop:0, marginBottom:20, color:'#555'}}>Centang baris yang ingin disertakan ke dalam dokumen cetak.</p>
+                  <p style={{marginTop:0, marginBottom:12, color:'#555'}}>Centang baris yang ingin disertakan ke dalam dokumen cetak.</p>
+               <div style={{marginBottom:16, display:'flex', alignItems:'center', gap:10, background:'#fff9e6', border:'1px solid #f59e0b', borderRadius:8, padding:'10px 14px'}}>
+                 <span style={{fontSize:14, whiteSpace:'nowrap', fontWeight:600, color:'#92400e'}}>✏️ Custom Pekerjaan:</span>
+                 <input
+                   value={customPrintPekerjaan}
+                   onChange={e => setCustomPrintPekerjaan(e.target.value)}
+                   placeholder="Kosongkan = pakai nama pekerjaan default per baris"
+                   style={{flex:1, padding:'7px 10px', border:'1px solid #d97706', borderRadius:6, fontSize:13, outline:'none'}}
+                 />
+               </div>
                   <table style={{width:'100%', borderCollapse:'collapse', fontSize:13, background:'#fff'}}>
                     <thead>
                       <tr style={{background:'#e2e8f0', color:'#333'}}>

@@ -28,6 +28,7 @@ const PROGRESS_BG   = { '0%': '#fff7ed', '50%': '#fefce8', '100%': '#f0fdf4' };
 export default function DokumentasiModal({ logs, onClose, pdfConfig, handleUploadTambahan }) {
   const [selectedLog, setSelectedLog]   = useState(null);
   const [dokSelection, setDokSelection] = useState({});
+  const [customPekerjaan, setCustomPekerjaan] = useState('');
   const [filter, setFilter]             = useState('all');
   const [search, setSearch]             = useState('');
 
@@ -208,7 +209,7 @@ export default function DokumentasiModal({ logs, onClose, pdfConfig, handleUploa
 
       const desa = (log.override_desa || log.assignment?.location_village || '').toUpperCase();
       const kec  = (log.override_kecamatan || log.assignment?.location_district || '').toUpperCase();
-      const pek  = SUB_MAP[log.assignment?.job_sub_type] || config.pekerjaanPrefix;
+      const pek  = (customPekerjaan||"").trim().toUpperCase() || SUB_MAP[log.assignment?.job_sub_type] || config.pekerjaanPrefix;
       const tgl  = new Date(log.tanggal)
         .toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })
         .toUpperCase();
@@ -336,6 +337,12 @@ export default function DokumentasiModal({ logs, onClose, pdfConfig, handleUploa
                 <div style={{ fontSize:48, marginBottom:12 }}>👈</div>
                 <div style={{ fontSize:15, fontWeight:600, color:'#64748b' }}>Pilih baris dari panel kiri</div>
                 <div style={{ fontSize:13, marginTop:6 }}>untuk melihat dan menandai foto progress</div>
+              <div style={{ marginTop:8, display:'flex', alignItems:'center', gap:6, flexWrap:'wrap' }}>
+                <span style={{ fontSize:12, color:'rgba(255,255,255,0.85)', whiteSpace:'nowrap' }}>✏️ Custom Pekerjaan:</span>
+                <input value={customPekerjaan} onChange={e=>setCustomPekerjaan(e.target.value)}
+                  placeholder="Kosongkan = nama pekerjaan default per baris"
+                  style={{flex:1, minWidth:200, padding:'5px 8px', borderRadius:6, border:'1px solid rgba(255,255,255,0.3)', background:'rgba(255,255,255,0.15)', color:'#fff', fontSize:12, outline:'none'}} />
+              </div>
                 <div style={{ marginTop:16, fontSize:12, color:'#94a3b8', background:'#f1f5f9', padding:'8px 16px', borderRadius:8 }}>
                   💡 Setiap baris laporan akan dicetak pada 1 halaman Legal
                 </div>

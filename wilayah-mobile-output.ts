@@ -1,6 +1,5 @@
-// Data Wilayah Kabupaten Bojonegoro - dari file resmi desa kecamatan.xlsx
-// 28 kecamatan, 430 total desa
-const WILAYAH_BOJONEGORO = {
+// Data Wilayah Kabupaten Bojonegoro - dari file resmi
+export const DESA_MAP: Record<string, string[]> = {
   "BALEN": ["Balenrejo", "Bulaklo", "Bulu", "Kabunan", "Kedungbondo", "Kedungdowo", "Kemamang", "Kenep", "Lengkong", "Margomulyo", "Mayangkawis", "Mulyoagung", "Mulyorejo", "Ngadiluhur", "Penganten", "Pilanggede", "Pohbogo", "Prambatan", "Sarisejo", "Sekaran", "Sidobandung", "Sobontoro", "Swaloh"],
   "BAURENO": ["Banjaran", "Banjaranyar", "Baureno", "Blongsong", "Bumiayu", "Drajat", "Gajah", "Gunungsari", "Kalisari", "Karangdayu", "Kauman", "Kedungrejo", "Lebaksari", "Ngemplak", "Pasinan", "Pomahan", "Pucangarum", "Selorejo", "Sembunglor", "Sraturejo", "Sumuragung", "Tanggungan", "Tlogoagung", "Trojalu", "Tulungagung"],
   "BOJONEGORO": ["Campurejo", "Kalirejo", "Kauman", "Mulyoagung", "Pacul", "Semanding", "Sukorejo", "Banjarejo", "Jetak", "Kadipaten", "Karang Pacar", "Kepatihan", "Klangon", "Ledok Kulon", "Ledok Wetan", "Mojokampung", "Ngrowo", "Sumbang"],
@@ -30,5 +29,3 @@ const WILAYAH_BOJONEGORO = {
   "TEMAYANG": ["Bakulan", "Belun", "Buntalan", "Jono", "Kedungsari", "Kedungsumber", "Ngujung", "Pancur", "Pandantoyo", "Papringan", "Soko", "Temayang"],
   "TRUCUK": ["Banjarsari", "Guyangan", "Kandangan", "Kanten", "Mori", "Padang", "Pagerwesi", "Sranak", "Sumbangtimun", "Sumberejo", "Trucuk", "Tulungrejo"],
 };
-
-export default WILAYAH_BOJONEGORO;
