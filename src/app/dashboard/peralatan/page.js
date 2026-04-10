@@ -21,8 +21,9 @@ export default function PeralatanPage() {
   const [loading, setLoading] = useState(true);
   
   // UI States
-  const [mainTab, setMainTab] = useState('inventaris'); // 'inventaris' | 'arsip'
+  const [mainTab, setMainTab] = useState('inventaris'); // 'inventaris' | 'kerusakan' | 'arsip'
   const [statusTab, setStatusTab] = useState('semua');
+  const [pendingDamageCount, setPendingDamageCount] = useState(0);
   
   // Modals
   const [selectedAlat, setSelectedAlat] = useState(null);
@@ -62,6 +63,8 @@ export default function PeralatanPage() {
       logsMap[l.equipment_id].push(l);
     });
     setLogsByEq(logsMap);
+    // Hitung pending kerusakan dari operator (progress_status='pelaporan')
+    setPendingDamageCount((logsData || []).filter(l => l.progress_status === 'pelaporan').length);
     setLoading(false);
   }, []);
 
@@ -362,7 +365,11 @@ export default function PeralatanPage() {
       <div className="page-body">
         <div style={{display:'flex', gap: 10, marginBottom: 25, borderBottom: '2px solid #e2e8f0', paddingBottom: 10}}>
            <button onClick={()=>setMainTab('inventaris')} style={{fontSize:15, fontWeight:'bold', padding: '8px 16px', background: 'transparent', cursor:'pointer', border: 'none', color: mainTab === 'inventaris' ? '#1e3a8a' : '#64748b', borderBottom: mainTab === 'inventaris' ? '3px solid #1e3a8a' : '3px solid transparent'}}>
-             📦 Manajemen Aset & Status Operasional
+             📦 Manajemen Aset &amp; Status Operasional
+           </button>
+           <button onClick={()=>setMainTab('kerusakan')} style={{fontSize:15, fontWeight:'bold', padding: '8px 16px', background: 'transparent', cursor:'pointer', border: 'none', color: mainTab === 'kerusakan' ? '#dc2626' : '#64748b', borderBottom: mainTab === 'kerusakan' ? '3px solid #dc2626' : '3px solid transparent', position:'relative'}}>
+             🔴 Laporan Kerusakan Operator
+             {pendingDamageCount > 0 && <span style={{position:'absolute', top:4, right:4, background:'#dc2626', color:'#fff', borderRadius:'50%', width:18, height:18, fontSize:11, display:'flex', alignItems:'center', justifyContent:'center', fontWeight:'bold'}}>{pendingDamageCount}</span>}
            </button>
            <button onClick={()=>setMainTab('arsip')} style={{fontSize:15, fontWeight:'bold', padding: '8px 16px', background: 'transparent', cursor:'pointer', border: 'none', color: mainTab === 'arsip' ? '#1e3a8a' : '#64748b', borderBottom: mainTab === 'arsip' ? '3px solid #1e3a8a' : '3px solid transparent'}}>
              🛠️ Arsip Laporan Mekanik Khusus Kantor
@@ -468,6 +475,59 @@ export default function PeralatanPage() {
                </div>
             </div>
            </>
+        )}
+
+        {/* ================= TAB LAPORAN KERUSAKAN OPERATOR ================= */}
+        {mainTab === 'kerusakan' && (
+          <div className="card">
+            <div className="card-header" style={{justifyContent:'space-between', background:'#fef2f2', borderBottom:'2px solid #fca5a5'}}>
+              <span className="card-title" style={{color:'#991b1b'}}>🔴 Laporan Kerusakan dari Operator — Menunggu Tindakan</span>
+              <span style={{fontSize:12, color:'#64748b'}}>Klik "Terima &amp; Proses" untuk memulai penanganan. Status alat sudah otomatis jadi Maintenance.</span>
+            </div>
+            <div className="table-wrapper">
+              {loading ? <div style={{padding:40, textAlign:'center'}}>Memuat...</div> : (() => {
+                const kerusakanLogs = semuaLogs.filter(l => l.progress_status === 'pelaporan');
+                if (kerusakanLogs.length === 0) return (
+                  <div className="empty-state">
+                    <h3>✅ Tidak ada laporan kerusakan baru</h3>
+                    <p>Semua alat dalam kondisi baik atau laporan sudah ditangani.</p>
+                  </div>
+                );
+                return (
+                  <table style={{fontSize:13}}>
+                    <thead>
+                      <tr style={{background:'#fef2f2', color:'#7f1d1d'}}>
+                        <th style={{width:120}}>Tgl Laporan</th>
+                        <th>No. Lambung</th>
+                        <th>Nama Alat</th>
+                        <th>Dilaporkan Oleh</th>
+                        <th style={{width:280}}>Gejala Kerusakan</th>
+                        <th style={{width:120}}>Aksi</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {kerusakanLogs.map(log => (
+                        <tr key={log.id} style={{background:'#fff5f5', borderBottom:'1px solid #fecaca'}}>
+                          <td style={{color:'#64748b'}}>{new Date(log.reported_at).toLocaleDateString('id-ID', {day:'2-digit', month:'short', year:'numeric'})}</td>
+                          <td style={{fontWeight:'bold'}}>{log.equipment?.nomor_lambung || '—'}</td>
+                          <td>{log.equipment?.name}<br/><span style={{fontSize:11, color:'#64748b'}}>{log.equipment?.merk_type}</span></td>
+                          <td style={{color:'#0f172a', fontSize:12}}>{log.damage_description?.match(/\[Laporan Operator: ([^\]]+)\]/)?.[1] || '—'}</td>
+                          <td style={{color:'#991b1b'}}>{log.damage_description?.replace(/\[Laporan Operator: [^\]]+\]\s*/, '') || '—'}</td>
+                          <td>
+                            <button className="btn btn-sm" style={{background:'#1e3a8a', color:'#fff', border:'none', width:'100%'}} onClick={() => {
+                              if(confirm('Terima laporan ini dan mulai proses penanganan?')) {
+                                updateLogData(log.id, log.equipment_id, 'diterima', '', {});
+                              }
+                            }}>✅ Terima &amp; Proses</button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                );
+              })()}
+            </div>
+          </div>
         )}
 
         {/* ================= LAYAR ARSIP MEKANIK (EKSLUSIF CETAK) ================= */}
