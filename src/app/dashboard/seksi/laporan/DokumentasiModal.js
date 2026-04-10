@@ -95,7 +95,7 @@ export default function DokumentasiModal({ logs, onClose, pdfConfig, handleUploa
   body { font-family:Arial,sans-serif; font-size:11px; color:#000; }
 
   /* Legal portrait: 8.5in x 14in, margin 12mm atas-bawah, 15mm kiri-kanan */
-  @page { size: 8.5in 14in portrait; margin:12mm 15mm; }
+  @page { size: legal portrait; margin: 12mm 15mm; }
 
   /*
    * Setiap .hal = 1 halaman legal.

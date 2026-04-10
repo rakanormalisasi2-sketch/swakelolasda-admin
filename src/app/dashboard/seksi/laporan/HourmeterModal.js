@@ -58,7 +58,7 @@ export default function HourmeterModal({ logs, onClose, pdfConfig, handleUploadT
       <style>
         * { margin:0; padding:0; box-sizing:border-box; }
         body { font-family:Arial,sans-serif; font-size:11px; color:#000; }
-        @page { size: 8.5in 14in portrait; margin: 12mm 15mm; }
+        @page { size: legal portrait; margin: 12mm 15mm; }
         .page { padding:0; }
         .page-break { page-break-after: always; }
         .doc-title { font-size:16px; font-weight:bold; text-align:center; letter-spacing:2px; border-bottom:2px solid #000; padding-bottom:8px; margin-bottom:16px; }

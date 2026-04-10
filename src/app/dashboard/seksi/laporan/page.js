@@ -328,7 +328,8 @@ export default function LaporanPelaksanaanPage() {
     const printWin = window.open('', '_blank');
     let html = `<html><head><title>Batch Cetak Harian</title>
       <style>
-        @media print { @page { size: landscape; } body { -webkit-print-color-adjust: exact; } }
+        @page { size: legal portrait; margin: 12mm 15mm; }
+        @media print { body { -webkit-print-color-adjust: exact; print-color-adjust: exact; } }
         body { font-family: "Times New Roman", Times, serif; padding: 20px; font-size: 12px; line-height: 1.4; }
         .page-break { page-break-after: always; }
         .header { text-align: center; font-weight: bold; font-size: 14px; text-decoration: underline; margin-bottom: 15px; }
@@ -538,7 +539,8 @@ export default function LaporanPelaksanaanPage() {
         table.data { width: 100%; border-collapse: collapse; margin-bottom: 10px; }
         table.data th, table.data td { border: 1px solid #000; padding: 5px 6px; }
         table.data th { background: #fff; font-weight: bold; text-align: center; }
-        @media print { @page { size: landscape; } body { -webkit-print-color-adjust: exact; } }
+        @page { size: legal portrait; margin: 12mm 15mm; }
+        @media print { body { -webkit-print-color-adjust: exact; print-color-adjust: exact; } }
       </style></head><body>`;
 
     const days = ['Minggu','Senin','Selasa','Rabu','Kamis','Jumat','Sabtu'];
