@@ -24,6 +24,18 @@ export default function HourmeterModal({ logs, onClose, pdfConfig, handleUploadT
   const [customPekerjaan, setCustomPekerjaan] = useState('');
   const [hmLastAfter, setHmLastAfter] = useState(null);
   const [activeLogId, setActiveLogId] = useState(null);
+  const [viewHmMode, setViewHmMode] = useState('flat'); // 'flat' | 'grouped'
+  const [groupHmExpanded, setGroupHmExpanded] = useState({});
+
+  const SUB_MAP_HM = {
+    normalisasi_sungai: 'NORMALISASI SUNGAI',
+    normalisasi_saluran_irigasi: 'NORMALISASI SALURAN / IRIGASI',
+    rehabilitasi_embung: 'REHABILITASI EMBUNG',
+    pembangunan_embung: 'PEMBANGUNAN EMBUNG',
+    saluran_afvoer: 'SALURAN AIR / AFVOER',
+    normalisasi_embung: 'NORMALISASI EMBUNG',
+  };
+  const getHmJobLabel = (log) => SUB_MAP_HM[log.assignment?.job_sub_type] || log.assignment?.job_sub_type || 'Pekerjaan Lainnya';
 
   // Build rows sorted by date
   const rows = useMemo(() =>
@@ -35,6 +47,17 @@ export default function HourmeterModal({ logs, onClose, pdfConfig, handleUploadT
       return { log, urls, sel };
     }).sort((a, b) => new Date(a.log.tanggal) - new Date(b.log.tanggal))
   , [logs, hmSelection]);
+
+  // Group by pekerjaan label for left panel
+  const groupedHmRows = useMemo(() => {
+    const groups = {};
+    rows.forEach(r => {
+      const key = getHmJobLabel(r.log);
+      if (!groups[key]) groups[key] = [];
+      groups[key].push(r);
+    });
+    return groups;
+  }, [rows]);
 
   const pairedCount = Object.values(hmSelection).filter(s => s?.before && s?.after).length;
 
@@ -155,11 +178,25 @@ export default function HourmeterModal({ logs, onClose, pdfConfig, handleUploadT
 
           {/* LEFT PANEL: Timeline */}
           <div style={{ width:280, borderRight:'1px solid #e2e8f0', background:'#f8fafc', display:'flex', flexDirection:'column', flexShrink:0 }}>
-            <div style={{ padding:'10px 14px', borderBottom:'1px solid #e2e8f0', background:'#fff', fontSize:12, fontWeight:600, color:'#64748b' }}>
-              TIMELINE HARI KERJA ({rows.length} hari)
+            <div style={{ padding:'10px 14px', borderBottom:'1px solid #e2e8f0', background:'#fff' }}>
+              <div style={{ fontSize:12, fontWeight:600, color:'#64748b', marginBottom:6 }}>TIMELINE ({rows.length} hari)</div>
+              <div style={{ display:'flex', gap:4 }}>
+                <button onClick={() => setViewHmMode('flat')}
+                  style={{ flex:1, padding:'4px 0', fontSize:11, fontWeight:600, borderRadius:5, border:'none', cursor:'pointer',
+                    background: viewHmMode==='flat' ? '#059669' : '#f1f5f9', color: viewHmMode==='flat' ? '#fff' : '#64748b' }}>
+                  📋 Flat
+                </button>
+                <button onClick={() => setViewHmMode('grouped')}
+                  style={{ flex:1, padding:'4px 0', fontSize:11, fontWeight:600, borderRadius:5, border:'none', cursor:'pointer',
+                    background: viewHmMode==='grouped' ? '#059669' : '#f1f5f9', color: viewHmMode==='grouped' ? '#fff' : '#64748b' }}>
+                  🗂️ Per Pekerjaan
+                </button>
+              </div>
             </div>
             <div style={{ flex:1, overflowY:'auto' }}>
-              {rows.map(({ log, urls, sel }, idx) => {
+
+              {/* ── FLAT MODE ── */}
+              {viewHmMode === 'flat' && rows.map(({ log, urls, sel }, idx) => {
                 const isActive = activeLogId === log.id;
                 const hasBefore = !!sel.before;
                 const hasAfter  = !!sel.after;
@@ -183,14 +220,12 @@ export default function HourmeterModal({ logs, onClose, pdfConfig, handleUploadT
                     <div style={{ fontSize:11, color:'#64748b' }}>{hari}</div>
                     <div style={{ display:'flex', gap:6, marginTop:6 }}>
                       <div style={{ flex:1, fontSize:10, padding:'3px 6px', borderRadius:6, textAlign:'center', border:'1px solid',
-                        borderColor: hasBefore ? '#f97316' : '#e2e8f0',
-                        background: hasBefore ? '#fff7ed' : '#f8fafc',
+                        borderColor: hasBefore ? '#f97316' : '#e2e8f0', background: hasBefore ? '#fff7ed' : '#f8fafc',
                         color: hasBefore ? '#c2410c' : '#94a3b8' }}>
                         {hasBefore ? '📷 Before ✓' : 'Before —'}
                       </div>
                       <div style={{ flex:1, fontSize:10, padding:'3px 6px', borderRadius:6, textAlign:'center', border:'1px solid',
-                        borderColor: hasAfter ? '#16a34a' : '#e2e8f0',
-                        background: hasAfter ? '#f0fdf4' : '#f8fafc',
+                        borderColor: hasAfter ? '#16a34a' : '#e2e8f0', background: hasAfter ? '#f0fdf4' : '#f8fafc',
                         color: hasAfter ? '#15803d' : '#94a3b8' }}>
                         {hasAfter ? '📷 After ✓' : 'After —'}
                       </div>
@@ -199,6 +234,61 @@ export default function HourmeterModal({ logs, onClose, pdfConfig, handleUploadT
                   </div>
                 );
               })}
+
+              {/* ── GROUPED MODE ── */}
+              {viewHmMode === 'grouped' && Object.entries(groupedHmRows).map(([groupKey, groupRows]) => {
+                const isOpen = groupHmExpanded[groupKey] !== false;
+                const pairedInGroup = groupRows.filter(({ sel }) => sel.before && sel.after).length;
+                return (
+                  <div key={groupKey}>
+                    {/* Group header */}
+                    <div style={{ padding:'9px 12px', background:'#064e3b', color:'#fff', display:'flex', alignItems:'center', gap:8, cursor:'pointer' }}
+                      onClick={() => setGroupHmExpanded(p => ({ ...p, [groupKey]: !isOpen }))}>
+                      <span style={{ fontSize:11 }}>{isOpen ? '▼' : '▶'}</span>
+                      <span style={{ fontWeight:700, fontSize:11, flex:1 }}>🗂️ {groupKey}</span>
+                      <span style={{ fontSize:10, opacity:0.8 }}>{groupRows.length} hari</span>
+                      {pairedInGroup > 0 && <span style={{ fontSize:10, background:'#d1fae5', color:'#065f46', padding:'1px 6px', borderRadius:8, fontWeight:700 }}>✅{pairedInGroup}</span>}
+                    </div>
+                    {/* Rows in group */}
+                    {isOpen && groupRows.map(({ log, urls, sel }, gIdx) => {
+                      const isActive = activeLogId === log.id;
+                      const hasBefore = !!sel.before;
+                      const hasAfter  = !!sel.after;
+                      const isPaired  = hasBefore && hasAfter;
+                      const tgl = new Date(log.tanggal).toLocaleDateString('id-ID', { day:'numeric', month:'short'});
+                      const hari = new Date(log.tanggal).toLocaleDateString('id-ID', { weekday:'long'});
+                      return (
+                        <div key={log.id} onClick={() => setActiveLogId(log.id)}
+                          style={{ padding:'10px 14px 10px 20px', borderBottom:'1px solid #f0f4f8', cursor:'pointer', transition:'background 0.15s',
+                            background: isActive ? '#ecfdf5' : '#fff', borderLeft: isActive ? '4px solid #059669' : '4px solid transparent' }}>
+                          <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:3 }}>
+                            <div style={{ fontWeight:700, fontSize:12, color: isActive ? '#047857' : '#1e293b' }}>{gIdx+1}. {tgl}</div>
+                            <div style={{ fontSize:10, borderRadius:10, padding:'1px 6px', fontWeight:700,
+                              background: isPaired ? '#d1fae5' : hasBefore ? '#fef9c3' : '#f1f5f9',
+                              color: isPaired ? '#065f46' : hasBefore ? '#92400e' : '#94a3b8' }}>
+                              {isPaired ? '✅' : hasBefore ? '⚠️' : '—'}
+                            </div>
+                          </div>
+                          <div style={{ fontSize:10, color:'#64748b' }}>{hari}</div>
+                          <div style={{ display:'flex', gap:4, marginTop:4 }}>
+                            <div style={{ flex:1, fontSize:9, padding:'2px 4px', borderRadius:4, textAlign:'center', border:'1px solid',
+                              borderColor: hasBefore ? '#f97316' : '#e2e8f0', background: hasBefore ? '#fff7ed' : '#f8fafc',
+                              color: hasBefore ? '#c2410c' : '#94a3b8' }}>
+                              {hasBefore ? '📷 B ✓' : 'Before —'}
+                            </div>
+                            <div style={{ flex:1, fontSize:9, padding:'2px 4px', borderRadius:4, textAlign:'center', border:'1px solid',
+                              borderColor: hasAfter ? '#16a34a' : '#e2e8f0', background: hasAfter ? '#f0fdf4' : '#f8fafc',
+                              color: hasAfter ? '#15803d' : '#94a3b8' }}>
+                              {hasAfter ? '📷 A ✓' : 'After —'}
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                );
+              })}
+
             </div>
           </div>
 
