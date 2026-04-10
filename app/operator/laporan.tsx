@@ -138,7 +138,7 @@ export default function LaporanScreen() {
       .eq('operator_id', operatorId)
       .eq('status', 'active')
       .single()
-      .then(({ data, error }) => {
+      .then(async ({ data, error }) => {
         if (error) {
           console.warn('Gagal memuat detail penugasan:', error.message);
           return;
