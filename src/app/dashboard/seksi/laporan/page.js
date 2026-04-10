@@ -834,10 +834,10 @@ export default function LaporanPelaksanaanPage() {
                                {/* OVERRIDE FIELDS — urutan: Operator, Helper, Kecamatan, Desa, Alat */}
                                <td style={{padding:'2px 6px', border:'1px solid rgba(0,0,0,0.1)', fontWeight:'500'}}>
                                   {isSelesai ? (
-                                    <input type="text" style={openInputStyle} value={log.override_operator || log.operator?.full_name || ''}
+                                    <input type="text" style={openInputStyle} value={log.override_operator || log.operator?.full_name || log.operator_name || ''}
                                          onChange={e => handleInlineEdit(log.id, 'override_operator', e.target.value)}
                                          onBlur={e => handleBlurSave(log.id, 'override_operator', e.target.value)} />
-                                  ) : ( log.override_operator || log.operator?.full_name || '-' )}
+                                  ) : ( log.override_operator || log.operator?.full_name || log.operator_name || '-' )}
                                </td>
 
                                {/* HELPER (di samping Operator) */}
@@ -859,10 +859,10 @@ export default function LaporanPelaksanaanPage() {
                                </td>
                                <td style={{padding:'2px 6px', border:'1px solid rgba(0,0,0,0.1)'}}>
                                   {isSelesai ? (
-                                    <input type="text" style={openInputStyle} value={log.override_alat || log.equipment?.name || ''}
+                                    <input type="text" style={openInputStyle} value={log.override_alat || log.equipment?.name || log.jenis_alat || ''}
                                          onChange={e => handleInlineEdit(log.id, 'override_alat', e.target.value)}
                                          onBlur={e => handleBlurSave(log.id, 'override_alat', e.target.value)} />
-                                  ) : ( log.override_alat || log.equipment?.name || '-' )}
+                                  ) : ( log.override_alat || log.equipment?.name || log.jenis_alat || '-' )}
                                </td>
 
                                {/* NORMAL EDITABLE FIELDS */}
@@ -889,9 +889,28 @@ export default function LaporanPelaksanaanPage() {
                                          onBlur={e => handleBlurSave(log.id, 'jam_kerja', e.target.value)} />
                                </td>
 
-                               {/* Foto */}
-                               <td style={{padding:'6px 12px', border:'1px solid rgba(0,0,0,0.1)'}}>
-                                 {log.foto_lapangan_urls ? <a href={log.foto_lapangan_urls.split(',')[0]} target="_blank" style={{color:'#1a0dab', textDecoration:'underline'}}>Gambar Terlampir...</a> : '-'}
+                               {/* Foto — semua URL ditampilkan sebagai link */}
+                               <td style={{padding:'4px 8px', border:'1px solid rgba(0,0,0,0.1)', maxWidth: 140}}>
+                                 {log.foto_lapangan_urls ? (
+                                   <div style={{display:'flex', flexDirection:'column', gap:2}}>
+                                     {log.foto_lapangan_urls.split(',').map((url, fi) => {
+                                       const trimmed = url.trim();
+                                       if (!trimmed) return null;
+                                       // Extract file ID dari berbagai format URL Drive
+                                       const idMatch = trimmed.match(/\/d\/([a-zA-Z0-9_-]{25,})/)
+                                         || trimmed.match(/id=([a-zA-Z0-9_-]{25,})/);
+                                       const viewUrl = idMatch
+                                         ? `https://drive.google.com/file/d/${idMatch[1]}/view`
+                                         : trimmed;
+                                       return (
+                                         <a key={fi} href={viewUrl} target="_blank" rel="noreferrer"
+                                           style={{color:'#1a0dab', textDecoration:'underline', fontSize:11, whiteSpace:'nowrap'}}>
+                                           📷 Foto {fi + 1}
+                                         </a>
+                                       );
+                                     })}
+                                   </div>
+                                 ) : '-'}
                                </td>
 
                                {/* Panjang Pekerjaan */}

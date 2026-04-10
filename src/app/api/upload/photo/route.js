@@ -23,7 +23,7 @@ export async function POST(request) {
   try {
     const contentType = request.headers.get('content-type') || '';
 
-    let photoBuffer, mimeType, filename, sectionRole, operatorName, village, date;
+    let photoBuffer, mimeType, filename, sectionRole, operatorName, village, district, equipment, date;
 
     if (contentType.includes('multipart/form-data')) {
       // --- Mode: multipart/form-data (React Native FormData) ---
@@ -41,6 +41,8 @@ export async function POST(request) {
       sectionRole   = formData.get('section_role');
       operatorName  = formData.get('operator_name');
       village       = formData.get('village');
+      district      = formData.get('district');
+      equipment     = formData.get('equipment');
       date          = formData.get('date');
 
     } else {
@@ -55,6 +57,8 @@ export async function POST(request) {
       sectionRole   = body.section_role;
       operatorName  = body.operator_name;
       village       = body.village;
+      district      = body.district;
+      equipment     = body.equipment;
       date          = body.date;
     }
 
@@ -67,6 +71,8 @@ export async function POST(request) {
       sectionRole,
       operatorName,
       village,
+      district,
+      equipment,
       date,
       photoBuffer,
       mimeType,
