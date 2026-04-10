@@ -223,9 +223,13 @@ export default function MekanikFormScreen() {
             }),
           });
           const json = await res.json();
-          if (json.success) uploadedUrls.push(json.url);
-        } catch (e) {
-          console.warn('Upload foto gagal:', e);
+          if (json.success) {
+            uploadedUrls.push(json.url);
+          } else {
+            throw new Error(json.error || 'Terjadi kesalahan tidak diketahui dari server.');
+          }
+        } catch (e: any) {
+          throw new Error(`Upload foto gagal: ${e.message}`);
         }
       }
       result.push({ text: item.text, fotos: uploadedUrls });

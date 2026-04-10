@@ -3,6 +3,7 @@ import {
   View, Text, TextInput, ScrollView, TouchableOpacity, StyleSheet,
   Image, Alert, ActivityIndicator, Platform, KeyboardAvoidingView,
 } from 'react-native';
+import DateTimePicker from '@react-native-community/datetimepicker';
 import { useLocalSearchParams, router } from 'expo-router';
 import * as ImagePicker from 'expo-image-picker';
 import * as ImageManipulator from 'expo-image-manipulator';
@@ -59,15 +60,38 @@ type Assignment = {
   location_village: string;
   job_type: string;
   job_sub_type: string;
+  equipment_id?: string | null;
   equipment: { name: string } | null;
   helper_override?: string | null;
   helper?: { full_name: string } | null;
+};
+
+type ColumnConfig = {
+  id: string;
+  column_key: string;
+  column_label: string;
+  column_type: string;
+  dropdown_options?: string[] | null;
+  is_required?: boolean;
+  position: number;
 };
 
 export default function LaporanScreen() {
   const { operatorId, operatorName } = useLocalSearchParams<{ operatorId: string; operatorName: string }>();
 
   const [assignment, setAssignment] = useState<Assignment | null>(null);
+  const [customColumns, setCustomColumns] = useState<ColumnConfig[]>([]);
+  const [customFieldValues, setCustomFieldValues] = useState<Record<string, string>>({});
+  const [customDropdownOpen, setCustomDropdownOpen] = useState<string | null>(null);
+
+  // Date picker state
+  const [showDatePicker, setShowDatePicker] = useState(false);
+  const [dateObj, setDateObj] = useState(new Date());
+
+  // Helper dropdown state
+  const [helperOpen, setHelperOpen] = useState(false);
+  const [operatorList, setOperatorList] = useState<{ id: string; full_name: string }[]>([]);
+
   const [form, setForm] = useState({
     tanggal: new Date().toISOString().split('T')[0],
     helper: '',
@@ -93,12 +117,24 @@ export default function LaporanScreen() {
     return (!isNaN(a) && !isNaN(b) && b > a) ? (b - a).toFixed(1) : null;
   })();
 
+  // Load semua operator untuk dropdown helper
+  useEffect(() => {
+    supabase
+      .from('user_profiles')
+      .select('id, full_name')
+      .eq('role', 'operator')
+      .order('full_name')
+      .then(({ data }) => {
+        setOperatorList((data || []).filter(o => o.full_name?.toLowerCase() !== 'operator test'));
+      });
+  }, []);
+
   // Load assignment aktif operator
   useEffect(() => {
     if (!operatorId) return;
     supabase
       .from('assignments')
-      .select('id, location_district, location_village, job_type, job_sub_type, equipment:heavy_equipment(name), helper_override, helper:user_profiles!assignments_helper_id_fkey(full_name)')
+      .select('id, location_district, location_village, job_type, job_sub_type, equipment_id, equipment:heavy_equipment(name), helper_override, helper:user_profiles!assignments_helper_id_fkey(full_name)')
       .eq('operator_id', operatorId)
       .eq('status', 'active')
       .single()
@@ -115,6 +151,17 @@ export default function LaporanScreen() {
           const assignedHelper = data.helper_override || (data.helper as any)?.full_name || '';
           setForm(f => ({ ...f, kecamatan: kec, desa, jenisAlat: equipName || '', helper: assignedHelper }));
           setDesaOptions(DESA_MAP[kec] || []);
+
+          // Fetch custom columns sesuai role seksi yang menugaskan operator
+          const sectionRole = (data as any).created_by_role || 
+            (data.job_type === 'embung' ? 'seksi_embung' : 'seksi_normalisasi');
+          const { data: colConfigs } = await supabase
+            .from('section_column_configs')
+            .select('*')
+            .eq('role', sectionRole)
+            .neq('column_type', 'formula') // formula hanya di web, bukan input operator
+            .order('position', { ascending: true });
+          setCustomColumns(colConfigs || []);
         }
       });
   }, [operatorId]);
@@ -221,9 +268,13 @@ export default function LaporanScreen() {
             }),
           });
           const json = await res.json();
-          if (json.success) uploadedUrls.push(json.url);
-        } catch (e) {
-          console.warn('Upload foto gagal:', e);
+          if (json.success) {
+            uploadedUrls.push(json.url);
+          } else {
+            throw new Error(json.error || 'Terjadi kesalahan server saat upload foto.');
+          }
+        } catch (e: any) {
+          throw new Error(`Upload foto gagal: ${e.message}`);
         }
       }
 
@@ -231,8 +282,24 @@ export default function LaporanScreen() {
       const hmAwal = parseFloat(form.hmAwal.replace(',', '.')) || null;
       const hmAkhir = parseFloat(form.hmAkhir.replace(',', '.')) || null;
 
+      // Ambil equipment_id dari assignment untuk relasi ke heavy_equipment
+      const equipmentId = assignment?.equipment_id || null;
+      // Nama alat yang dipilih operator (sebagai override fallback)
+      const alatDipilih = form.jenisAlat || null;
+
+      // Validasi custom field yang required
+      for (const col of customColumns) {
+        if (col.is_required && !customFieldValues[col.column_key]) {
+          setSubmitting(false);
+          return Alert.alert('Error', `${col.column_label} wajib diisi.`);
+        }
+      }
+
       const { error } = await supabase.from('operator_logs').insert({
         assignment_id: assignment?.id || null,
+        operator_id: operatorId,                    // relasi ke user_profiles → nama operator
+        equipment_id: equipmentId,                  // relasi ke heavy_equipment → nama alat
+        override_alat: alatDipilih,                 // fallback nama alat jika equipment_id null
         tanggal: form.tanggal,
         override_kecamatan: form.kecamatan !== assignment?.location_district ? form.kecamatan : null,
         override_desa: form.desa !== assignment?.location_village ? form.desa : null,
@@ -242,9 +309,10 @@ export default function LaporanScreen() {
         hm_akhir: hmAkhir,
         jam_kerja: jamKerja ? parseFloat(jamKerja) : null,
         panjang_pekerjaan: form.panjangPekerjaan || null,
-        foto_lapangan_urls: uploadedUrls,
+        foto_lapangan_urls: uploadedUrls.join(','),  // simpan sebagai string koma agar web bisa split
         helper_name: form.helper || null,
         submitted_by_operator_id: operatorId,
+        custom_fields: Object.keys(customFieldValues).length > 0 ? customFieldValues : null,
       });
 
       if (error) throw new Error(error.message);
@@ -275,26 +343,80 @@ export default function LaporanScreen() {
           {assignment && <Text style={styles.opBadgeSub}>Penugasan aktif: {assignment.job_sub_type || assignment.job_type}</Text>}
         </View>
 
-        {/* TANGGAL */}
+        {/* TANGGAL — Date Picker Kalender */}
         <View style={styles.fieldGroup}>
           <Text style={styles.label}>Tanggal *</Text>
-          <TextInput
-            style={styles.input}
-            value={form.tanggal}
-            onChangeText={v => set('tanggal', v)}
-            placeholder="YYYY-MM-DD"
-          />
+          <TouchableOpacity
+            style={styles.selectBtn}
+            onPress={() => setShowDatePicker(true)}
+          >
+            <Text style={styles.selectVal}>📅  {form.tanggal}</Text>
+            <Text style={styles.chevron}>›</Text>
+          </TouchableOpacity>
+          {showDatePicker && (
+            <DateTimePicker
+              value={dateObj}
+              mode="date"
+              display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+              maximumDate={new Date()}
+              onChange={(event, selected) => {
+                setShowDatePicker(Platform.OS === 'ios'); // iOS tetap terbuka sampai dismiss
+                if (selected) {
+                  setDateObj(selected);
+                  const iso = selected.toISOString().split('T')[0];
+                  set('tanggal', iso);
+                }
+              }}
+            />
+          )}
+          {Platform.OS === 'ios' && showDatePicker && (
+            <TouchableOpacity
+              style={{ alignSelf: 'flex-end', padding: 8 }}
+              onPress={() => setShowDatePicker(false)}
+            >
+              <Text style={{ color: '#1e3a5f', fontWeight: '700' }}>Selesai</Text>
+            </TouchableOpacity>
+          )}
         </View>
 
-        {/* HELPER */}
+        {/* HELPER — Dropdown semua operator */}
         <View style={styles.fieldGroup}>
-          <Text style={styles.label}>Helper / Pembantu (Opsional){(assignment?.helper_override || assignment?.helper?.full_name) ? ` (dari penugasan: ${assignment.helper_override || assignment.helper?.full_name})` : ''}</Text>
-          <TextInput
-            style={styles.input}
-            value={form.helper}
-            onChangeText={v => set('helper', v)}
-            placeholder="Nama helper..."
-          />
+          <Text style={styles.label}>
+            Helper / Pembantu (Opsional)
+            {(assignment?.helper_override || assignment?.helper?.full_name)
+              ? ` (penugasan: ${assignment.helper_override || assignment.helper?.full_name})`
+              : ''}
+          </Text>
+          <TouchableOpacity
+            style={styles.selectBtn}
+            onPress={() => setHelperOpen(v => !v)}
+          >
+            <Text style={form.helper ? styles.selectVal : styles.selectPlaceholder}>
+              {form.helper || '— Pilih Helper (Opsional) —'}
+            </Text>
+            <Text style={styles.chevron}>{helperOpen ? '▲' : '▼'}</Text>
+          </TouchableOpacity>
+          {helperOpen && (
+            <View style={styles.dropdownBox}>
+              <ScrollView nestedScrollEnabled style={{ maxHeight: 200 }}>
+                {/* Opsi kosong */}
+                <TouchableOpacity style={styles.dropdownItem} onPress={() => { set('helper', ''); setHelperOpen(false); }}>
+                  <Text style={[styles.dropdownText, { color: '#a0aec0', fontStyle: 'italic' }]}>— Tidak Ada Helper —</Text>
+                </TouchableOpacity>
+                {operatorList.map(op => (
+                  <TouchableOpacity
+                    key={op.id}
+                    style={styles.dropdownItem}
+                    onPress={() => { set('helper', op.full_name); setHelperOpen(false); }}
+                  >
+                    <Text style={[styles.dropdownText, form.helper === op.full_name && styles.dropdownActive]}>
+                      {op.full_name}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </ScrollView>
+            </View>
+          )}
         </View>
 
         {/* KECAMATAN */}
@@ -367,15 +489,29 @@ export default function LaporanScreen() {
           )}
         </View>
 
-        {/* PROGRESS */}
+        {/* PROGRESS — Numerik 0-100 */}
         <View style={styles.fieldGroup}>
-          <Text style={styles.label}>Progress Pekerjaan *</Text>
-          <TextInput
-            style={styles.input}
-            value={form.progress}
-            onChangeText={v => set('progress', v)}
-            placeholder="Contoh: Galian saluran 50%"
-          />
+          <Text style={styles.label}>Progress Pekerjaan (%) *</Text>
+          <View style={styles.progressRow}>
+            <TextInput
+              style={[styles.input, { flex: 1, marginRight: 10 }]}
+              value={form.progress}
+              onChangeText={v => {
+                // Hanya angka 0-100
+                const num = v.replace(/[^0-9]/g, '');
+                const n = parseInt(num, 10);
+                if (num === '') set('progress', '');
+                else if (!isNaN(n) && n >= 0 && n <= 100) set('progress', num);
+              }}
+              placeholder="0 – 100"
+              keyboardType="number-pad"
+              maxLength={3}
+            />
+            <View style={styles.progressBar}>
+              <View style={[styles.progressFill, { width: `${parseInt(form.progress || '0', 10)}%` as any }]} />
+              <Text style={styles.progressPct}>{form.progress || '0'}%</Text>
+            </View>
+          </View>
         </View>
 
         {/* KETERANGAN */}
@@ -421,16 +557,75 @@ export default function LaporanScreen() {
           </View>
         </View>
 
-        {/* PANJANG PEKERJAAN */}
+        {/* PANJANG PEKERJAAN — Numerik */}
         <View style={styles.fieldGroup}>
-          <Text style={styles.label}>Panjang Pekerjaan</Text>
+          <Text style={styles.label}>Panjang Pekerjaan (meter)</Text>
           <TextInput
             style={styles.input}
             value={form.panjangPekerjaan}
-            onChangeText={v => set('panjangPekerjaan', v)}
-            placeholder="Contoh: 150 meter"
+            onChangeText={v => set('panjangPekerjaan', v.replace(/[^0-9.]/g, ''))}
+            placeholder="Contoh: 150"
+            keyboardType="decimal-pad"
           />
         </View>
+
+        {/* KOLOM CUSTOM SEKSI */}
+        {customColumns.length > 0 && (
+          <View style={[styles.fieldGroup, { borderTopWidth: 1, borderTopColor: '#e2e8f0', paddingTop: 12 }]}>
+            <Text style={[styles.label, { color: '#5a67d8', fontSize: 14, marginBottom: 10 }]}>📋 Data Tambahan Seksi</Text>
+            {customColumns.map(col => (
+              <View key={col.column_key} style={[styles.fieldGroup, { marginBottom: 12 }]}>
+                <Text style={styles.label}>
+                  {col.column_label}{col.is_required ? ' *' : ''}
+                </Text>
+                {col.column_type === 'dropdown' && col.dropdown_options ? (
+                  <>
+                    <TouchableOpacity
+                      style={styles.selectBtn}
+                      onPress={() => setCustomDropdownOpen(customDropdownOpen === col.column_key ? null : col.column_key)}
+                    >
+                      <Text style={customFieldValues[col.column_key] ? styles.selectVal : styles.selectPlaceholder}>
+                        {customFieldValues[col.column_key] || `— Pilih ${col.column_label} —`}
+                      </Text>
+                      <Text style={styles.chevron}>{customDropdownOpen === col.column_key ? '▲' : '▼'}</Text>
+                    </TouchableOpacity>
+                    {customDropdownOpen === col.column_key && (
+                      <View style={styles.dropdownBox}>
+                        <ScrollView nestedScrollEnabled style={{ maxHeight: 180 }}>
+                          {col.dropdown_options.map(opt => (
+                            <TouchableOpacity key={opt} style={styles.dropdownItem}
+                              onPress={() => {
+                                setCustomFieldValues(v => ({ ...v, [col.column_key]: opt }));
+                                setCustomDropdownOpen(null);
+                              }}>
+                              <Text style={[styles.dropdownText, customFieldValues[col.column_key] === opt && styles.dropdownActive]}>{opt}</Text>
+                            </TouchableOpacity>
+                          ))}
+                        </ScrollView>
+                      </View>
+                    )}
+                  </>
+                ) : col.column_type === 'checkbox' ? (
+                  <TouchableOpacity
+                    style={[styles.selectBtn, { justifyContent: 'flex-start', gap: 10 }]}
+                    onPress={() => setCustomFieldValues(v => ({ ...v, [col.column_key]: v[col.column_key] === 'ya' ? 'tidak' : 'ya' }))}
+                  >
+                    <Text style={{ fontSize: 18 }}>{customFieldValues[col.column_key] === 'ya' ? '☑️' : '⬜'}</Text>
+                    <Text style={styles.selectVal}>{customFieldValues[col.column_key] === 'ya' ? 'Ya' : 'Tidak'}</Text>
+                  </TouchableOpacity>
+                ) : (
+                  <TextInput
+                    style={styles.input}
+                    value={customFieldValues[col.column_key] || ''}
+                    onChangeText={v => setCustomFieldValues(prev => ({ ...prev, [col.column_key]: v }))}
+                    placeholder={`Isi ${col.column_label}...`}
+                    keyboardType={col.column_type === 'number' ? 'decimal-pad' : 'default'}
+                  />
+                )}
+              </View>
+            ))}
+          </View>
+        )}
 
         {/* FOTO */}
         <View style={styles.fieldGroup}>
@@ -596,4 +791,26 @@ const styles = StyleSheet.create({
   },
   submitDisabled: { opacity: 0.7 },
   submitText: { color: '#fff', fontWeight: '700', fontSize: 16 },
+  progressRow: { flexDirection: 'row', alignItems: 'center' },
+  progressBar: {
+    flex: 1,
+    height: 44,
+    backgroundColor: '#e2e8f0',
+    borderRadius: 10,
+    overflow: 'hidden',
+    position: 'relative',
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#cbd5e0',
+  },
+  progressFill: {
+    position: 'absolute',
+    left: 0,
+    top: 0,
+    bottom: 0,
+    backgroundColor: '#48bb78',
+    borderRadius: 10,
+  },
+  progressPct: { fontSize: 14, fontWeight: '700', color: '#1a202c', zIndex: 1 },
 });
