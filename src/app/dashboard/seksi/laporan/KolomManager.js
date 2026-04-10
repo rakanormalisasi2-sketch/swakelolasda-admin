@@ -2,11 +2,11 @@
 import { useState } from 'react';
 
 const TIPE_OPTIONS = [
-  { value: 'text',     label: '📝 Teks' },
-  { value: 'number',   label: '🔢 Angka' },
-  { value: 'dropdown', label: '📋 Pilihan (Dropdown)' },
-  { value: 'formula',  label: '🧮 Formula (Auto-hitung)' },
-  { value: 'checkbox', label: '☑️ Centang (Ya/Tidak)' },
+  { value: 'text',     label: '📝 Teks Bebas',           desc: 'Input huruf dan angka bebas' },
+  { value: 'number',   label: '🔢 Numerik Saja',         desc: 'Hanya menerima angka (desimal diizinkan)' },
+  { value: 'dropdown', label: '📋 Pilihan (Dropdown)',   desc: 'Operator memilih dari daftar opsi' },
+  { value: 'formula',  label: '🧮 Formula (Auto-hitung)', desc: 'Hasil otomatis, tidak diisi operator' },
+  { value: 'checkbox', label: '☑️ Centang (Ya/Tidak)',   desc: 'Toggle Ya atau Tidak' },
 ];
 
 // ─── FormulaEditor ────────────────────────────────────────────────────
@@ -268,6 +268,12 @@ export default function KolomManager({ columns, onSave, onClose, saving }) {
                   style={{ width: '100%', padding: '8px 10px', border: '1px solid #d1d5db', borderRadius: 6, fontSize: 13 }}>
                   {TIPE_OPTIONS.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
                 </select>
+                {/* Deskripsi tipe yang dipilih */}
+                {TIPE_OPTIONS.find(t => t.value === form.column_type)?.desc && (
+                  <div style={{ marginTop: 5, fontSize: 11, color: '#6b7280', background: '#f9fafb', padding: '5px 10px', borderRadius: 5, border: '1px solid #e5e7eb' }}>
+                    ℹ️ {TIPE_OPTIONS.find(t => t.value === form.column_type).desc}
+                  </div>
+                )}
               </div>
 
               {form.column_type === 'dropdown' && (
