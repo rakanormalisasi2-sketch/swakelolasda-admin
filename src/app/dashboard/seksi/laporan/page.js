@@ -4,6 +4,31 @@ import React from 'react';
 import * as XLSX from 'xlsx';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/context/AuthContext';
+import KolomManager from './KolomManager';
+
+// ─── Evaluasi formula sederhana ─────────────────────────────────────
+function evaluateFormula(formula, log) {
+  if (!formula) return '';
+  try {
+    // Ganti {field_key} dengan nilai dari log atau custom_fields
+    let expr = formula.replace(/\{(\w+)\}/g, (_, key) => {
+      const sysVal = log[key];
+      if (sysVal !== undefined && sysVal !== null) return String(sysVal);
+      const customVal = (log.custom_fields || {})[key];
+      if (customVal !== undefined && customVal !== null) return String(customVal);
+      return '0';
+    });
+    // Ganti × dan ÷ ke operator js
+    expr = expr.replace(/×/g, '*').replace(/÷/g, '/');
+    // SUM(a, b, c) → a + b + c
+    expr = expr.replace(/SUM\(([^)]+)\)/gi, (_, args) =>
+      args.split(',').map(s => s.trim()).join('+')
+    );
+    // Evaluasi
+    const result = Function('"use strict"; return (' + expr + ')')();
+    return isNaN(result) ? '' : (+result.toFixed(4)).toString();
+  } catch { return ''; }
+}
 
 export default function LaporanPelaksanaanPage() {
   const { profile } = useAuth();
@@ -11,6 +36,9 @@ export default function LaporanPelaksanaanPage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [pdfConfig, setPdfConfig] = useState(null);
+  const [customColumns, setCustomColumns] = useState([]);
+  const [kolomManagerOpen, setKolomManagerOpen] = useState(false);
+  const [savingKolom, setSavingKolom] = useState(false);
   
   // Modals Data & Flow
   const [filterTab, setFilterTab] = useState('semua');
@@ -39,6 +67,14 @@ export default function LaporanPelaksanaanPage() {
         nipStaf: sectionData.pdf_nip_staf || '19980711 202204 1 001',
       });
     }
+
+    // Fetch konfigurasi kolom custom untuk seksi ini
+    const { data: colConfigs } = await supabase
+      .from('section_column_configs')
+      .select('*')
+      .eq('role', profile.role)
+      .order('position', { ascending: true });
+    setCustomColumns(colConfigs || []);
 
     const { data: assignments } = await supabase
       .from('assignments')
@@ -88,6 +124,30 @@ export default function LaporanPelaksanaanPage() {
   }, [profile]);
 
   useEffect(() => { loadData(); }, [loadData]);
+
+  // ─── Simpan konfigurasi kolom ke DB ────────────────────────────────
+  const saveKolomConfig = async (newCols) => {
+    setSavingKolom(true);
+    // Hapus semua kolom lama milik seksi ini
+    await supabase.from('section_column_configs').delete().eq('role', profile.role);
+    // Insert kolom baru
+    if (newCols.length > 0) {
+      const rows = newCols.map((c, i) => ({
+        role: profile.role,
+        column_key: c.column_key,
+        column_label: c.column_label,
+        column_type: c.column_type || 'text',
+        dropdown_options: c.dropdown_options || null,
+        formula: c.formula || null,
+        position: i,
+        is_required: c.is_required || false,
+      }));
+      await supabase.from('section_column_configs').insert(rows);
+    }
+    setSavingKolom(false);
+    setKolomManagerOpen(false);
+    loadData(); // Refresh data
+  };
 
 
   // ============ INLINE SPREADSHEET LOGIC ============
@@ -694,6 +754,7 @@ export default function LaporanPelaksanaanPage() {
            <button className="btn btn-outline" onClick={() => openPrintModal('mingguan')}>📘 Cetak Mingguan</button>
            <button className="btn btn-outline" onClick={openDokumentasi}>📷 Buat Dokumentasi</button>
            <button className="btn btn-outline" onClick={openHourmeter}>⏱️ Susun Hourmeter</button>
+           <button className="btn btn-outline" onClick={() => setKolomManagerOpen(true)} style={{borderColor:'#7c3aed', color:'#7c3aed'}}>⚙️ Kelola Kolom</button>
         </div>
       </div>
 
@@ -722,26 +783,34 @@ export default function LaporanPelaksanaanPage() {
                   <tr style={{background:'#d9ead3', color:'#000'}}>
                     <th style={{padding:'8px 12px', border:'1px solid #ccc', fontWeight:'bold', textAlign:'center'}}>Aksi</th>
                     <th style={{padding:'8px 12px', border:'1px solid #ccc', fontWeight:'bold'}}>Timestamp</th>
-                    <th style={{padding:'8px 12px', border:'1px solid #ccc', fontWeight:'bold'}}>Tanggal Laporan</th>
+                    <th style={{padding:'8px 12px', border:'1px solid #ccc', fontWeight:'bold'}}>Tanggal</th>
                     <th style={{padding:'8px 12px', border:'1px solid #ccc', fontWeight:'bold'}}>Nama Operator</th>
-                    <th style={{padding:'8px 12px', border:'1px solid #ccc', fontWeight:'bold'}}>Pilih Kecamatan</th>
+                    <th style={{padding:'8px 12px', border:'1px solid #ccc', fontWeight:'bold'}}>Nama Helper</th>
+                    <th style={{padding:'8px 12px', border:'1px solid #ccc', fontWeight:'bold'}}>Kecamatan</th>
                     <th style={{padding:'8px 12px', border:'1px solid #ccc', fontWeight:'bold'}}>Desa</th>
                     <th style={{padding:'8px 12px', border:'1px solid #ccc', fontWeight:'bold'}}>Jenis Alat Berat</th>
                     <th style={{padding:'8px 12px', border:'1px solid #ccc', fontWeight:'bold'}}>Progress Pekerjaan</th>
-                    <th style={{padding:'8px 12px', border:'1px solid #ccc', fontWeight:'bold'}}>Foto Lapangan</th>
-                    <th style={{padding:'8px 12px', border:'1px solid #ccc', fontWeight:'bold'}}>Keterangan Tambahan</th>
-                    <th style={{padding:'8px 12px', border:'1px solid #ccc', fontWeight:'bold'}}>HM Akhir</th>
-                    <th style={{padding:'8px 12px', border:'1px solid #ccc', fontWeight:'bold'}}>Panjang Pekerjaan</th>
                     <th style={{padding:'8px 12px', border:'1px solid #ccc', fontWeight:'bold'}}>HM Awal</th>
-                    <th style={{padding:'8px 12px', border:'1px solid #ccc', fontWeight:'bold'}}>Nama Helper</th>
+                    <th style={{padding:'8px 12px', border:'1px solid #ccc', fontWeight:'bold'}}>HM Akhir</th>
                     <th style={{padding:'8px 12px', border:'1px solid #ccc', fontWeight:'bold'}}>Jam Kerja</th>
+                    <th style={{padding:'8px 12px', border:'1px solid #ccc', fontWeight:'bold'}}>Foto Lapangan</th>
+                    <th style={{padding:'8px 12px', border:'1px solid #ccc', fontWeight:'bold'}}>Panjang Pekerjaan</th>
+                    <th style={{padding:'8px 12px', border:'1px solid #ccc', fontWeight:'bold'}}>Keterangan Tambahan</th>
+                    {customColumns.map(col => (
+                      <th key={col.column_key} style={{padding:'8px 12px', border:'1px solid #ccc', fontWeight:'bold',
+                        background: col.column_type === 'formula' ? '#fef9c3' : '#d9ead3'}}>
+                        {col.column_label}
+                        {col.column_type === 'formula' && <span style={{fontSize:9, display:'block', color:'#92400e', opacity:0.8}}>🧮 formula</span>}
+                        {col.is_required && <span style={{color:'#dc2626'}}>*</span>}
+                      </th>
+                    ))}
                   </tr>
                 </thead>
                 <tbody>
                   {Object.keys(mainTableGroups).map(gId => (
                      <Fragment key={gId}>
                         <tr className="group-header">
-                           <td colSpan={15} style={{background:'#e2e8f0', color:'#1e3a5f', padding:'10px 15px', fontWeight:'bold', border:'1px solid #ccc', fontSize:14}}>🗂️ {gId}</td>
+                           <td colSpan={15 + customColumns.length} style={{background:'#e2e8f0', color:'#1e3a5f', padding:'10px 15px', fontWeight:'bold', border:'1px solid #ccc', fontSize:14}}>🗂️ {gId}</td>
                         </tr>
                         {mainTableGroups[gId].map(log => {
                            const helper = log.assignment?.helper_override || log.assignment?.helper?.full_name || '';
@@ -762,7 +831,7 @@ export default function LaporanPelaksanaanPage() {
                                          onBlur={e => handleBlurSave(log.id, 'tanggal', e.target.value)} />
                                </td>
 
-                               {/* OVERRIDE FIELDS */}
+                               {/* OVERRIDE FIELDS — urutan: Operator, Helper, Kecamatan, Desa, Alat */}
                                <td style={{padding:'2px 6px', border:'1px solid rgba(0,0,0,0.1)', fontWeight:'500'}}>
                                   {isSelesai ? (
                                     <input type="text" style={openInputStyle} value={log.override_operator || log.operator?.full_name || ''}
@@ -770,6 +839,10 @@ export default function LaporanPelaksanaanPage() {
                                          onBlur={e => handleBlurSave(log.id, 'override_operator', e.target.value)} />
                                   ) : ( log.override_operator || log.operator?.full_name || '-' )}
                                </td>
+
+                               {/* HELPER (di samping Operator) */}
+                               <td style={{padding:'6px 12px', border:'1px solid rgba(0,0,0,0.1)'}}>{helper}</td>
+
                                <td style={{padding:'2px 6px', border:'1px solid rgba(0,0,0,0.1)'}}>
                                   {isSelesai ? (
                                     <input type="text" style={openInputStyle} value={log.override_kecamatan || log.assignment?.location_district || ''}
@@ -798,13 +871,12 @@ export default function LaporanPelaksanaanPage() {
                                          onChange={e => handleInlineEdit(log.id, 'progress_pekerjaan', e.target.value)} 
                                          onBlur={e => handleBlurSave(log.id, 'progress_pekerjaan', e.target.value)} />
                                </td>
-                               <td style={{padding:'6px 12px', border:'1px solid rgba(0,0,0,0.1)'}}>
-                                 {log.foto_lapangan_urls ? <a href={log.foto_lapangan_urls.split(',')[0]} target="_blank" style={{color:'#1a0dab', textDecoration:'underline'}}>Gambar Terlampir...</a> : '-'}
-                               </td>
+
+                               {/* HM Awal → HM Akhir → Jam Kerja */}
                                <td style={{padding:'2px 6px', border:'1px solid rgba(0,0,0,0.1)'}}>
-                                  <input type="text" style={inputStyle} value={log.keterangan_tambahan || ''} 
-                                         onChange={e => handleInlineEdit(log.id, 'keterangan_tambahan', e.target.value)} 
-                                         onBlur={e => handleBlurSave(log.id, 'keterangan_tambahan', e.target.value)} />
+                                  <input type="text" style={inputStyle} value={log.hm_awal || ''} 
+                                         onChange={e => handleInlineEdit(log.id, 'hm_awal', e.target.value)} 
+                                         onBlur={e => handleBlurSave(log.id, 'hm_awal', e.target.value)} />
                                </td>
                                <td style={{padding:'2px 6px', border:'1px solid rgba(0,0,0,0.1)'}}>
                                   <input type="text" style={inputStyle} value={log.hm_akhir || ''} 
@@ -812,24 +884,59 @@ export default function LaporanPelaksanaanPage() {
                                          onBlur={e => handleBlurSave(log.id, 'hm_akhir', e.target.value)} />
                                </td>
                                <td style={{padding:'2px 6px', border:'1px solid rgba(0,0,0,0.1)'}}>
-                                  <input type="text" style={inputStyle} value={log.panjang_pekerjaan || ''} 
-                                         onChange={e => handleInlineEdit(log.id, 'panjang_pekerjaan', e.target.value)} 
-                                         onBlur={e => handleBlurSave(log.id, 'panjang_pekerjaan', e.target.value)} />
-                               </td>
-                               <td style={{padding:'2px 6px', border:'1px solid rgba(0,0,0,0.1)'}}>
-                                  <input type="text" style={inputStyle} value={log.hm_awal || ''} 
-                                         onChange={e => handleInlineEdit(log.id, 'hm_awal', e.target.value)} 
-                                         onBlur={e => handleBlurSave(log.id, 'hm_awal', e.target.value)} />
-                               </td>
-
-                               {/* HELPER (READONLY) */}
-                               <td style={{padding:'6px 12px', border:'1px solid rgba(0,0,0,0.1)'}}>{helper}</td>
-                               
-                               <td style={{padding:'2px 6px', border:'1px solid rgba(0,0,0,0.1)'}}>
                                   <input type="text" style={inputStyle} value={log.jam_kerja || ''} 
                                          onChange={e => handleInlineEdit(log.id, 'jam_kerja', e.target.value)} 
                                          onBlur={e => handleBlurSave(log.id, 'jam_kerja', e.target.value)} />
                                </td>
+
+                               {/* Foto */}
+                               <td style={{padding:'6px 12px', border:'1px solid rgba(0,0,0,0.1)'}}>
+                                 {log.foto_lapangan_urls ? <a href={log.foto_lapangan_urls.split(',')[0]} target="_blank" style={{color:'#1a0dab', textDecoration:'underline'}}>Gambar Terlampir...</a> : '-'}
+                               </td>
+
+                               {/* Panjang Pekerjaan */}
+                               <td style={{padding:'2px 6px', border:'1px solid rgba(0,0,0,0.1)'}}>
+                                  <input type="text" style={inputStyle} value={log.panjang_pekerjaan || ''} 
+                                         onChange={e => handleInlineEdit(log.id, 'panjang_pekerjaan', e.target.value)} 
+                                         onBlur={e => handleBlurSave(log.id, 'panjang_pekerjaan', e.target.value)} />
+                               </td>
+
+                               {/* Keterangan Tambahan — di akhir kolom sistem */}
+                               <td style={{padding:'2px 6px', border:'1px solid rgba(0,0,0,0.1)'}}>
+                                  <input type="text" style={inputStyle} value={log.keterangan_tambahan || ''} 
+                                         onChange={e => handleInlineEdit(log.id, 'keterangan_tambahan', e.target.value)} 
+                                         onBlur={e => handleBlurSave(log.id, 'keterangan_tambahan', e.target.value)} />
+                               </td>
+
+                               {/* KOLOM CUSTOM DINAMIS */}
+                               {customColumns.map(col => {
+                                 const customVal = (log.custom_fields || {})[col.column_key] ?? '';
+                                 if (col.column_type === 'formula') {
+                                   const result = evaluateFormula(col.formula, log);
+                                   return (
+                                     <td key={col.column_key} style={{padding:'6px 12px', border:'1px solid rgba(0,0,0,0.1)', background:'#fefce8', textAlign:'right', fontWeight:600, color:'#92400e'}}>
+                                       {result || '—'}
+                                     </td>
+                                   );
+                                 }
+                                 return (
+                                   <td key={col.column_key} style={{padding:'2px 6px', border:'1px solid rgba(0,0,0,0.1)'}}>
+                                     <input
+                                       type={col.column_type === 'number' ? 'number' : 'text'}
+                                       style={inputStyle}
+                                       value={customVal}
+                                       onChange={e => {
+                                         const newCF = { ...(log.custom_fields || {}), [col.column_key]: e.target.value };
+                                         handleInlineEdit(log.id, 'custom_fields', newCF);
+                                       }}
+                                       onBlur={e => {
+                                         const newCF = { ...(log.custom_fields || {}), [col.column_key]: e.target.value };
+                                         handleBlurSave(log.id, 'custom_fields', newCF);
+                                       }}
+                                     />
+                                   </td>
+                                 );
+                               })}
                              </tr>
                            );
                         })}
@@ -1035,6 +1142,16 @@ export default function LaporanPelaksanaanPage() {
            </div>
         </div>
       )})()}
+
+      {/* ================= MODAL KELOLA KOLOM CUSTOM ================= */}
+      {kolomManagerOpen && (
+        <KolomManager
+          columns={customColumns}
+          onSave={saveKolomConfig}
+          onClose={() => setKolomManagerOpen(false)}
+          saving={savingKolom}
+        />
+      )}
     </>
   );
 }
