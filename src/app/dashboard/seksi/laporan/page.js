@@ -299,23 +299,46 @@ export default function LaporanPelaksanaanPage() {
 
   // ============ SPREADSHEET & PDF GENERATORS ============
   const generateExcel = () => {
-    if (logs.length === 0) return alert('Tidak ada data untuk diunduh');
-    const wsData = logs.map(log => ({
-      'Timestamp': new Date(log.reported_at).toLocaleString('id-ID'),
-      'Tanggal Laporan': new Date(log.tanggal).toLocaleDateString('id-ID'),
-      'Nama Operator': log.override_operator || log.operator?.full_name || '',
-      'Pilih Kecamatan': log.override_kecamatan || log.assignment?.location_district || '',
-      'Desa': log.override_desa || log.assignment?.location_village || '',
-      'Jenis Alat Berat': log.override_alat || log.equipment?.name || '',
-      'Progress Pekerjaan': log.progress_pekerjaan || '',
-      'Foto Lapangan': log.foto_lapangan_urls || '',
-      'Keterangan Tambahan': log.keterangan_tambahan || '',
-      'HM Akhir': log.hm_akhir || '',
-      'Panjang Pekerjaan': log.panjang_pekerjaan || '',
-      'HM Awal': log.hm_awal || '',
-      'Nama Helper': log.assignment?.helper_override || log.assignment?.helper?.full_name || '',
-      'Lama Waktu Bekerja': log.jam_kerja || ''
-    }));
+    if (Object.keys(mainTableGroups).length === 0) return alert('Tidak ada data untuk diunduh');
+    
+    // Gunakan mainTableGroups agar urutan & pengelompokan sama persis dengan tabel web
+    const wsData = [];
+    Object.keys(mainTableGroups).forEach(gId => {
+      mainTableGroups[gId].forEach(log => {
+        const row = {
+          'Timestamp': new Date(log.reported_at).toLocaleString('id-ID'),
+          'Tanggal': log.tanggal ? new Date(log.tanggal).toLocaleDateString('id-ID') : '',
+          'Custom Nama Pekerjaan': log.custom_pekerjaan || '',
+          'Nama Operator': log.override_operator || log.operator?.full_name || log.operator_name || '',
+          'Nama Helper': log.assignment?.helper_override || log.assignment?.helper?.full_name || '',
+          'Kecamatan': log.override_kecamatan || log.assignment?.location_district || '',
+          'Desa': log.override_desa || log.assignment?.location_village || '',
+          'Jenis Alat Berat': log.override_alat || log.equipment?.name || log.jenis_alat || '',
+          'Progress Pekerjaan': log.progress_pekerjaan || '',
+          'HM Awal': log.hm_awal || '',
+          'HM Akhir': log.hm_akhir || '',
+          'Jam Kerja': log.jam_kerja || '',
+          'Foto Lapangan': log.foto_lapangan_urls || '',
+          'Panjang Pekerjaan': log.panjang_pekerjaan || '',
+          'Keterangan Tambahan': log.keterangan_tambahan || '',
+        };
+
+        // Sertakan custom columns dinamis yang muncul di tabel
+        if (customColumns && customColumns.length > 0) {
+          customColumns.forEach(col => {
+            const customVal = (log.custom_fields || {})[col.column_key] ?? '';
+            if (col.column_type === 'formula') {
+              row[col.column_label] = evaluateFormula(col.formula, log) || '';
+            } else {
+              row[col.column_label] = customVal;
+            }
+          });
+        }
+        
+        wsData.push(row);
+      });
+    });
+
     const worksheet = XLSX.utils.json_to_sheet(wsData);
     const workbook = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(workbook, worksheet, "Laporan_Pelaksanaan");
