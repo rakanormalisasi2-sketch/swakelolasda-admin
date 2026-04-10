@@ -31,6 +31,18 @@ export default function DokumentasiModal({ logs, onClose, pdfConfig, handleUploa
   const [customPekerjaan, setCustomPekerjaan] = useState('');
   const [filter, setFilter]             = useState('all');
   const [search, setSearch]             = useState('');
+  const [groupExpanded, setGroupExpanded] = useState({});
+  const [viewMode, setViewMode]         = useState('flat'); // 'flat' | 'grouped'
+
+  const SUB_MAP_DOK = {
+    normalisasi_sungai: 'NORMALISASI SUNGAI',
+    normalisasi_saluran_irigasi: 'NORMALISASI SALURAN / IRIGASI',
+    rehabilitasi_embung: 'REHABILITASI EMBUNG',
+    pembangunan_embung: 'PEMBANGUNAN EMBUNG',
+    saluran_afvoer: 'SALURAN AIR / AFVOER',
+    normalisasi_embung: 'NORMALISASI EMBUNG',
+  };
+  const getJobLabel = (log) => SUB_MAP_DOK[log.assignment?.job_sub_type] || log.assignment?.job_sub_type || 'Pekerjaan Lainnya';
 
   const rows = useMemo(() => logs.map(log => {
     const urls = log.foto_lapangan_urls
@@ -42,6 +54,46 @@ export default function DokumentasiModal({ logs, onClose, pdfConfig, handleUploa
     }).length;
     return { log, urls, selectedCount };
   }), [logs, dokSelection]);
+
+  const SUB_MAP_DOK = {
+    normalisasi_sungai: 'NORMALISASI SUNGAI',
+    normalisasi_saluran_irigasi: 'NORMALISASI SALURAN / IRIGASI',
+    rehabilitasi_embung: 'REHABILITASI EMBUNG',
+    pembangunan_embung: 'PEMBANGUNAN EMBUNG',
+    saluran_afvoer: 'SALURAN AIR / AFVOER',
+    normalisasi_embung: 'NORMALISASI EMBUNG',
+  };
+  const getJobLabel = (log) => SUB_MAP_DOK[log.assignment?.job_sub_type] || log.assignment?.job_sub_type || 'Pekerjaan Lainnya';
+
+  // Group rows by pekerjaan
+  const groupedRows = useMemo(() => {
+    const groups = {};
+    rows.forEach(r => {
+      const key = getJobLabel(r.log);
+      if (!groups[key]) groups[key] = [];
+      groups[key].push(r);
+    });
+    return groups;
+  }, [rows]);
+
+  // Centang massal per kelompok pekerjaan
+  const selectAllGroup = (groupKey, val) => {
+    setDokSelection(prev => {
+      const next = { ...prev };
+      groupedRows[groupKey].forEach(({ log, urls }) =>
+        urls.forEach((_, i) => { next[log.id + '_' + i] = val; })
+      );
+      return next;
+    });
+  };
+  const isGroupAllSelected = (groupKey) => {
+    return groupedRows[groupKey].every(({ log, urls }) =>
+      urls.every((_, i) => {
+        const v = dokSelection[log.id + '_' + i];
+        return v && v !== 'skip';
+      })
+    );
+  };
 
   const filteredRows = useMemo(() => rows.filter(({ log, urls, selectedCount }) => {
     if (filter === 'selected' && selectedCount === 0) return false;
@@ -55,6 +107,32 @@ export default function DokumentasiModal({ logs, onClose, pdfConfig, handleUploa
   }), [rows, filter, search]);
 
   const totalSelected = Object.values(dokSelection).filter(v => v && v !== 'skip').length;
+
+  // Grouped rows for 'Per Pekerjaan' mode
+  const groupedRows = useMemo(() => {
+    const groups = {};
+    rows.forEach(r => {
+      const key = getJobLabel(r.log);
+      if (!groups[key]) groups[key] = [];
+      groups[key].push(r);
+    });
+    return groups;
+  }, [rows]);
+
+  const selectAllGroup = (groupKey, val) => {
+    setDokSelection(prev => {
+      const next = { ...prev };
+      groupedRows[groupKey].forEach(({ log, urls }) =>
+        urls.forEach((_, i) => { next[log.id + '_' + i] = val; })
+      );
+      return next;
+    });
+  };
+  const isGroupAllSelected = (groupKey) => {
+    return groupedRows[groupKey].every(({ log, urls }) =>
+      urls.every((_, i) => { const v = dokSelection[log.id + '_' + i]; return v && v !== 'skip'; })
+    );
+  };
 
   const selectedUrls = selectedLog
     ? (selectedLog.foto_lapangan_urls || '').split(',').map(u => u.trim()).filter(Boolean)
@@ -301,32 +379,111 @@ export default function DokumentasiModal({ logs, onClose, pdfConfig, handleUploa
                   </button>
                 ))}
               </div>
+              <div style={{ display:'flex', gap:4, marginTop:6 }}>
+                <button onClick={() => setViewMode('flat')}
+                  style={{ flex:1, padding:'5px 0', fontSize:11, fontWeight:600, borderRadius:6, border:'none', cursor:'pointer',
+                    background: viewMode==='flat' ? '#0f766e' : '#f1f5f9', color: viewMode==='flat' ? '#fff' : '#64748b' }}>
+                  📋 Flat
+                </button>
+                <button onClick={() => setViewMode('grouped')}
+                  style={{ flex:1, padding:'5px 0', fontSize:11, fontWeight:600, borderRadius:6, border:'none', cursor:'pointer',
+                    background: viewMode==='grouped' ? '#0f766e' : '#f1f5f9', color: viewMode==='grouped' ? '#fff' : '#64748b' }}>
+                  🗂️ Per Pekerjaan
+                </button>
+              </div>
             </div>
             <div style={{ flex:1, overflowY:'auto' }}>
-              {filteredRows.length === 0 && (
-                <div style={{ padding:24, textAlign:'center', color:'#94a3b8', fontSize:13 }}>Tidak ada data</div>
-              )}
-              {filteredRows.map(({ log, urls, selectedCount }) => {
-                const isActive = selectedLog?.id === log.id;
-                const tgl = new Date(log.tanggal).toLocaleDateString('id-ID');
-                const op  = log.override_operator || log.operator?.full_name || log.operator_name || '-';
-                const loc = `${log.override_desa || log.assignment?.location_village || ''}, ${log.override_kecamatan || log.assignment?.location_district || ''}`;
-                return (
-                  <div key={log.id} onClick={() => setSelectedLog(log)}
-                    style={{ padding:'12px 14px', borderBottom:'1px solid #f0f4f8', cursor:'pointer', transition:'all 0.15s',
-                      background: isActive ? '#eff6ff' : '#fff', borderLeft: isActive ? '3px solid #2563eb' : '3px solid transparent' }}>
-                    <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start', marginBottom:4 }}>
-                      <div style={{ fontWeight:600, fontSize:13, color: isActive ? '#1e40af' : '#1e293b' }}>📅 {tgl}</div>
-                      <div style={{ display:'flex', gap:4 }}>
-                        <span style={{ fontSize:11, background:'#e2e8f0', padding:'2px 7px', borderRadius:10, color:'#475569' }}>{urls.length}📷</span>
-                        {selectedCount > 0 && <span style={{ fontSize:11, background:'#d1fae5', padding:'2px 7px', borderRadius:10, color:'#065f46' }}>✅{selectedCount}</span>}
+              {/* ── FLAT MODE ── */}
+              {viewMode === 'flat' && (
+                <>
+                  {filteredRows.length === 0 && (
+                    <div style={{ padding:24, textAlign:'center', color:'#94a3b8', fontSize:13 }}>Tidak ada data</div>
+                  )}
+                  {filteredRows.map(({ log, urls, selectedCount }) => {
+                    const isActive = selectedLog?.id === log.id;
+                    const tgl = new Date(log.tanggal).toLocaleDateString('id-ID');
+                    const op  = log.override_operator || log.operator?.full_name || log.operator_name || '-';
+                    const loc = `${log.override_desa || log.assignment?.location_village || ''}, ${log.override_kecamatan || log.assignment?.location_district || ''}`;
+                    return (
+                      <div key={log.id} onClick={() => setSelectedLog(log)}
+                        style={{ padding:'12px 14px', borderBottom:'1px solid #f0f4f8', cursor:'pointer', transition:'all 0.15s',
+                          background: isActive ? '#eff6ff' : '#fff', borderLeft: isActive ? '3px solid #2563eb' : '3px solid transparent' }}>
+                        <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start', marginBottom:4 }}>
+                          <div style={{ fontWeight:600, fontSize:13, color: isActive ? '#1e40af' : '#1e293b' }}>📅 {tgl}</div>
+                          <div style={{ display:'flex', gap:4 }}>
+                            <span style={{ fontSize:11, background:'#e2e8f0', padding:'2px 7px', borderRadius:10, color:'#475569' }}>{urls.length}📷</span>
+                            {selectedCount > 0 && <span style={{ fontSize:11, background:'#d1fae5', padding:'2px 7px', borderRadius:10, color:'#065f46' }}>✅{selectedCount}</span>}
+                          </div>
+                        </div>
+                        <div style={{ fontSize:11, color:'#64748b' }}>{op}</div>
+                        <div style={{ fontSize:11, color:'#94a3b8' }}>{loc}</div>
                       </div>
-                    </div>
-                    <div style={{ fontSize:11, color:'#64748b' }}>{op}</div>
-                    <div style={{ fontSize:11, color:'#94a3b8' }}>{loc}</div>
-                  </div>
-                );
-              })}
+                    );
+                  })}
+                </>
+              )}
+              {/* ── GROUPED MODE ── */}
+              {viewMode === 'grouped' && (
+                <>
+                  {Object.keys(groupedRows).length === 0 && (
+                    <div style={{ padding:24, textAlign:'center', color:'#94a3b8', fontSize:13 }}>Tidak ada data</div>
+                  )}
+                  {Object.entries(groupedRows).map(([groupKey, groupRows]) => {
+                    const isOpen = groupExpanded[groupKey] !== false;
+                    const totalFoto = groupRows.reduce((s, { urls }) => s + urls.length, 0);
+                    const selCnt = groupRows.reduce((s, { selectedCount }) => s + selectedCount, 0);
+                    return (
+                      <div key={groupKey}>
+                        <div style={{ padding:'9px 12px', background:'#1e3a5f', color:'#fff', display:'flex', alignItems:'center', gap:8, cursor:'pointer' }}
+                          onClick={() => setGroupExpanded(p => ({ ...p, [groupKey]: !isOpen }))}>
+                          <span style={{ fontSize:11 }}>{isOpen ? '▼' : '▶'}</span>
+                          <span style={{ fontWeight:700, fontSize:12, flex:1 }}>🗂️ {groupKey}</span>
+                          <span style={{ fontSize:10, opacity:0.8 }}>{groupRows.length} baris · {totalFoto}📷</span>
+                          {selCnt > 0 && <span style={{ fontSize:10, background:'#d1fae5', color:'#065f46', padding:'1px 6px', borderRadius:8, fontWeight:700 }}>✅{selCnt}</span>}
+                        </div>
+                        {isOpen && (
+                          <div style={{ display:'flex', gap:4, padding:'5px 8px', background:'#f0fdf4', borderBottom:'1px solid #bbf7d0' }}>
+                            <span style={{ fontSize:10, color:'#64748b', alignSelf:'center', flex:1 }}>Centang semua:</span>
+                            {['0%','50%','100%'].map(p => (
+                              <button key={p} onClick={() => selectAllGroup(groupKey, p)}
+                                style={{ padding:'2px 8px', fontSize:10, fontWeight:700, borderRadius:5, border:'none', cursor:'pointer',
+                                  background: p==='0%'?'#fed7aa': p==='50%'?'#fde68a':'#bbf7d0',
+                                  color: p==='0%'?'#9a3412': p==='50%'?'#92400e':'#14532d' }}>
+                                {p}
+                              </button>
+                            ))}
+                            <button onClick={() => selectAllGroup(groupKey, 'skip')}
+                              style={{ padding:'2px 8px', fontSize:10, fontWeight:600, borderRadius:5, border:'none', cursor:'pointer', background:'#f1f5f9', color:'#64748b' }}>
+                              Lewati
+                            </button>
+                          </div>
+                        )}
+                        {isOpen && groupRows.map(({ log, urls, selectedCount }) => {
+                          const isActive = selectedLog?.id === log.id;
+                          const tgl = new Date(log.tanggal).toLocaleDateString('id-ID');
+                          const op  = log.override_operator || log.operator?.full_name || log.operator_name || '-';
+                          const loc = `${log.override_desa || log.assignment?.location_village || ''}, ${log.override_kecamatan || log.assignment?.location_district || ''}`;
+                          return (
+                            <div key={log.id} onClick={() => setSelectedLog(log)}
+                              style={{ padding:'10px 14px 10px 20px', borderBottom:'1px solid #f0f4f8', cursor:'pointer', transition:'all 0.15s',
+                                background: isActive ? '#eff6ff' : '#fff', borderLeft: isActive ? '4px solid #2563eb' : '4px solid transparent' }}>
+                              <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start', marginBottom:3 }}>
+                                <div style={{ fontWeight:600, fontSize:12, color: isActive ? '#1e40af' : '#1e293b' }}>📅 {tgl}</div>
+                                <div style={{ display:'flex', gap:4 }}>
+                                  <span style={{ fontSize:10, background:'#e2e8f0', padding:'1px 6px', borderRadius:8, color:'#475569' }}>{urls.length}📷</span>
+                                  {selectedCount > 0 && <span style={{ fontSize:10, background:'#d1fae5', padding:'1px 6px', borderRadius:8, color:'#065f46' }}>✅{selectedCount}</span>}
+                                </div>
+                              </div>
+                              <div style={{ fontSize:11, color:'#64748b' }}>{op}</div>
+                              <div style={{ fontSize:11, color:'#94a3b8' }}>{loc}</div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    );
+                  })}
+                </>
+              )}
             </div>
           </div>
 
