@@ -39,3 +39,9 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# Supabase CLI token
+.env.supabase
+
+# DB push script (contains token reference)
+db-push.ps1
