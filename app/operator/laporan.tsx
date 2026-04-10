@@ -264,6 +264,8 @@ export default function LaporanScreen() {
               section_role: assignment?.job_type === 'embung' ? 'seksi_embung' : 'seksi_normalisasi',
               operator_name: operatorName,
               village: form.desa,
+              district: form.kecamatan,
+              equipment: form.jenisAlat,
               date: form.tanggal,
             }),
           });
@@ -298,8 +300,10 @@ export default function LaporanScreen() {
       const { error } = await supabase.from('operator_logs').insert({
         assignment_id: assignment?.id || null,
         operator_id: operatorId,                    // relasi ke user_profiles → nama operator
+        operator_name: operatorName,                // teks fallback nama operator
         equipment_id: equipmentId,                  // relasi ke heavy_equipment → nama alat
-        override_alat: alatDipilih,                 // fallback nama alat jika equipment_id null
+        jenis_alat: form.jenisAlat || null,         // teks fallback jenis alat berat
+        override_alat: alatDipilih,                 // override manual jika ingin ubah
         tanggal: form.tanggal,
         override_kecamatan: form.kecamatan !== assignment?.location_district ? form.kecamatan : null,
         override_desa: form.desa !== assignment?.location_village ? form.desa : null,
