@@ -63,7 +63,7 @@ export default function PenugasanPage() {
         *,
         operator:user_profiles!assignments_operator_id_fkey(full_name),
         helper:user_profiles!assignments_helper_id_fkey(full_name),
-        equipment:heavy_equipment(name, status)
+        equipment:heavy_equipment(name, merk_type, nomor_lambung, status)
       `).eq('status', 'active').eq('created_by_role', profile?.role),
       // Ambil SEMUA assignment aktif (lintas seksi) hanya untuk cek busyIds
       supabase.from('assignments').select('operator_id, helper_id').eq('status', 'active'),
@@ -200,7 +200,14 @@ export default function PenugasanPage() {
                     <tr key={a.id}>
                       <td className="font-semibold">{a.operator?.full_name||'—'}</td>
                       <td className="text-muted">{a.helper?.full_name||'—'}</td>
-                      <td>{a.equipment?.name||'—'}</td>
+                      <td>
+                        {a.equipment ? (
+                          <div>
+                            <div className="font-semibold">{a.equipment.nomor_lambung || '—'}</div>
+                            <div className="text-xs text-muted">{[a.equipment.merk_type, a.equipment.name].filter(Boolean).join(' · ')}</div>
+                          </div>
+                        ) : '—'}
+                      </td>
                       <td>
                         <span className={`badge ${a.job_type==='normalisasi'?'badge-primary':a.job_type==='embung'?'badge-success':'badge-neutral'}`}>
                           {JOB_LABELS[a.job_type]||a.job_type}
@@ -260,11 +267,15 @@ export default function PenugasanPage() {
                   <label className="form-label">Alat Berat * <span className="text-xs text-muted">({availableAlat.length} tersedia)</span></label>
                   <select className="form-control" required value={form.equipment_id} onChange={e=>setForm({...form,equipment_id:e.target.value})}>
                     <option value="">— Pilih Alat Berat —</option>
-                    {alat.map(a => (
-                      <option key={a.id} value={a.id} disabled={a.status!=='ready' && a.id !== form.equipment_id}>
-                        {a.name}{a.merk_type?` (${a.merk_type})`:''} {a.status!=='ready' && a.id !== form.equipment_id ?`— ${a.status==='maintenance'?'⚠ Maintenance':'Beroperasi'}`:''}
-                      </option>
-                    ))}
+                    {alat.map(a => {
+                      const labelDetail = [a.nomor_lambung, a.merk_type ? `(${a.merk_type})` : null, a.name].filter(Boolean).join(' ');
+                      const statusNote = a.status!=='ready' && a.id !== form.equipment_id ? ` — ${a.status==='maintenance'?'⚠ Maintenance':'Beroperasi'}` : '';
+                      return (
+                        <option key={a.id} value={a.id} disabled={a.status!=='ready' && a.id !== form.equipment_id}>
+                          {labelDetail}{statusNote}
+                        </option>
+                      );
+                    })}
                   </select>
                   <p className="text-xs text-muted" style={{marginTop:4}}>Alat berstatus Maintenance tidak dapat dipilih.</p>
                 </div>

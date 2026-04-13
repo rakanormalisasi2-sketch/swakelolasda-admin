@@ -118,7 +118,7 @@ export default function LaporanPelaksanaanPage() {
           *,
           assignment:assignments(id, status, job_type, job_sub_type, location_district, location_village, helper_override, helper:user_profiles!assignments_helper_id_fkey(full_name)),
           operator:user_profiles!operator_logs_operator_id_fkey(full_name),
-          equipment:heavy_equipment(name, merk_type)
+          equipment:heavy_equipment(name, merk_type, nomor_lambung)
         `)
         .in('assignment_id', assignmentIds)
         .order('assignment_id', { ascending: true })
@@ -237,10 +237,13 @@ export default function LaporanPelaksanaanPage() {
       return true;
   }).forEach(log => {
       const op = log.override_operator || log.operator?.full_name || '-';
-      const al = log.override_alat || log.equipment?.name || '-';
+      const eq = log.equipment;
+      const alatLabel = log.override_alat || (
+        eq ? [eq.nomor_lambung, eq.merk_type ? `(${eq.merk_type})` : null, eq.name].filter(Boolean).join(' ') : null
+      ) || log.jenis_alat || '-';
       const k = log.override_kecamatan || log.assignment?.location_district || '-';
       const d = log.override_desa || log.assignment?.location_village || '-';
-      const gId = `${op} | ${al} | Kec. ${k} - Desa ${d}`;
+      const gId = `${op} | ${alatLabel} | Kec. ${k} - Desa ${d}`;
       
       if(!mainTableGroups[gId]) mainTableGroups[gId] = [];
       mainTableGroups[gId].push(log);
@@ -287,7 +290,8 @@ export default function LaporanPelaksanaanPage() {
     const groups = {};
     logs.forEach(log => {
       const op = log.override_operator || log.operator?.full_name || '-';
-      const al = log.override_alat || log.equipment?.name || '-';
+      const eq = log.equipment;
+      const al = log.override_alat || (eq ? [eq.nomor_lambung, eq.merk_type ? `(${eq.merk_type})` : null, eq.name].filter(Boolean).join(' ') : null) || log.jenis_alat || '-';
       const d = log.override_desa || log.assignment?.location_village || '-';
       const gId = `${op} | ${al} | ${d}`;
       if(!groups[gId]) groups[gId] = [];
@@ -313,7 +317,9 @@ export default function LaporanPelaksanaanPage() {
           'Nama Helper': log.assignment?.helper_override || log.assignment?.helper?.full_name || '',
           'Kecamatan': log.override_kecamatan || log.assignment?.location_district || '',
           'Desa': log.override_desa || log.assignment?.location_village || '',
-          'Jenis Alat Berat': log.override_alat || log.equipment?.name || log.jenis_alat || '',
+          'Jenis Alat Berat': log.override_alat || (
+            log.equipment ? [log.equipment.nomor_lambung, log.equipment.merk_type ? `(${log.equipment.merk_type})` : null, log.equipment.name].filter(Boolean).join(' ') : null
+          ) || log.jenis_alat || '',
           'Progress Pekerjaan': log.progress_pekerjaan || '',
           'HM Awal': log.hm_awal || '',
           'HM Akhir': log.hm_akhir || '',
@@ -939,10 +945,21 @@ export default function LaporanPelaksanaanPage() {
                                </td>
                                <td style={{padding:'2px 6px', border:'1px solid rgba(0,0,0,0.1)'}}>
                                   {isSelesai ? (
-                                    <input type="text" style={openInputStyle} value={log.override_alat || log.equipment?.name || log.jenis_alat || ''}
+                                    <input type="text" style={openInputStyle}
+                                         value={log.override_alat != null ? log.override_alat : (
+                                           log.equipment ? [log.equipment.nomor_lambung, log.equipment.merk_type ? `(${log.equipment.merk_type})` : null, log.equipment.name].filter(Boolean).join(' ') : (log.jenis_alat || '')
+                                         )}
                                          onChange={e => handleInlineEdit(log.id, 'override_alat', e.target.value)}
                                          onBlur={e => handleBlurSave(log.id, 'override_alat', e.target.value)} />
-                                  ) : ( log.override_alat || log.equipment?.name || log.jenis_alat || '-' )}
+                                  ) : ( log.override_alat || (
+                                    log.equipment ? (
+                                      <span>
+                                        {log.equipment.nomor_lambung && <strong>{log.equipment.nomor_lambung}</strong>}
+                                        {log.equipment.merk_type && <span style={{color:'#64748b'}}> ({log.equipment.merk_type})</span>}
+                                        {log.equipment.name && <span> {log.equipment.name}</span>}
+                                      </span>
+                                    ) : (log.jenis_alat || '-')
+                                  ))}
                                </td>
 
                                {/* NORMAL EDITABLE FIELDS */}

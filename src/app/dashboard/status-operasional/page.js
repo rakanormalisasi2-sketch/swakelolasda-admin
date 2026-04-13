@@ -36,7 +36,7 @@ export default function StatusOperasionalPage() {
         *,
         operator:user_profiles!assignments_operator_id_fkey(full_name),
         helper:user_profiles!assignments_helper_id_fkey(full_name),
-        equipment:heavy_equipment(name, status)
+        equipment:heavy_equipment(name, merk_type, nomor_lambung, status)
       `).eq('status', 'active').order('start_date', { ascending: false });
 
     const [asgnRes, opsRes, alatRes, logsRes] = await Promise.all([
@@ -136,7 +136,7 @@ export default function StatusOperasionalPage() {
                 <div className="table-wrapper">
                   {loading ? <div style={{padding:20,textAlign:'center'}}>Memuat...</div> : (
                     <table>
-                      <thead><tr><th>Nama Alat</th><th>Merk</th><th>Kondisi</th><th>Status</th><th>Info</th></tr></thead>
+                      <thead><tr><th>Nama Alat</th><th>Merk</th><th>No. Lambung</th><th>Kondisi</th><th>Status</th><th>Info</th></tr></thead>
                       <tbody>
                         {displayAlat.map(a => {
                           const statusObj = STATUS_MAP[a.status] || STATUS_MAP.ready;
@@ -146,6 +146,7 @@ export default function StatusOperasionalPage() {
                             <tr key={a.id}>
                               <td className="font-semibold">{a.name}</td>
                               <td className="text-muted">{a.merk_type||'—'}</td>
+                              <td><span className="badge" style={{background:'#e2e8f0',color:'#334155',fontWeight:'bold',letterSpacing:1}}>{a.nomor_lambung||'—'}</span></td>
                               <td style={{width:160}}>
                                  <div style={{display:'flex',alignItems:'center',gap:8}}>
                                    <div className="progress-bar-wrapper" style={{flex:1}}>
@@ -205,7 +206,11 @@ export default function StatusOperasionalPage() {
                               <td>
                                  <div><span className={`badge ${a.job_type==='normalisasi'?'badge-primary':'badge-success'}`}>{JOB_LABELS[a.job_type]||a.job_type}</span></div>
                                  {a.job_sub_type && <div className="text-xs" style={{marginTop:3, color:'var(--primary)'}}>{SUB_LABELS[a.job_sub_type]||a.job_sub_type}</div>}
-                                 <div className="text-xs font-semibold mt-1" style={{marginTop:4}}>🚜 {a.equipment?.name}</div>
+                                 {a.equipment && (
+                                   <div className="text-xs font-semibold mt-1" style={{marginTop:4}}>
+                                     🚜 {[a.equipment.nomor_lambung, a.equipment.merk_type ? `(${a.equipment.merk_type})` : null, a.equipment.name].filter(Boolean).join(' ')}
+                                   </div>
+                                 )}
                               </td>
                               <td>
                                 <div>Desa {locVillage}, Kec. {locDistrict}</div>
