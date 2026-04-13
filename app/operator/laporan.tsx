@@ -62,7 +62,7 @@ type Assignment = {
   job_type: string;
   job_sub_type: string;
   equipment_id?: string | null;
-  equipment: { name: string } | null;
+  equipment: { name: string; merk_type?: string | null; nomor_lambung?: string | null; } | null;
   helper_override?: string | null;
   helper?: { full_name: string } | null;
 };
@@ -139,7 +139,7 @@ export default function LaporanScreen() {
     if (!operatorId) return;
     supabase
       .from('assignments')
-      .select('id, location_district, location_village, job_type, job_sub_type, equipment_id, equipment:heavy_equipment(name), helper_override, helper:user_profiles!assignments_helper_id_fkey(full_name)')
+      .select('id, location_district, location_village, job_type, job_sub_type, equipment_id, equipment:heavy_equipment(name, merk_type, nomor_lambung), helper_override, helper:user_profiles!assignments_helper_id_fkey(full_name)')
       .eq('operator_id', operatorId)
       .eq('status', 'active')
       .single()
@@ -152,9 +152,11 @@ export default function LaporanScreen() {
           setAssignment(data as unknown as Assignment);
           const kec = (data.location_district || '').toUpperCase();
           const desa = data.location_village || '';
-          const equipName = Array.isArray(data.equipment) ? data.equipment[0]?.name : (data.equipment as any)?.name;
+          const eq = Array.isArray(data.equipment) ? data.equipment[0] : (data.equipment as any);
+          const equipName = eq?.name || '';
+          const equipDetail = eq ? [eq.nomor_lambung, eq.merk_type ? `(${eq.merk_type})` : null, eq.name].filter(Boolean).join(' ') : '';
           const assignedHelper = data.helper_override || (data.helper as any)?.full_name || '';
-          setForm(f => ({ ...f, kecamatan: kec, desa, jenisAlat: equipName || '', helper: assignedHelper }));
+          setForm(f => ({ ...f, kecamatan: kec, desa, jenisAlat: equipDetail || equipName || '', helper: assignedHelper }));
           setDesaOptions(DESA_MAP[kec] || []);
 
           // Fetch custom columns sesuai role seksi yang menugaskan operator
