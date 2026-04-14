@@ -79,6 +79,9 @@ export default function MapComponent({ mapItems }) {
   const mapInstanceRef = useRef(null);
   const markersRef = useRef([]);
 
+  // Ensure mapItems is always a valid array
+  const safeItems = Array.isArray(mapItems) ? mapItems : [];
+
   useEffect(() => {
     if (mapInstanceRef.current || !mapRef.current) return;
 
@@ -100,7 +103,7 @@ export default function MapComponent({ mapItems }) {
       }).addTo(map);
 
       mapInstanceRef.current = map;
-      renderMarkers(L, map, mapItems);
+      renderMarkers(L, map, safeItems);
     });
 
     return () => { cancelled = true; };
@@ -109,7 +112,7 @@ export default function MapComponent({ mapItems }) {
 
   useEffect(() => {
     if (!window.L || !mapInstanceRef.current) return;
-    renderMarkers(window.L, mapInstanceRef.current, mapItems);
+    renderMarkers(window.L, mapInstanceRef.current, safeItems);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [mapItems]);
 
