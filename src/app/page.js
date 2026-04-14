@@ -2,9 +2,20 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
+import dynamic from 'next/dynamic';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/context/AuthContext';
 import { geocodeLocation } from '@/lib/geocoder';
+
+const MapComponent = dynamic(() => import('@/components/MapComponent'), {
+  ssr: false,
+  loading: () => (
+    <div className="map-loading">
+      <div className="map-loading-spinner" />
+      <span>Memuat peta...</span>
+    </div>
+  )
+});
 
 function RootPageErrorFallback({ error, reset }) {
   return (
@@ -160,17 +171,11 @@ function RootPageContent() {
   });
   const [recentAssignments, setRecentAssignments] = useState([]);
   const [mapItems, setMapItems] = useState([]);
-  const [MapComponent, setMapComponent] = useState(null);
 
   // Filters
   const [filterKecamatan, setFilterKecamatan] = useState('semua');
   const [filterStatus, setFilterStatus] = useState('semua');
   const [filterSearch, setFilterSearch] = useState('');
-
-  // Dynamic import MapComponent to avoid SSR issues
-  useEffect(() => {
-    import('@/components/MapComponent').then(m => setMapComponent(m.default));
-  }, []);
 
   // Role-based redirect
   useEffect(() => {
@@ -404,14 +409,7 @@ function RootPageContent() {
 
           {/* Map card */}
           <div className="card public-map-card">
-            {MapComponent ? (
-              <MapComponent mapItems={filteredMapItems} />
-            ) : (
-              <div className="map-loading">
-                <div className="map-loading-spinner" />
-                <span>Memuat peta...</span>
-              </div>
-            )}
+            <MapComponent mapItems={filteredMapItems} />
           </div>
 
           {/* Map legend */}
