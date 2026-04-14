@@ -1,10 +1,31 @@
 'use client';
-import { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/context/AuthContext';
 import { geocodeLocation } from '@/lib/geocoder';
+
+function RootPageErrorFallback({ error, reset }) {
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '100vh', padding: 24, textAlign: 'center' }}>
+      <div>
+        <h2 style={{ color: '#dc2626', marginBottom: 8 }}>Gagal memuat halaman</h2>
+        <p style={{ color: '#64748b', marginBottom: 16 }}>{error?.message || 'Terjadi kesalahan.'}</p>
+        <button onClick={reset} style={{ padding: '8px 16px', background: '#1a56db', color: 'white', border: 'none', borderRadius: 8, cursor: 'pointer' }}>Coba lagi</button>
+      </div>
+    </div>
+  );
+}
+
+class RootPageErrorBoundary extends React.Component {
+  constructor(props) { super(props); this.state = { hasError: false, error: null }; }
+  static getDerivedStateFromError(error) { return { hasError: true, error }; }
+  render() {
+    if (this.state.hasError) return <RootPageErrorFallback error={this.state.error} reset={() => this.setState({ hasError: false })} />;
+    return this.props.children;
+  }
+}
 
 const JOB_LABELS = {
   normalisasi: 'Normalisasi',
@@ -124,7 +145,7 @@ async function buildMapItems(assignments, equipment) {
 }
 
 // ── Page component ────────────────────────────────────────────────────────
-export default function RootPage() {
+function RootPageContent() {
   const router = useRouter();
   const { user, profile, loading: authLoading } = useAuth();
   const [pageLoading, setPageLoading] = useState(true);
@@ -524,5 +545,13 @@ export default function RootPage() {
         </div>
       </footer>
     </div>
+  );
+}
+
+export default function RootPage() {
+  return (
+    <RootPageErrorBoundary>
+      <RootPageContent />
+    </RootPageErrorBoundary>
   );
 }
