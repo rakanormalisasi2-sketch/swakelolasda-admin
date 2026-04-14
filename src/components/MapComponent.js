@@ -14,22 +14,42 @@ function buildRouteUrl(lat, lng) {
   return `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(`${lat},${lng}`)}`;
 }
 
-function createIconHtml(status, isAtOffice) {
+function getEquipmentSvg(name = '') {
+  const n = name.toLowerCase();
+  
+  if (n.includes('excavator') || n.includes('beko')) {
+    return `<svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><path d="M19 15v-3h-2v-2h-3v2h-1l-2-2h-2v2l-3 3v4h2v1h8v-1h2v-4h-1zm-10 1H7v-2h2v2zm5-5h2v2h-2v-2zm-5-3l1-2h4l1 2H9zM2 19h20v2H2v-2z" /></svg>`;
+  }
+  if (n.includes('dozer') || n.includes('bulldozer')) {
+    return `<svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><path d="M21 16v-4h-2v-3h-5v7h-8v-2H4v5h17v-3zM7 11h4l1-3h3v3h3v-2H7v2zM2 19h20v2H2v-2z" /></svg>`;
+  }
+  if (n.includes('truk') || n.includes('dump')) {
+    return `<svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><path d="M20 8h-3V4H3v11h2c0 1.66 1.34 3 3 3s3-1.34 3-3h6c0 1.66 1.34 3 3 3s3-1.34 3-3h2v-5l-3-2zM8 16.5c-.83 0-1.5-.67-1.5-1.5s.67-1.5 1.5-1.5 1.5.67 1.5 1.5-.67 1.5-1.5 1.5zm12-3.5h-1.5v-2.5h-4v2.5H11V6h4.5l3.5 2.5v4.5zM20 16.5c-.83 0-1.5-.67-1.5-1.5s.67-1.5 1.5-1.5 1.5.67 1.5 1.5-.67 1.5-1.5 1.5z" /></svg>`;
+  }
+  if (n.includes('pompa')) {
+    return `<svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8zm-1-12h2v5h-2zm0 6h2v2h-2z" /></svg>`;
+  }
+  
+  // Default (Tools)
+  return `<svg width="18" height="18" viewBox="0 0 24 24" fill="${name ? 'currentColor' : 'currentColor'}"><path d="M22.7 19l-9.1-9.1c.9-2.3.4-5-1.5-6.9-2-2-5-2.4-7.4-1.3L9 6 6 9 1.6 4.7C.4 7.1.9 10.1 2.9 12.1c1.9 1.9 4.6 2.4 6.9 1.5l9.1 9.1c.4.4 1 .4 1.4 0l2.3-2.3c.5-.4.5-1.1.1-1.4z"/></svg>`;
+}
+
+function createIconHtml(status, isAtOffice, alatName) {
   const cfg = STATUS_COLORS[status] || STATUS_COLORS.ready;
   const color = isAtOffice ? '#64748b' : cfg.color;
   const bg = isAtOffice ? '#f1f5f9' : cfg.bg;
   const label = isAtOffice ? 'Kantor' : cfg.label;
+  const svgHtml = getEquipmentSvg(alatName);
 
-  return `<div style="position:relative;width:44px;height:44px;">
-    <div style="width:40px;height:40px;background:${bg};border:3px solid ${color};border-radius:50% 50% 50% 0;transform:rotate(-45deg);display:flex;align-items:center;justify-content:center;box-shadow:0 3px 10px rgba(0,0,0,0.18);margin:auto;">
-      <div style="transform:rotate(45deg);display:flex;align-items:center;justify-content:center;">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="${color}"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/></svg>
+  return `<div style="position:relative;width:48px;height:48px;">
+    <div style="width:44px;height:44px;background:${bg};border:3px solid ${color};border-radius:50% 50% 50% 0;transform:rotate(-45deg);display:flex;align-items:center;justify-content:center;box-shadow:0 3px 10px rgba(0,0,0,0.18);margin:auto;z-index:2;position:relative;">
+      <div style="transform:rotate(45deg);display:flex;align-items:center;justify-content:center;color:${color}">
+        ${svgHtml}
       </div>
     </div>
-    <div style="position:absolute;top:-18px;left:50%;transform:translateX(-50%);background:${color};color:#fff;font-size:9px;font-weight:700;padding:2px 6px;border-radius:999px;white-space:nowrap;box-shadow:0 1px 4px rgba(0,0,0,0.2);">${label}</div>
+    <div style="position:absolute;top:-16px;left:50%;transform:translateX(-50%);background:${color};color:#fff;font-size:10px;font-weight:700;padding:2px 8px;border-radius:999px;white-space:nowrap;box-shadow:0 2px 6px rgba(0,0,0,0.3);z-index:3;">${label}</div>
   </div>`;
 }
-
 function buildPopupHtml(item) {
   const cfg = STATUS_COLORS[item.status] || STATUS_COLORS.ready;
   const color = item.isAtOffice ? '#64748b' : cfg.color;
@@ -148,6 +168,7 @@ export default function MapComponent({ mapItems, previewMode = false }) {
         disableClusteringAtZoom: 16,
         spiderfyOnMaxZoom: true,
         showCoverageOnHover: false,
+        spiderfyDistanceMultiplier: 2.2, // Spread out wider to prevent overlap
       });
       map.addLayer(clusterGroupRef.current);
 
@@ -169,18 +190,43 @@ export default function MapComponent({ mapItems, previewMode = false }) {
     clusterGroup.clearLayers();
     const markers = [];
 
+    const groups = {};
+    items.forEach((item, idx) => {
+      if (!item.lat || !item.lng) return;
+      const key = `${item.lat.toFixed(4)}_${item.lng.toFixed(4)}`;
+      if (!groups[key]) groups[key] = [];
+      groups[key].push({ ...item, _idx: idx });
+    });
+
     items.forEach((item) => {
       if (!item.lat || !item.lng) return;
+      
+      const key = `${item.lat.toFixed(4)}_${item.lng.toFixed(4)}`;
+      const group = groups[key];
+      const isClustered = group && group.length > 1;
+      let offsetLat = 0, offsetLng = 0;
+
+      // Automatically organically spread points at identical locations
+      if (isClustered) {
+        const groupIdx = group.findIndex(g => g._idx === item._idx);
+        if (groupIdx > 0) {
+          const angle = (groupIdx / group.length) * 2 * Math.PI;
+          // Radius of spread increases slightly with more items
+          const radius = 0.0004 + (group.length * 0.00002);
+          offsetLat = Math.cos(angle) * radius;
+          offsetLng = Math.sin(angle) * radius;
+        }
+      }
 
       const icon = L.divIcon({
-        html: createIconHtml(item.status, item.isAtOffice),
+        html: createIconHtml(item.status, item.isAtOffice, item.alatName),
         className: '',
         iconSize: [44, 44],
         iconAnchor: [22, 44],
         popupAnchor: [0, -48],
       });
 
-      const marker = L.marker([item.lat, item.lng], { icon });
+      const marker = L.marker([item.lat + offsetLat, item.lng + offsetLng], { icon });
       if (!previewMode) {
         marker.bindPopup(buildPopupHtml(item), { maxWidth: 280, minWidth: 260 });
       }
