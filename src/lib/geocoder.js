@@ -1,7 +1,7 @@
 /**
- * Geocoding utility using Nominatim (OpenStreetMap).
- * Results are cached per (normalized_desa|kecamatan) pair so we
- * don't call the API repeatedly for the same location.
+ * Geocoding utility using ArcGIS World Geocoding Service.
+ * High limits, no auth required for basic searches, and highly reliable.
+ * Results are cached per (normalized_desa|kecamatan) pair.
  */
 
 const GEOCODER_CACHE = {};
@@ -49,10 +49,6 @@ function normalizeName(name) {
 /**
  * Geocode a desa/kecamatan pair in Bojonegoro.
  * Returns { lat, lng } or null if geocoding fails.
- *
- * @param {string} desa
- * @param {string} kecamatan
- * @returns {Promise<{lat: number, lng: number} | null>}
  */
 export async function geocodeLocation(desa, kecamatan) {
   const key = cacheKey(desa, kecamatan);
@@ -69,23 +65,21 @@ export async function geocodeLocation(desa, kecamatan) {
     return stored;
   }
 
-  // call Nominatim
+  // call ArcGIS API
   try {
     const query = encodeURIComponent(`${normalizeName(desa)}, ${normalizeName(kecamatan)}, Bojonegoro, East Java, Indonesia`);
-    const url = `https://nominatim.openstreetmap.org/search?q=${query}&format=json&limit=1&addressdetails=0`;
+    const url = `https://geocode.arcgis.com/arcgis/rest/services/World/GeocodeServer/findAddressCandidates?SingleLine=${query}&f=json&maxLocations=1`;
 
-    const res = await fetch(url, {
-      headers: { 'Accept-Language': 'id,en' },
-    });
-
-    if (!res.ok) throw new Error(`Nominatim HTTP ${res.status}`);
+    const res = await fetch(url);
+    if (!res.ok) throw new Error(`ArcGIS HTTP ${res.status}`);
 
     const results = await res.json();
 
-    if (results && results.length > 0) {
+    if (results && results.candidates && results.candidates.length > 0) {
+      const location = results.candidates[0].location;
       const entry = {
-        lat: parseFloat(results[0].lat),
-        lng: parseFloat(results[0].lon),
+        lat: location.y,
+        lng: location.x,
       };
 
       GEOCODER_CACHE[key] = { data: entry, timestamp: Date.now() };

@@ -142,6 +142,7 @@ async function buildMapItems(assignments, equipment) {
       kondisi: e.condition_percentage != null ? `${e.condition_percentage}%` : 'Baik',
       operator: assignment?.operator?.full_name || null,
       pekerjaan: JOB_LABELS[assignment?.job_type] || assignment?.job_sub_type || 'Pekerjaan Lapangan',
+      seksi: assignment?.created_by_role === 'seksi_embung' ? 'Seksi Embung' : (assignment?.created_by_role === 'seksi_normalisasi' ? 'Seksi Normalisasi' : null),
       desa: locDesa || null,
       kecamatan: locKec || null,
       lat: lat ?? KANTOR_COORDS.lat,
@@ -355,83 +356,24 @@ function RootPageContent() {
 
         {/* Map section */}
         <section className="public-map-section">
-          <div className="public-map-header">
+          {/* Map Section Header */}
+          <div className="public-map-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
             <div>
               <span className="card-title">Peta Sebaran Alat Berat</span>
               <div className="header-subtitle">
-                Lokasi alat berat berdasarkan pekerjaan aktif — klik marker untuk detail dan rute
+                Pratinjau lokasi alat berat. Buka layar penuh untuk detail interaktif.
               </div>
             </div>
+            <Link href="/peta" className="btn btn-primary">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7"/></svg>
+              Perbesar Peta
+            </Link>
           </div>
 
-          {/* Filter bar */}
-          <div className="public-map-filters">
-            <div className="public-filter-search">
-              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/>
-              </svg>
-              <input
-                type="text"
-                placeholder="Cari alat, desa, nomor lambung..."
-                value={filterSearch}
-                onChange={e => setFilterSearch(e.target.value)}
-              />
-              {filterSearch && (
-                <button className="filter-clear-btn" onClick={() => setFilterSearch('')} aria-label="Hapus pencarian">
-                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-                    <path d="M18 6L6 18M6 6l12 12"/>
-                  </svg>
-                </button>
-              )}
-            </div>
-
-            <select
-              className="form-control public-filter-select"
-              value={filterKecamatan}
-              onChange={e => setFilterKecamatan(e.target.value)}
-            >
-              <option value="semua">Semua Kecamatan</option>
-              {KECAMATAN_LIST.map(k => (
-                <option key={k} value={k}>{k.charAt(0) + k.slice(1).toLowerCase()}</option>
-              ))}
-            </select>
-
-            <select
-              className="form-control public-filter-select"
-              value={filterStatus}
-              onChange={e => setFilterStatus(e.target.value)}
-            >
-              {STATUS_LIST.map(s => (
-                <option key={s.value} value={s.value}>{s.label}</option>
-              ))}
-            </select>
-          </div>
-
-          {/* Map card */}
-          <div className="card public-map-card">
-            <MapComponent mapItems={filteredMapItems} />
-          </div>
-
-          {/* Map legend */}
-          <div className="public-map-legend">
-            <span className="legend-title">Status:</span>
-            <div className="legend-items">
-              <div className="legend-item">
-                <span className="legend-dot" style={{ background: '#d97706', borderColor: '#d97706' }} />
-                <span>Beroperasi</span>
-              </div>
-              <div className="legend-item">
-                <span className="legend-dot" style={{ background: '#16a34a', borderColor: '#16a34a' }} />
-                <span>Siap Ditugaskan</span>
-              </div>
-              <div className="legend-item">
-                <span className="legend-dot" style={{ background: '#7c3aed', borderColor: '#7c3aed' }} />
-                <span>Maintenance</span>
-              </div>
-              <div className="legend-item">
-                <span className="legend-dot" style={{ background: '#64748b', borderColor: '#64748b' }} />
-                <span>Di Kantor</span>
-              </div>
+          {/* Map card (Preview Mode) */}
+          <div className="card public-map-card" style={{ height: '300px', cursor: 'pointer', overflow: 'hidden' }} onClick={() => router.push('/peta')}>
+            <div style={{ pointerEvents: 'none', height: '100%', width: '100%' }}>
+              <MapComponent mapItems={filteredMapItems} previewMode={true} />
             </div>
           </div>
         </section>

@@ -45,3 +45,4 @@ next-env.d.ts
 
 # DB push script (contains token reference)
 db-push.ps1
+.vercel

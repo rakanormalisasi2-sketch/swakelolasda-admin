@@ -1396,3 +1396,75 @@ tbody tr:hover { background: var(--bg-base); }
     gap: 6px 12px;
   }
 }
+
+/* ============================================
+   FULLSCREEN MAP PAGE
+   ============================================ */
+.fullscreen-map-page {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  width: 100vw;
+  overflow: hidden;
+  position: relative;
+  background: var(--bg-base);
+}
+
+.fullscreen-filters {
+  position: absolute;
+  top: 80px;
+  left: 20px;
+  right: 20px;
+  z-index: 1000;
+  display: flex;
+  gap: 10px;
+  background: rgba(255, 255, 255, 0.95);
+  padding: 10px;
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-md);
+  backdrop-filter: blur(8px);
+  border: 1px solid rgba(226, 232, 240, 0.7);
+}
+
+.fullscreen-map-container {
+  flex: 1;
+  width: 100%;
+}
+
+.fullscreen-map-container .leaflet-container {
+  height: 100% !important;
+  width: 100% !important;
+}
+
+/* Override Map Popup Row */
+.map-popup-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 8px;
+  line-height: 1.4;
+  padding: 4px 0;
+  border-bottom: 1px dashed var(--border);
+}
+
+.map-popup-row:last-child {
+  border-bottom: none;
+}
+
+/* Marker Cluster Customization */
+.marker-cluster-small { background-color: rgba(26, 86, 219, 0.6); }
+.marker-cluster-small div { background-color: rgba(26, 86, 219, 0.8); color: white; }
+.marker-cluster-medium { background-color: rgba(217, 119, 6, 0.6); }
+.marker-cluster-medium div { background-color: rgba(217, 119, 6, 0.8); color: white; }
+.marker-cluster-large { background-color: rgba(220, 38, 38, 0.6); }
+.marker-cluster-large div { background-color: rgba(220, 38, 38, 0.8); color: white; }
+
+@media (max-width: 768px) {
+  .fullscreen-filters {
+    flex-direction: column;
+    top: 70px;
+    left: 10px;
+    right: 10px;
+    gap: 8px;
+  }
+}
