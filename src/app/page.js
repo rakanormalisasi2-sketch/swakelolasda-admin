@@ -450,76 +450,7 @@ function RootPageContent() {
           </div>
         </section>
 
-        {/* PERSONIL SECTION */}
-        <section className="public-section">
-          <div className="card-header" style={{ marginBottom: 16 }}>
-            <span className="card-title">👷 Personil & Armada</span>
-            <div className="header-subtitle">Daftar operator dan alat berat yang beroperasi vs siap ditugaskan</div>
-          </div>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: 16 }}>
-            {/* Kiri: Operator Beroperasi */}
-            <div className="card">
-              <div className="card-header" style={{ background: '#fef3c7' }}>
-                <span className="card-title">🔧 Operator Beroperasi ({overview.operatingOperators?.length || 0})</span>
-              </div>
-              <div className="card-body">
-                {pageLoading ? (
-                  <p style={{ color: 'var(--text-muted)' }}>Memuat...</p>
-                ) : overview.operatingOperators?.length > 0 ? (
-                  <div style={{ maxHeight: 300, overflowY: 'auto' }}>
-                    {overview.operatingOperators.map((op, idx) => (
-                      <div key={idx} style={{ padding: '10px 0', borderBottom: '1px solid var(--border)' }}>
-                        <div style={{ fontWeight: 600, marginBottom: 4 }}>
-                          {op.full_name || 'Operator'}
-                        </div>
-                        {op.assignment && (
-                          <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>
-                            <span style={{ background: '#dcfce7', color: '#166534', padding: '2px 6px', borderRadius: 4, fontSize: 10, marginRight: 6 }}>
-                              {op.assignment.location_village || op.assignment.location_village_override || '-'}
-                            </span>
-                            {op.assignment.equipment?.name && (
-                              <span style={{ color: '#1a56db' }}>
-                                {op.assignment.equipment.name}
-                              </span>
-                            )}
-                            {op.assignment.equipment?.merk_type && (
-                              <span style={{ color: '#64748b' }}> - {op.assignment.equipment.merk_type}</span>
-                            )}
-                          </div>
-                        )}
-                      </div>
-                    ))}
-                  </div>
-                ) : (
-                  <p style={{ color: 'var(--text-muted)' }}>Belum ada operator beroperasi.</p>
-                )}
-              </div>
-            </div>
-
-            {/* Kanan: Operator Ready */}
-            <div className="card">
-              <div className="card-header" style={{ background: '#dcfce7' }}>
-                <span className="card-title">✅ Operator Siap Ditugaskan ({overview.readyOperators?.length || 0})</span>
-              </div>
-              <div className="card-body">
-                {pageLoading ? (
-                  <p style={{ color: 'var(--text-muted)' }}>Memuat...</p>
-                ) : overview.readyOperators?.length > 0 ? (
-                  <div style={{ maxHeight: 300, overflowY: 'auto' }}>
-                    {overview.readyOperators.map((op, idx) => (
-                      <div key={idx} style={{ padding: '10px 0', borderBottom: '1px solid var(--border)' }}>
-                        <div style={{ fontWeight: 600 }}>{op.full_name || 'Operator'}</div>
-                        <div style={{ fontSize: 12, color: '#16a34a' }}>Siap ditugaskan</div>
-                      </div>
-                    ))}
-                  </div>
-                ) : (
-                  <p style={{ color: 'var(--text-muted)' }}>Semua operator sudah ditugaskan.</p>
-                )}
-              </div>
-            </div>
-          </div>
-        </section>
+        {/* PERSONIL SECTION - removed, content merged into Equipment Lists below */
 
         {/* Highlights + Summary */}
         <section className="public-grid">
@@ -618,35 +549,57 @@ function RootPageContent() {
           </div>
         </section>
 
-        {/* Equipment Lists */}
-        <section className="public-grid" style={{ marginTop: '24px' }}>
-          <div className="card">
-            <div className="card-header">
-              <span className="card-title">Armada Beroperasi ({operatingEquipments.length})</span>
+        {/* ── ARMADA & OPERATOR SECTION ─────────────────────────────── */}
+        <section style={{ marginTop: '24px' }}>
+
+          {/* (1) ALAT BEROPERASI — full width, tampilkan operator di dalamnya */}
+          <div className="card" style={{ marginBottom: 20 }}>
+            <div className="card-header" style={{ background: '#fef3c7' }}>
+              <span className="card-title">🚜 Alat Beroperasi ({operatingEquipments.length})</span>
+              <div className="header-subtitle">Armada yang sedang aktif di lapangan beserta operatornya</div>
             </div>
             <div className="card-body" style={{ padding: '0' }}>
-              <div style={{ maxHeight: '400px', overflowY: 'auto' }}>
-                <table className="public-table" style={{ width: '100%', borderCollapse: 'collapse' }}>
-                  <thead style={{ position: 'sticky', top: 0, background: '#f8fafc' }}>
+              <div style={{ overflowX: 'auto' }}>
+                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
+                  <thead style={{ background: '#fffbeb' }}>
                     <tr>
-                      <th style={{ padding: '12px 16px', textAlign: 'left', borderBottom: '1px solid #e2e8f0', fontSize: '13px' }}>Alat & Nomor</th>
-                      <th style={{ padding: '12px 16px', textAlign: 'left', borderBottom: '1px solid #e2e8f0', fontSize: '13px' }}>Personil</th>
+                      <th style={{ padding: '10px 16px', textAlign: 'left', borderBottom: '2px solid #fde68a', color: '#92400e', fontWeight: 700 }}>Alat Berat</th>
+                      <th style={{ padding: '10px 16px', textAlign: 'left', borderBottom: '2px solid #fde68a', color: '#92400e', fontWeight: 700 }}>No. Lambung</th>
+                      <th style={{ padding: '10px 16px', textAlign: 'left', borderBottom: '2px solid #fde68a', color: '#92400e', fontWeight: 700 }}>Operator</th>
+                      <th style={{ padding: '10px 16px', textAlign: 'left', borderBottom: '2px solid #fde68a', color: '#92400e', fontWeight: 700 }}>Lokasi</th>
                     </tr>
                   </thead>
                   <tbody>
-                    {operatingEquipments.length === 0 ? (
-                      <tr><td colSpan={2} style={{ padding: '20px', textAlign: 'center', color: '#64748b' }}>Tidak ada alat beroperasi</td></tr>
+                    {pageLoading ? (
+                      <tr><td colSpan={4} style={{ padding: '24px', textAlign: 'center', color: '#64748b' }}>Memuat data...</td></tr>
+                    ) : operatingEquipments.length === 0 ? (
+                      <tr><td colSpan={4} style={{ padding: '24px', textAlign: 'center', color: '#64748b' }}>Tidak ada alat sedang beroperasi</td></tr>
                     ) : operatingEquipments.map(eq => {
                       const asgn = overview.assignmentList?.find(a => a.equipment_id === eq.id);
+                      const locVillage = asgn?.location_village_override || asgn?.location_village;
+                      const locDistrict = asgn?.location_district_override || asgn?.location_district;
                       return (
-                        <tr key={eq.id}>
-                          <td style={{ padding: '12px 16px', borderBottom: '1px solid #f1f5f9' }}>
-                            <div style={{ fontWeight: '500', fontSize: '14px', color: '#0f172a' }}>{eq.name}</div>
-                            <div style={{ fontSize: '12px', color: '#64748b' }}>({eq.nomor_lambung || '-'}) {eq.merk_type}</div>
+                        <tr key={eq.id} style={{ borderBottom: '1px solid #f1f5f9' }}>
+                          <td style={{ padding: '12px 16px' }}>
+                            <div style={{ fontWeight: 600, color: '#0f172a' }}>{eq.name}</div>
+                            <div style={{ fontSize: '11px', color: '#64748b', marginTop: 2 }}>{eq.merk_type || '—'}</div>
                           </td>
-                          <td style={{ padding: '12px 16px', borderBottom: '1px solid #f1f5f9' }}>
-                            <div style={{ fontSize: '13px', color: '#334155' }}>Op: {asgn?.operator?.full_name || '-'}</div>
-                            {asgn?.helper?.full_name && <div style={{ fontSize: '12px', color: '#64748b' }}>Hp: {asgn.helper.full_name}</div>}
+                          <td style={{ padding: '12px 16px' }}>
+                            <span style={{ background: '#e2e8f0', color: '#334155', padding: '2px 8px', borderRadius: 4, fontWeight: 700, fontSize: 12 }}>
+                              {eq.nomor_lambung || '-'}
+                            </span>
+                          </td>
+                          <td style={{ padding: '12px 16px' }}>
+                            <div style={{ fontWeight: 500, color: '#1e40af' }}>{asgn?.operator?.full_name || '—'}</div>
+                            {asgn?.helper?.full_name && <div style={{ fontSize: '11px', color: '#64748b', marginTop: 2 }}>Helper: {asgn.helper.full_name}</div>}
+                          </td>
+                          <td style={{ padding: '12px 16px' }}>
+                            {locVillage ? (
+                              <div style={{ fontSize: '12px', color: '#334155' }}>
+                                <div>Desa {locVillage}</div>
+                                <div style={{ color: '#64748b' }}>Kec. {locDistrict || '—'}</div>
+                              </div>
+                            ) : <span style={{ color: '#94a3b8', fontSize: 12 }}>—</span>}
                           </td>
                         </tr>
                       );
@@ -657,39 +610,92 @@ function RootPageContent() {
             </div>
           </div>
 
-          <div className="card">
-            <div className="card-header">
-              <span className="card-title">Armada Siap / Maintenance ({idleEquipments.length})</span>
-            </div>
-            <div className="card-body" style={{ padding: '0' }}>
-              <div style={{ maxHeight: '400px', overflowY: 'auto' }}>
-                <table className="public-table" style={{ width: '100%', borderCollapse: 'collapse' }}>
-                  <thead style={{ position: 'sticky', top: 0, background: '#f8fafc' }}>
-                    <tr>
-                      <th style={{ padding: '12px 16px', textAlign: 'left', borderBottom: '1px solid #e2e8f0', fontSize: '13px' }}>Alat & Nomor</th>
-                      <th style={{ padding: '12px 16px', textAlign: 'left', borderBottom: '1px solid #e2e8f0', fontSize: '13px' }}>Status</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {idleEquipments.length === 0 ? (
-                      <tr><td colSpan={2} style={{ padding: '20px', textAlign: 'center', color: '#64748b' }}>Semua alat sedang beroperasi</td></tr>
-                    ) : idleEquipments.map(eq => (
-                      <tr key={eq.id}>
-                        <td style={{ padding: '12px 16px', borderBottom: '1px solid #f1f5f9' }}>
-                          <div style={{ fontWeight: '500', fontSize: '14px', color: '#0f172a' }}>{eq.name}</div>
-                          <div style={{ fontSize: '12px', color: '#64748b' }}>({eq.nomor_lambung || '-'}) {eq.merk_type}</div>
-                        </td>
-                        <td style={{ padding: '12px 16px', borderBottom: '1px solid #f1f5f9' }}>
-                          <span className={`badge ${STATUS_BADGE_CLASS[eq.status] || 'badge-neutral'}`} style={{ fontSize: '11px' }}>
-                            {eq.status === 'ready' ? 'Siap' : eq.status === 'maintenance' ? 'Maintenance' : eq.status}
-                          </span>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
+          {/* (2) DAFTAR OPERATOR & DAFTAR ALAT BERAT — side by side */}
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: 16 }}>
+
+            {/* Kiri: Daftar Semua Operator */}
+            <div className="card">
+              <div className="card-header" style={{ background: '#eff6ff' }}>
+                <span className="card-title">👷 Daftar Operator ({overview.totalOperators || 0})</span>
+              </div>
+              <div className="card-body" style={{ padding: '0' }}>
+                <div style={{ maxHeight: '360px', overflowY: 'auto' }}>
+                  {pageLoading ? (
+                    <div style={{ padding: '20px', textAlign: 'center', color: '#64748b' }}>Memuat...</div>
+                  ) : [
+                    ...(overview.operatingOperators || []).map(op => ({ ...op, _status: 'operating' })),
+                    ...(overview.readyOperators || []).map(op => ({ ...op, _status: 'ready' })),
+                  ].length === 0 ? (
+                    <div style={{ padding: '20px', textAlign: 'center', color: '#64748b' }}>Belum ada operator terdaftar</div>
+                  ) : [
+                    ...(overview.operatingOperators || []).map(op => ({ ...op, _status: 'operating' })),
+                    ...(overview.readyOperators || []).map(op => ({ ...op, _status: 'ready' })),
+                  ].map((op, idx) => (
+                    <div key={idx} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 14px', borderBottom: '1px solid #f1f5f9' }}>
+                      <div style={{
+                        width: 34, height: 34, borderRadius: '50%', flexShrink: 0,
+                        background: op._status === 'operating' ? '#fef3c7' : '#dcfce7',
+                        color: op._status === 'operating' ? '#92400e' : '#166534',
+                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        fontSize: 12, fontWeight: 700
+                      }}>
+                        {op.full_name?.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase()}
+                      </div>
+                      <div style={{ flex: 1 }}>
+                        <div style={{ fontWeight: 600, fontSize: 13, color: '#0f172a' }}>{op.full_name || 'Operator'}</div>
+                        <div style={{ fontSize: 11, marginTop: 2 }}>
+                          {op._status === 'operating' ? (
+                            <span style={{ color: '#d97706' }}>● Sedang Beroperasi</span>
+                          ) : (
+                            <span style={{ color: '#16a34a' }}>● Siap Ditugaskan</span>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
               </div>
             </div>
+
+            {/* Kanan: Daftar Semua Alat Berat */}
+            <div className="card">
+              <div className="card-header" style={{ background: '#f0fdf4' }}>
+                <span className="card-title">🏗️ Daftar Alat Berat ({overview.totalEquipment || 0})</span>
+              </div>
+              <div className="card-body" style={{ padding: '0' }}>
+                <div style={{ maxHeight: '360px', overflowY: 'auto' }}>
+                  {pageLoading ? (
+                    <div style={{ padding: '20px', textAlign: 'center', color: '#64748b' }}>Memuat...</div>
+                  ) : (overview.equipmentList || []).length === 0 ? (
+                    <div style={{ padding: '20px', textAlign: 'center', color: '#64748b' }}>Belum ada alat terdaftar</div>
+                  ) : (overview.equipmentList || []).map(eq => (
+                    <div key={eq.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 14px', borderBottom: '1px solid #f1f5f9' }}>
+                      <div style={{
+                        width: 34, height: 34, borderRadius: 8, flexShrink: 0,
+                        background: eq.status === 'operating' ? '#fef3c7' : eq.status === 'maintenance' ? '#fee2e2' : '#dcfce7',
+                        display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 16
+                      }}>
+                        {eq.status === 'operating' ? '🚜' : eq.status === 'maintenance' ? '🔧' : '✅'}
+                      </div>
+                      <div style={{ flex: 1 }}>
+                        <div style={{ fontWeight: 600, fontSize: 13, color: '#0f172a' }}>{eq.name}</div>
+                        <div style={{ fontSize: 11, color: '#64748b', marginTop: 2 }}>
+                          ({eq.nomor_lambung || '-'}) {eq.merk_type || ''}
+                        </div>
+                      </div>
+                      <span style={{
+                        fontSize: 10, fontWeight: 700, padding: '3px 7px', borderRadius: 4,
+                        background: eq.status === 'operating' ? '#fef3c7' : eq.status === 'maintenance' ? '#fee2e2' : '#dcfce7',
+                        color: eq.status === 'operating' ? '#92400e' : eq.status === 'maintenance' ? '#991b1b' : '#166534',
+                      }}>
+                        {eq.status === 'ready' ? 'SIAP' : eq.status === 'maintenance' ? 'REPAIR' : 'OPERASI'}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+
           </div>
         </section>
       </main>
