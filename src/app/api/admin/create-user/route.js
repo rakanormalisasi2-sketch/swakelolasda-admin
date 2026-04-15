@@ -1,14 +1,7 @@
 // API Route: Membuat user baru via Supabase Admin (Service Role Key)
 export const dynamic = 'force-dynamic';
 
-import { createClient } from '@supabase/supabase-js';
-
-function getAdmin() {
-  return createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL,
-    process.env.SUPABASE_SERVICE_ROLE_KEY
-  );
-}
+import { supabaseAdmin } from '@/lib/supabase-admin';
 
 export async function POST(req) {
   const { username, password, full_name, role } = await req.json();

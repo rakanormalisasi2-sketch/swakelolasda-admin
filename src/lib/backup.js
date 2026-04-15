@@ -8,15 +8,7 @@
  * - Google Sheets config TIDAK akan dihapus saat clear/restore
  */
 
-import { createClient } from '@supabase/supabase-js';
-
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-
-// Client dengan service role untuk admin operations
-const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey, {
-  auth: { persistSession: false }
-});
+import { supabaseAdmin } from './supabase-admin';
 
 // =====================================================
 // GOOGLE SHEETS CONFIG - TIDAK AKAN DIHAPUS

@@ -15,9 +15,14 @@ export default function KelolapenggnaanPage() {
 
   const loadUsers = useCallback(async () => {
     setLoading(true);
-    const { data } = await supabase.from('user_profiles').select('*').neq('role', 'operator').order('full_name');
-    setUsers(data || []);
-    setLoading(false);
+    try {
+      const { data } = await supabase.from('user_profiles').select('*').neq('role', 'operator').order('full_name');
+      setUsers(data || []);
+    } catch (err) {
+      console.error('Error loading users:', err);
+    } finally {
+      setLoading(false);
+    }
   }, []);
 
   useEffect(() => { loadUsers(); }, [loadUsers]);

@@ -1,17 +1,8 @@
 import { google } from 'googleapis';
-import { createClient } from '@supabase/supabase-js';
+import { supabaseAdmin } from './supabase-admin';
 import { Readable } from 'stream';
 
-function getSupabaseAdmin() {
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-
-  if (!supabaseUrl || !serviceRoleKey) {
-    throw new Error('Supabase admin environment variables are missing.');
-  }
-
-  return createClient(supabaseUrl, serviceRoleKey);
-}
+// Using centralized supabaseAdmin instead of local getSupabaseAdmin()
 
 function getOAuth2Client(refreshToken) {
   const clientId = process.env.GOOGLE_CLIENT_ID;
@@ -53,8 +44,6 @@ async function getOrCreateFolder(drive, name, parentId) {
 }
 
 export async function uploadPhotoToDrive({ sectionRole, operatorName, village, district, equipment, date, photoBuffer, mimeType, filename }) {
-  const supabaseAdmin = getSupabaseAdmin();
-
   const { data: sectionData, error: dbErr } = await supabaseAdmin
     .from('section_settings')
     .select('google_refresh_token, google_root_folder_id')

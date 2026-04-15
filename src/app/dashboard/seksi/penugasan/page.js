@@ -57,29 +57,34 @@ export default function PenugasanPage() {
 
   const load = useCallback(async () => {
     setLoading(true);
-    const [{ data: ops }, { data: alatData }, { data: asgn }, { data: allActiveAsgn }] = await Promise.all([
-      supabase.from('user_profiles').select('*').eq('role', 'operator').order('full_name'),
-      supabase.from('heavy_equipment').select('*').order('name'),
-      supabase.from('assignments').select(`
-        *,
-        operator:user_profiles!assignments_operator_id_fkey(full_name),
-        helper:user_profiles!assignments_helper_id_fkey(full_name),
-        equipment:heavy_equipment(name, merk_type, nomor_lambung, status)
-      `).eq('status', 'active').eq('created_by_role', profile?.role),
-      // Ambil SEMUA assignment aktif (lintas seksi) hanya untuk cek busyIds
-      supabase.from('assignments').select('operator_id, helper_id').eq('status', 'active'),
-    ]);
-    setOperators(ops || []);
-    setAlat(alatData || []);
-    setAssignments(asgn || []);
-    // busyIds dihitung dari semua seksi agar tidak bisa assign operator yang sudah aktif di seksi lain
-    const allBusy = new Set([
-      ...(allActiveAsgn || []).map(a => a.operator_id),
-      ...(allActiveAsgn || []).map(a => a.helper_id).filter(Boolean),
-    ]);
-    setBusyIdsAll(allBusy);
-    setLoading(false);
-  }, []);
+    try {
+      const [{ data: ops }, { data: alatData }, { data: asgn }, { data: allActiveAsgn }] = await Promise.all([
+        supabase.from('user_profiles').select('*').eq('role', 'operator').order('full_name'),
+        supabase.from('heavy_equipment').select('*').order('name'),
+        supabase.from('assignments').select(`
+          *,
+          operator:user_profiles!assignments_operator_id_fkey(full_name),
+          helper:user_profiles!assignments_helper_id_fkey(full_name),
+          equipment:heavy_equipment(name, merk_type, nomor_lambung, status)
+        `).eq('status', 'active').eq('created_by_role', profile?.role),
+        // Ambil SEMUA assignment aktif (lintas seksi) hanya untuk cek busyIds
+        supabase.from('assignments').select('operator_id, helper_id').eq('status', 'active'),
+      ]);
+      setOperators(ops || []);
+      setAlat(alatData || []);
+      setAssignments(asgn || []);
+      // busyIds dihitung dari semua seksi agar tidak bisa assign operator yang sudah aktif di seksi lain
+      const allBusy = new Set([
+        ...(allActiveAsgn || []).map(a => a.operator_id),
+        ...(allActiveAsgn || []).map(a => a.helper_id).filter(Boolean),
+      ]);
+      setBusyIdsAll(allBusy);
+    } catch (err) {
+      console.error('Error loading penugasan data:', err);
+    } finally {
+      setLoading(false);
+    }
+  }, [profile]);
 
   useEffect(() => { load(); }, [load]);
 

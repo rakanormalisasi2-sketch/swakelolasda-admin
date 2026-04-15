@@ -1,20 +1,8 @@
 import { google } from 'googleapis';
 import { NextResponse } from 'next/server';
-import { createClient } from '@supabase/supabase-js';
-
-function getSupabaseAdmin() {
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-
-  if (!supabaseUrl || !serviceRoleKey) {
-    throw new Error('Supabase admin environment variables are missing.');
-  }
-
-  return createClient(supabaseUrl, serviceRoleKey);
-}
+import { supabaseAdmin } from '@/lib/supabase-admin';
 
 export async function GET(request) {
-  const supabaseAdmin = getSupabaseAdmin();
 
   const { searchParams } = new URL(request.url);
   const code = searchParams.get('code');

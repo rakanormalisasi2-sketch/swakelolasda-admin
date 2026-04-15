@@ -81,74 +81,79 @@ export default function LaporanPelaksanaanPage() {
 
   const loadData = useCallback(async () => {
     setLoading(true);
-    if (!profile?.role) return;
+    try {
+      if (!profile?.role) return;
 
-    // Fetch section configuration
-    const { data: sectionData } = await supabase.from('section_settings').select('*').eq('role', profile.role).single();
-    if (sectionData) {
-      setPdfConfig({
-        program: sectionData.pdf_program || 'PENGELOLAAN SUMBER DAYA AIR',
-        kegiatan: sectionData.pdf_kegiatan || 'PENGELOLAAN SDA DAN BANGUNAN PENGAMAN PANTAI PADA WILAYAH SUNGAI (WS) DALAM 1 (SATU) DAERAH KABUPATEN/KOTA',
-        subKegiatan: sectionData.pdf_sub_kegiatan || 'NORMALISASI / RESTORASI SUNGAI',
-        pekerjaanPrefix: sectionData.pdf_pekerjaan_prefix || 'NORMALISASI SUNGAI',
-        namaStaf: sectionData.pdf_nama_staf || 'PANGESTU EKA DEWANTO W, A.Md.T',
-        nipStaf: sectionData.pdf_nip_staf || '19980711 202204 1 001',
-      });
-    }
-
-    // Fetch konfigurasi kolom custom untuk seksi ini
-    const { data: colConfigs } = await supabase
-      .from('section_column_configs')
-      .select('*')
-      .eq('role', profile.role)
-      .order('position', { ascending: true });
-    setCustomColumns(colConfigs || []);
-
-    const { data: assignments } = await supabase
-      .from('assignments')
-      .select('id, status')
-      .eq('created_by_role', profile.role);
-
-    const assignmentIds = assignments?.map(a => a.id) || [];
-
-    if (assignmentIds.length > 0) {
-      const { data: logsData } = await supabase
-        .from('operator_logs')
-        .select(`
-          *,
-          assignment:assignments(id, status, job_type, job_sub_type, location_district, location_village, helper_override, helper:user_profiles!assignments_helper_id_fkey(full_name)),
-          operator:user_profiles!operator_logs_operator_id_fkey(full_name),
-          equipment:heavy_equipment(name, merk_type, nomor_lambung)
-        `)
-        .in('assignment_id', assignmentIds)
-        .order('assignment_id', { ascending: true })
-        .order('tanggal', { ascending: true });
-
-      if (logsData && logsData.length > 0) {
-        logsData.sort((a, b) => {
-           const opA = a.override_operator || a.operator?.full_name || '';
-           const alA = a.override_alat || a.equipment?.name || '';
-           const kA = a.override_kecamatan || a.assignment?.location_district || '';
-           const dA = a.override_desa || a.assignment?.location_village || '';
-
-           const opB = b.override_operator || b.operator?.full_name || '';
-           const alB = b.override_alat || b.equipment?.name || '';
-           const kB = b.override_kecamatan || b.assignment?.location_district || '';
-           const dB = b.override_desa || b.assignment?.location_village || '';
-
-           const groupA = `${opA} ${alA} ${kA} ${dA}`;
-           const groupB = `${opB} ${alB} ${kB} ${dB}`;
-           
-           if (groupA < groupB) return -1;
-           if (groupA > groupB) return 1;
-           return new Date(a.tanggal).getTime() - new Date(b.tanggal).getTime();
+      // Fetch section configuration
+      const { data: sectionData } = await supabase.from('section_settings').select('*').eq('role', profile.role).single();
+      if (sectionData) {
+        setPdfConfig({
+          program: sectionData.pdf_program || 'PENGELOLAAN SUMBER DAYA AIR',
+          kegiatan: sectionData.pdf_kegiatan || 'PENGELOLAAN SDA DAN BANGUNAN PENGAMAN PANTAI PADA WILAYAH SUNGAI (WS) DALAM 1 (SATU) DAERAH KABUPATEN/KOTA',
+          subKegiatan: sectionData.pdf_sub_kegiatan || 'NORMALISASI / RESTORASI SUNGAI',
+          pekerjaanPrefix: sectionData.pdf_pekerjaan_prefix || 'NORMALISASI SUNGAI',
+          namaStaf: sectionData.pdf_nama_staf || 'PANGESTU EKA DEWANTO W, A.Md.T',
+          nipStaf: sectionData.pdf_nip_staf || '19980711 202204 1 001',
         });
       }
-      setLogs(logsData || []);
-    } else {
-      setLogs([]);
+
+      // Fetch konfigurasi kolom custom untuk seksi ini
+      const { data: colConfigs } = await supabase
+        .from('section_column_configs')
+        .select('*')
+        .eq('role', profile.role)
+        .order('position', { ascending: true });
+      setCustomColumns(colConfigs || []);
+
+      const { data: assignments } = await supabase
+        .from('assignments')
+        .select('id, status')
+        .eq('created_by_role', profile.role);
+
+      const assignmentIds = assignments?.map(a => a.id) || [];
+
+      if (assignmentIds.length > 0) {
+        const { data: logsData } = await supabase
+          .from('operator_logs')
+          .select(`
+            *,
+            assignment:assignments(id, status, job_type, job_sub_type, location_district, location_village, helper_override, helper:user_profiles!assignments_helper_id_fkey(full_name)),
+            operator:user_profiles!operator_logs_operator_id_fkey(full_name),
+            equipment:heavy_equipment(name, merk_type, nomor_lambung)
+          `)
+          .in('assignment_id', assignmentIds)
+          .order('assignment_id', { ascending: true })
+          .order('tanggal', { ascending: true });
+
+        if (logsData && logsData.length > 0) {
+          logsData.sort((a, b) => {
+             const opA = a.override_operator || a.operator?.full_name || '';
+             const alA = a.override_alat || a.equipment?.name || '';
+             const kA = a.override_kecamatan || a.assignment?.location_district || '';
+             const dA = a.override_desa || a.assignment?.location_village || '';
+
+             const opB = b.override_operator || b.operator?.full_name || '';
+             const alB = b.override_alat || b.equipment?.name || '';
+             const kB = b.override_kecamatan || b.assignment?.location_district || '';
+             const dB = b.override_desa || b.assignment?.location_village || '';
+
+             const groupA = `${opA} ${alA} ${kA} ${dA}`;
+             const groupB = `${opB} ${alB} ${kB} ${dB}`;
+             
+             if (groupA < groupB) return -1;
+             if (groupA > groupB) return 1;
+             return new Date(a.tanggal).getTime() - new Date(b.tanggal).getTime();
+          });
+        }
+        setLogs(logsData || []);
+      } else {
+        setLogs([]);
+      }
+    } catch (err) {
+      console.error('Error loading reports data:', err);
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
   }, [profile]);
 
   useEffect(() => { loadData(); }, [loadData]);
