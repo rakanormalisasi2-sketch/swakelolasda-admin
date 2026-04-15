@@ -450,7 +450,7 @@ function RootPageContent() {
           </div>
         </section>
 
-        {/* PERSONIL SECTION - removed, content merged into Equipment Lists below */
+        {/* PERSONIL SECTION - removed, content merged into Equipment Lists below */}
 
         {/* Highlights + Summary */}
         <section className="public-grid">
