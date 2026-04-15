@@ -8,61 +8,26 @@ import { useLocalSearchParams, router } from 'expo-router';
 import * as ImagePicker from 'expo-image-picker';
 import * as ImageManipulator from 'expo-image-manipulator';
 import { supabase } from '@/lib/supabase';
-
-/* KECAMATAN & DESA - Data resmi Kabupaten Bojonegoro (28 kec, 430 desa) */
-const DESA_MAP = {
-  'BALEN': ['Balenrejo','Bulaklo','Bulu','Kabunan','Kedungbondo','Kedungdowo','Kemamang','Kenep','Lengkong','Margomulyo','Mayangkawis','Mulyoagung','Mulyorejo','Ngadiluhur','Penganten','Pilanggede','Pohbogo','Prambatan','Sarisejo','Sekaran','Sidobandung','Sobontoro','Swaloh'],
-  'BAURENO': ['Banjaran','Banjaranyar','Baureno','Blongsong','Bumiayu','Drajat','Gajah','Gunungsari','Kalisari','Karangdayu','Kauman','Kedungrejo','Lebaksari','Ngemplak','Pasinan','Pomahan','Pucangarum','Selorejo','Sembunglor','Sraturejo','Sumuragung','Tanggungan','Tlogoagung','Trojalu','Tulungagung'],
-  'BOJONEGORO': ['Campurejo','Kalirejo','Kauman','Mulyoagung','Pacul','Semanding','Sukorejo','Banjarejo','Jetak','Kadipaten','Karang Pacar','Kepatihan','Klangon','Ledok Kulon','Ledok Wetan','Mojokampung','Ngrowo','Sumbang'],
-  'BUBULAN': ['Bubulan','Cancung','Clebung','Ngorogunung','Sumberbendo'],
-  'DANDER': ['Dander','Growok','Jatiblimbing','Karangsono','Kunci','Mojoranu','Ngablak','Ngraseh','Ngulanan','Ngumpakdalem','Ngunut','Sendangrejo','Sumberagung','Sumberarum','Sumbertlaseh','Sumodikaran'],
-  'GAYAM': ['Begadon','Beged','Bonorejo','Brabowan','Cengungklung','Gayam','Katur','Manukan','Mojodelik','Ngraho','Ringintunggal','Sudu'],
-  'GONDANG': ['Gondang','Jari','Krondonan','Pajeng','Pragelan','Sambongrejo','Senganten'],
-  'KALITIDU': ['Brenggolo','Grebegan','Kalitidu','Leran','Mayanggeneng','Mayangrejo','Mlaten','Mojo','Mojosari','Ngringinrejo','Ngujo','Panjunan','Pilangsari','Pungpungan','Sukoharjo','Sumengko','Talok','Wotanngare'],
-  'KANOR': ['Bakung','Bungur','Cangakan','Caruban','Gedongarum','Kabalan','Kanor','Kedungprimpen','Nglarangan','Palembon','Pesen','Pilang','Piyak','Prigi','Samberan','Sarangan','Sedeng','Semambung','Simbatan','Simorejo','Sroyo','Sumberwangi','Tambahrejo','Tejo','Temu'],
-  'KAPAS': ['Bakalan','Bangilan','Bendo','Bogo','Kalianyar','Kapas','Kedaton','Klampok','Kumpulrejo','Mojodeso','Ngampel','Padang Mentoyo','Plesungan','Sambiroto','Sembung','Semenpinggir','Sukowati','Tanjungharjo','Tapelan','Tikusan','Wedi'],
-  'KASIMAN': ['Batokan','Besah','Betet','Kasiman','Ngaglik','Sambeng','Sekaran','Sidomukti','Tambakmerak','Tembeling'],
-  'KEDEWAN': ['Beji','Hargomulyo','Kedewan','Kawengan','Wonocolo'],
-  'KEDUNGADEM': ['Babad','Balongcabe','Dayukidul','Drokilo','Duwel','Geger','Jamberejo','Kedungadem','Kedungrejo','Kepohkidul','Kendung','Kesongo','Megale','Mlideg','Mojorejo','Ngrandu','Panjang','Pejok','Sidorejo','Sidomulyo','Tlogoagung','Tondomulo','Tumbrasanom'],
-  'KEPOHBARU': ['Balongdowo','Bayemgede','Betet','Brangkal','Bumirejo','Cengkir','Jipo','Karangan','Kepoh','Krangkong','Mojosari','Mudung','Nglumber','Ngranggonanyar','Pejok','Pohwates','Sidomukti','Simorejo','Sugihwaras','Sumberagung','Sumbergede','Sumberoto','Tlogorejo','Turigede','Woro'],
-  'MALO': ['Banaran','Dukohlor','Kacangan','Kedungrejo','Kemiri','Ketileng','Kliteh','Petak','Malo','Ngujung','Rendeng','Semlaran','Sudah','Sukorejo','Sumberejo','Tambakromo','Tanggir','Tinawun','Trembes','Tulungagung'],
-  'MARGOMULYO': ['Geneng','Kalangan','Margomulyo','Meduri','Ngelo','Sumberejo'],
-  'NGAMBON': ['Bondol','Karangmangu','Ngambon','Nglamping','Sengon'],
-  'NGASEM': ['Bandungrejo','Bareng','Butoh','Dukoh Kidul','Jampet','Jelu','Kolong','Mediyunan','Ngadiluwih','Ngantru','Ngasem','Sambong','Sendangharjo','Setren','Tengger','Trenggulunan','Wadang'],
-  'NGRAHO': ['Bancer','Blimbinggede','Jumok','Kalirejo','Klempun','Luwihaji','Mojorejo','Nganti','Ngraho','Pandan','Payaman','Sugihwaras','Sumberagung','Sumberarum','Tanggungan','Tapelan'],
-  'PADANGAN': ['Banjarejo','Cendono','Dengok','Kebonagung','Kendung','Kuncan','Ngasiman','Ngeper','Ngradin','Nguken','Padangan','Prangi','Purworejo','Sidorejo','Sonorejo','Tebon'],
-  'PURWOSARI': ['Donan','Gapluk','Kaliombo','Kuniran','Ngrejeng','Pelem','Pojok','Punggur','Purwosari','Sedahkidul','Tinumpuk','Tlatah'],
-  'SEKAR': ['Bareng','Bobol','Deling','Klino','Miyono','Sekar'],
-  'SUGIHWARAS': ['Alasgung','Balongrejo','Bareng','Bulu','Drenges','Genjor','Glagahan','Glagahwangi','Jatitengah','Kedungdowo','Nglajang','Panemon','Panunggalan','Siwalan','Sugihwaras','Trate','Wedoro'],
-  'SUKOSEWU': ['Duyungan','Jumput','Kalicilik','Klepek','Pacing','Purwoasri','Semawot','Semen Kidul','Sidodadi','Sidorejo','Sitiaji','Sukosewu','Sumberjo Kidul','Tegalkodo'],
-  'SUMBEREJO': ['Banjarjo','Bogangin','Butoh','Deru','Jatigede','Karangdinoyo','Karangdowo','Kayulemah','Kedungrejo','Margoagung','Mejuwet','Mlinjeng','Ngampal','Pejambon','Pekuwon','Prayungan','Sambongrejo','Sendangagung','Sumberharjo','Sumberejo','Sumuragung','Talun','Teleng','Tlogohaji','Tulungrejo','Wotan'],
-  'TAMBAKREJO': ['Bakalan','Dolokgede','Gading','Gamongan','Jatimulyo','Jawik','Kacangan','Kalisumber','Malingmati','Mulyorejo','Napis','Ngrancang','Pengkol','Sendangrejo','Sukorejo','Tambakrejo','Tanjung','Turi'],
-  'TEMAYANG': ['Bakulan','Belun','Buntalan','Jono','Kedungsari','Kedungsumber','Ngujung','Pancur','Pandantoyo','Papringan','Soko','Temayang'],
-  'TRUCUK': ['Banjarsari','Guyangan','Kandangan','Kanten','Mori','Padang','Pagerwesi','Sranak','Sumbangtimun','Sumberejo','Trucuk','Tulungrejo'],
-};
-
-
-const ALAT_LIST = [
-  'Excavator 5 Ton (PC 50)',
-  'Excavator 7,5 Ton (PC 75)',
-  'Excavator 13 Ton (313D / PC 100)',
-  'Excavator 20 Ton Standard (PC 200)',
-  'Excavator 20 Ton Long Arm',
-  'Bulldozer',
-  'Wheel Excavator',
-];
+import DESA_MAP from '@/lib/wilayah';
 
 const API_URL = 'https://swakelolasda.vercel.app';
 
 type Photo = { uri: string; base64: string; };
+type EquipmentOption = {
+  id: string;
+  name: string;
+  merk_type?: string | null;
+  nomor_lambung?: string | null;
+};
 type Assignment = {
   id: string;
   location_district: string;
   location_village: string;
   job_type: string;
   job_sub_type: string;
+  created_by_role?: string | null;
   equipment_id?: string | null;
-  equipment: { name: string; merk_type?: string | null; nomor_lambung?: string | null; } | null;
+  equipment: EquipmentOption | null;
   helper_override?: string | null;
   helper?: { full_name: string } | null;
 };
@@ -92,10 +57,27 @@ export default function LaporanScreen() {
   // Helper dropdown state
   const [helperOpen, setHelperOpen] = useState(false);
   const [operatorList, setOperatorList] = useState<{ id: string; full_name: string }[]>([]);
+  const [equipmentList, setEquipmentList] = useState<EquipmentOption[]>([]);
 
   const [keteranganKategori, setKeteranganKategori] = useState<'Kerusakan'|'Cuaca'|'Lainnya'|''>('');
   const [kateOpen, setKateOpen] = useState(false);
   const KATEGORI_OPTIONS = ['Kerusakan', 'Cuaca', 'Lainnya'];
+
+  const formatEquipmentLabel = (equipment?: EquipmentOption | null) => {
+    if (!equipment) return '';
+    return [
+      equipment.nomor_lambung,
+      equipment.merk_type ? `(${equipment.merk_type})` : null,
+      equipment.name,
+    ].filter(Boolean).join(' ');
+  };
+
+  const normalizeDistrict = (value?: string | null) => (value || '').trim().toUpperCase();
+
+  const syncEquipmentStatusForAssignment = async (equipmentId: string, hasActiveAssignment: boolean) => {
+    const nextStatus = hasActiveAssignment ? 'operating' : 'ready';
+    await supabase.from('heavy_equipment').update({ status: nextStatus }).eq('id', equipmentId);
+  };
 
   const [form, setForm] = useState({
     tanggal: new Date().toISOString().split('T')[0],
@@ -132,6 +114,14 @@ export default function LaporanScreen() {
       .then(({ data }) => {
         setOperatorList((data || []).filter(o => o.full_name?.toLowerCase() !== 'operator test'));
       });
+
+    supabase
+      .from('heavy_equipment')
+      .select('id, name, merk_type, nomor_lambung')
+      .order('name')
+      .then(({ data }) => {
+        setEquipmentList(data || []);
+      });
   }, []);
 
   // Load assignment aktif operator
@@ -139,7 +129,7 @@ export default function LaporanScreen() {
     if (!operatorId) return;
     supabase
       .from('assignments')
-      .select('id, location_district, location_village, job_type, job_sub_type, equipment_id, equipment:heavy_equipment(name, merk_type, nomor_lambung), helper_override, helper:user_profiles!assignments_helper_id_fkey(full_name)')
+      .select('id, location_district, location_village, job_type, job_sub_type, created_by_role, equipment_id, equipment:heavy_equipment(id, name, merk_type, nomor_lambung), helper_override, helper:user_profiles!assignments_helper_id_fkey(full_name)')
       .eq('operator_id', operatorId)
       .eq('status', 'active')
       .single()
@@ -150,17 +140,16 @@ export default function LaporanScreen() {
         }
         if (data) {
           setAssignment(data as unknown as Assignment);
-          const kec = (data.location_district || '').toUpperCase();
+          const kec = normalizeDistrict(data.location_district);
           const desa = data.location_village || '';
           const eq = Array.isArray(data.equipment) ? data.equipment[0] : (data.equipment as any);
-          const equipName = eq?.name || '';
-          const equipDetail = eq ? [eq.nomor_lambung, eq.merk_type ? `(${eq.merk_type})` : null, eq.name].filter(Boolean).join(' ') : '';
+          const equipDetail = formatEquipmentLabel(eq);
           const assignedHelper = data.helper_override || (data.helper as any)?.full_name || '';
-          setForm(f => ({ ...f, kecamatan: kec, desa, jenisAlat: equipDetail || equipName || '', helper: assignedHelper }));
+          setForm(f => ({ ...f, kecamatan: kec, desa, jenisAlat: equipDetail || '', helper: assignedHelper }));
           setDesaOptions(DESA_MAP[kec] || []);
 
           // Fetch custom columns sesuai role seksi yang menugaskan operator
-          const sectionRole = (data as any).created_by_role || 
+          const sectionRole = data.created_by_role ||
             (data.job_type === 'embung' ? 'seksi_embung' : 'seksi_normalisasi');
           const { data: colConfigs } = await supabase
             .from('section_column_configs')
@@ -175,11 +164,17 @@ export default function LaporanScreen() {
 
   // Update desa options when kecamatan changes
   useEffect(() => {
-    setDesaOptions(DESA_MAP[form.kecamatan] || []);
-    if (!DESA_MAP[form.kecamatan]?.includes(form.desa)) {
+    const normalizedDistrict = normalizeDistrict(form.kecamatan);
+    const nextDesaOptions = DESA_MAP[normalizedDistrict] || [];
+    setDesaOptions(nextDesaOptions);
+    if (form.kecamatan !== normalizedDistrict) {
+      setForm(f => ({ ...f, kecamatan: normalizedDistrict }));
+      return;
+    }
+    if (form.desa && !nextDesaOptions.includes(form.desa)) {
       setForm(f => ({ ...f, desa: '' }));
     }
-  }, [form.kecamatan]);
+  }, [form.kecamatan, form.desa]);
 
   // Compress and pick photos
   const pickPhotos = async () => {
@@ -312,8 +307,8 @@ export default function LaporanScreen() {
         jenis_alat: form.jenisAlat || null,         // teks fallback jenis alat berat
         override_alat: alatDipilih,                 // override manual jika ingin ubah
         tanggal: form.tanggal,
-        override_kecamatan: form.kecamatan !== assignment?.location_district ? form.kecamatan : null,
-        override_desa: form.desa !== assignment?.location_village ? form.desa : null,
+        override_kecamatan: form.kecamatan !== normalizeDistrict(assignment?.location_district) ? form.kecamatan : null,
+        override_desa: form.desa !== (assignment?.location_village || '') ? form.desa : null,
         progress_pekerjaan: form.progress,
         keterangan_tambahan: keteranganKategori ? `[${keteranganKategori}] ${form.keteranganDetail}`.trim() : (form.keteranganDetail || null),
         hm_awal: hmAwal,
@@ -328,16 +323,60 @@ export default function LaporanScreen() {
 
       if (error) throw new Error(error.message);
 
-      // Jika kategori Kerusakan → set equipment maintenance + buat maintenance_log
-      if (keteranganKategori === 'Kerusakan' && assignment?.equipment_id) {
-        await supabase.from('heavy_equipment').update({ status: 'maintenance' }).eq('id', assignment.equipment_id);
-        await supabase.from('maintenance_logs').insert({
-          equipment_id: assignment.equipment_id,
-          reported_by: operatorId,
-          damage_description: `[Laporan Operator: ${operatorName}] ${form.keteranganDetail}`,
-          progress_status: 'pelaporan',
-          mechanic_details: {},
-        });
+      // Jika kategori Kerusakan → set equipment maintenance + buat / update maintenance_log aktif
+      if (assignment?.equipment_id) {
+        if (keteranganKategori === 'Kerusakan') {
+          await supabase.from('heavy_equipment').update({ status: 'maintenance' }).eq('id', assignment.equipment_id);
+
+          const damageDescription = `[Laporan Operator: ${operatorName}] ${form.keteranganDetail}`.trim();
+          const { data: existingMaintenanceLog } = await supabase
+            .from('maintenance_logs')
+            .select('id')
+            .eq('equipment_id', assignment.equipment_id)
+            .neq('progress_status', 'selesai')
+            .order('reported_at', { ascending: false })
+            .limit(1)
+            .maybeSingle();
+
+          if (existingMaintenanceLog?.id) {
+            await supabase
+              .from('maintenance_logs')
+              .update({
+                reported_by: operatorId,
+                damage_description: damageDescription,
+                progress_status: 'pelaporan',
+                resolved_at: null,
+              })
+              .eq('id', existingMaintenanceLog.id);
+          } else {
+            await supabase.from('maintenance_logs').insert({
+              equipment_id: assignment.equipment_id,
+              reported_by: operatorId,
+              damage_description: damageDescription,
+              progress_status: 'pelaporan',
+              mechanic_details: {},
+            });
+          }
+        } else {
+          const { data: activeMaintenanceLog } = await supabase
+            .from('maintenance_logs')
+            .select('id')
+            .eq('equipment_id', assignment.equipment_id)
+            .neq('progress_status', 'selesai')
+            .order('reported_at', { ascending: false })
+            .limit(1)
+            .maybeSingle();
+
+          if (!activeMaintenanceLog?.id) {
+            const { data: activeAssignments } = await supabase
+              .from('assignments')
+              .select('id')
+              .eq('equipment_id', assignment.equipment_id)
+              .eq('status', 'active');
+
+            await syncEquipmentStatusForAssignment(assignment.equipment_id, (activeAssignments || []).length > 0);
+          }
+        }
       }
 
       Alert.alert(
@@ -503,11 +542,25 @@ export default function LaporanScreen() {
           </TouchableOpacity>
           {alatOpen && (
             <View style={styles.dropdownBox}>
-              {ALAT_LIST.map(a => (
-                <TouchableOpacity key={a} style={styles.dropdownItem} onPress={() => { set('jenisAlat', a); setAlatOpen(false); }}>
-                  <Text style={[styles.dropdownText, form.jenisAlat === a && styles.dropdownActive]}>{a}</Text>
-                </TouchableOpacity>
-              ))}
+              <ScrollView nestedScrollEnabled style={{ maxHeight: 220 }}>
+                {equipmentList.map(equipment => {
+                  const label = formatEquipmentLabel(equipment);
+                  return (
+                    <TouchableOpacity
+                      key={equipment.id}
+                      style={styles.dropdownItem}
+                      onPress={() => {
+                        set('jenisAlat', label || equipment.name || '');
+                        setAlatOpen(false);
+                      }}
+                    >
+                      <Text style={[styles.dropdownText, form.jenisAlat === label && styles.dropdownActive]}>
+                        {label || equipment.name}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </ScrollView>
             </View>
           )}
         </View>
