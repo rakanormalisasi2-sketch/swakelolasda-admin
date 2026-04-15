@@ -27,18 +27,24 @@ export default function PenugasanPage() {
   // Auto-geocode when village changes
   useEffect(() => {
     async function autoGeocode() {
+      // Hanya jalankan jika desa & kec ada, tapi kordinat MASIH KOSONG
       if (form.location_village && form.location_district && !form.latitude && !form.longitude) {
         setGeocoding(true);
-        console.log(`[Penugasan] Auto-geocoding: ${form.location_village}, ${form.location_district}`);
-        const result = await geocodeLocation(form.location_village, form.location_district);
-        if (result) {
-          setForm(f => ({
-            ...f,
-            latitude: result.lat.toString(),
-            longitude: result.lng.toString()
-          }));
+        try {
+          console.log(`[Penugasan] Auto-geocoding: ${form.location_village}, ${form.location_district}`);
+          const result = await geocodeLocation(form.location_village, form.location_district);
+          if (result && result.lat != null && result.lng != null) {
+            setForm(f => ({
+              ...f,
+              latitude: String(result.lat),
+              longitude: String(result.lng)
+            }));
+          }
+        } catch (err) {
+          console.error('[Penugasan] Geocoding error:', err);
+        } finally {
+          setGeocoding(false);
         }
-        setGeocoding(false);
       }
     }
     autoGeocode();

@@ -96,6 +96,9 @@ async function buildMapItems(assignments, equipment) {
       lng = parseFloat(assignment.longitude);
       coordSource = 'manual';
       console.log(`[Map] Using MANUAL coordinates for ${e.name}: ${lat}, ${lng}`);
+    } else if (e.status === 'maintenance' && assignment) {
+      // Jika maintenance tapi ada assignment, coba ambil koordinat desa penugasan
+      console.log(`[Map] Maintenance at job site detected for ${e.name}`);
     }
 
     // =============================================
@@ -103,7 +106,7 @@ async function buildMapItems(assignments, equipment) {
     // Hanya jika koordinat manual tidak diisi
     // =============================================
     if ((lat === null || lng === null) && locDesa && locKec) {
-      const cacheKey = `${locDesa}|${locKec}`;
+      const cacheKey = `${locDesa}|${locKec}`.toUpperCase();
       
       // Check cache first
       if (geocodeCache[cacheKey] !== undefined) {
@@ -111,18 +114,23 @@ async function buildMapItems(assignments, equipment) {
         if (result) {
           lat = result.lat;
           lng = result.lng;
-          coordSource = 'auto';
+          coordSource = 'auto-cache';
         }
       } else {
         // Geocode baru
         geocodeCache[cacheKey] = undefined;
-        const result = await geocodeLocation(locDesa, locKec);
-        geocodeCache[cacheKey] = result;
-        
-        if (result) {
-          lat = result.lat;
-          lng = result.lng;
-          coordSource = 'auto';
+        try {
+          const result = await geocodeLocation(locDesa, locKec);
+          geocodeCache[cacheKey] = result;
+          
+          if (result) {
+            lat = result.lat;
+            lng = result.lng;
+            coordSource = 'auto';
+            console.log(`[Map] Auto-geocoded ${e.name} to ${locDesa}: ${lat}, ${lng}`);
+          }
+        } catch (err) {
+          console.error('[Map] Geocoding fail:', err);
         }
       }
     }

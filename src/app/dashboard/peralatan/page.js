@@ -41,7 +41,7 @@ export default function PeralatanPage() {
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      // Fetch Equipment
+      // Fetch Equipment with active assignments
       const { data: alatData } = await supabase.from('heavy_equipment').select(`
         *,
         assignments (
@@ -50,13 +50,22 @@ export default function PeralatanPage() {
         )
       `).order('name');
       
+      const normalizedAlat = (alatData || []).map(a => {
+        const activeAsg = a.assignments?.find(asg => asg.status === 'active');
+        // Self-correction: Jika ada tugas aktif tapi status bukan operating/maintenance, 
+        // kita tampilkan sebagai operating untuk sinkronisasi dashboard UI
+        let displayStatus = a.status;
+        if (activeAsg && a.status === 'ready') displayStatus = 'operating';
+        return { ...a, displayStatus };
+      });
+
       // Fetch Logs
       const { data: logsData } = await supabase
         .from('maintenance_logs')
         .select('*, equipment:heavy_equipment(name, merk_type, nomor_lambung)')
         .order('reported_at', { ascending: false });
 
-      setAlat(alatData || []);
+      setAlat(normalizedAlat);
       setSemuaLogs(logsData || []);
       
       const logsMap = {};
@@ -65,7 +74,6 @@ export default function PeralatanPage() {
         logsMap[l.equipment_id].push(l);
       });
       setLogsByEq(logsMap);
-      // Hitung pending kerusakan dari operator (progress_status='pelaporan')
       setPendingDamageCount((logsData || []).filter(l => l.progress_status === 'pelaporan').length);
     } catch (err) {
       console.error('Error loading equipment data:', err);
@@ -107,10 +115,10 @@ export default function PeralatanPage() {
   const openEdit = (a) => {
     setSelectedAlat(a);
     setEditForm({
-      status: a.status,
-      prev_status: a.status,
-      condition_percentage: a.condition_percentage,
-      name: a.name,
+      status: a.status || 'ready',
+      prev_status: a.status || 'ready',
+      condition_percentage: a.condition_percentage || 100,
+      name: a.name || '',
       merk_type: a.merk_type || '',
       nomor_lambung: a.nomor_lambung || '',
       damage_description: '',
@@ -355,7 +363,7 @@ export default function PeralatanPage() {
   };
 
   const getCondColor = (pct) => pct >= 70 ? 'green' : pct >= 40 ? 'orange' : 'red';
-  const filteredAlat = statusTab === 'semua' ? alat : alat.filter(a => a.status === statusTab);
+  const filteredAlat = statusTab === 'semua' ? alat : alat.filter(a => a.displayStatus === statusTab);
 
 
   // ================= RENDER TABS =================
@@ -402,7 +410,7 @@ export default function PeralatanPage() {
                     </svg>
                   </div>
                   <div>
-                    <div className="stat-value">{alat.filter(a=>a.status===s.key).length}</div>
+                    <div className="stat-value">{alat.filter(a=>a.displayStatus===s.key).length}</div>
                     <div className="stat-label">{s.label}</div>
                   </div>
                 </div>
@@ -434,7 +442,7 @@ export default function PeralatanPage() {
                     </thead>
                     <tbody>
                       {filteredAlat.map(a => {
-                        const statusObj = STATUS_MAP[a.status] || STATUS_MAP.ready;
+                        const statusObj = STATUS_MAP[a.displayStatus] || STATUS_MAP.ready;
                         const alatLogs = logsByEq[a.id] || [];
                         return (
                           <tr key={a.id}>

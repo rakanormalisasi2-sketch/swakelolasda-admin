@@ -72,7 +72,10 @@ export default function RekapPerbaikanPage() {
 
     if (form.progress_status === 'selesai') {
       const { data: activeAsg } = await supabase
-        .from('assignments').select('id').eq('equipment_id', editingLog.equipment_id).eq('status', 'active');
+        .from('assignments')
+        .select('id')
+        .eq('equipment_id', editingLog.equipment_id)
+        .eq('status', 'active');
       const newStatus = (activeAsg && activeAsg.length > 0) ? 'operating' : 'ready';
       await supabase.from('heavy_equipment').update({ status: newStatus }).eq('id', editingLog.equipment_id);
     }

@@ -33,49 +33,18 @@ content = content.replace(
   });`
 );
 
-// ── 2. Di handleSubmit: SEBELUM insert, siapkan keterangan_tambahan dan logic kerusakan ──
-// Ganti baris keterangan_tambahan di insert
+// ── 2. Di handleSubmit: Siapkan keterangan_tambahan dengan label kategori ──
+// Website (Receiver) akan mengenali [Kerusakan] dari string ini melalui Trigger
 content = content.replace(
   `        keterangan_tambahan: form.keterangan || null,`,
   `        keterangan_tambahan: keteranganKategori ? \`[\${keteranganKategori}] \${form.keteranganDetail}\`.trim() : (form.keteranganDetail || null),`
 );
 
-// ── 3. Tambah logika laporan kerusakan SETELAH insert sukses ──
-content = content.replace(
-  `      if (error) throw new Error(error.message);
+// ── 3. Hapus logika redundant (DIPINDAHKAN KE WEBSITE/DATABASE TRIGGER) ──
+// Sebelumnya di sini ada blok insert maintenance_logs, sekarang dihapus agar APK tetap ringan
+// Database akan mengolah laporan secara otomatis saat data diterima.
 
-      Alert.alert(`,
-  `      if (error) throw new Error(error.message);
-
-      // Jika kategori Kerusakan → set equipment maintenance + buat maintenance_log
-      if (keteranganKategori === 'Kerusakan' && assignment?.equipment_id) {
-        await supabase.from('heavy_equipment').update({ status: 'maintenance' }).eq('id', assignment.equipment_id);
-        await supabase.from('maintenance_logs').insert({
-          equipment_id: assignment.equipment_id,
-          reported_by: operatorId,
-          damage_description: \`[Laporan Operator: \${operatorName}] \${form.keteranganDetail}\`,
-          progress_status: 'pelaporan',
-          mechanic_details: {},
-        });
-      }
-
-      Alert.alert(`
-);
-
-// ── 4. Ganti field keterangan UI (baris ~521-532) → dropdown + text ──
-const OLD_KETERANGAN_UI = `        {/* KETERANGAN */}
-        <View style={styles.fieldGroup}>
-          <Text style={styles.label}>Keterangan Tambahan</Text>
-          <TextInput
-            style={[styles.input, styles.textarea]}
-            value={form.keterangan}
-            onChangeText={v => set('keterangan', v)}
-            placeholder="Keterangan tambahan..."
-            multiline
-            numberOfLines={3}
-          />
-        </View>`;
-
+// ── 4. Ganti field keterangan UI ──
 const NEW_KETERANGAN_UI = `        {/* KETERANGAN — Kategori + Detail */}
         <View style={styles.fieldGroup}>
           <Text style={styles.label}>Keterangan Tambahan</Text>
@@ -105,10 +74,10 @@ const NEW_KETERANGAN_UI = `        {/* KETERANGAN — Kategori + Detail */}
           {keteranganKategori === 'Kerusakan' && (
             <View style={{ marginTop: 8, padding: 10, backgroundColor: '#fff5f5', borderLeftWidth: 4, borderLeftColor: '#e53e3e', borderRadius: 6 }}>
               <Text style={{ color: '#c53030', fontSize: 12, fontWeight: '700' }}>⚠️ Laporan kerusakan akan dikirim ke Tim Peralatan</Text>
-              <Text style={{ color: '#c53030', fontSize: 11, marginTop: 2 }}>Status alat akan berubah ke MAINTENANCE otomatis</Text>
+              <Text style={{ color: '#c53030', fontSize: 11, marginTop: 2 }}>Sistem akan memproses status pemeliharaan secara otomatis.</Text>
             </View>
           )}
-          {/* Text input detail — muncul setelah pilih kategori */}
+          {/* Text input detail */}
           {keteranganKategori !== '' && (
             <TextInput
               style={[styles.input, styles.textarea, { marginTop: 8 }]}
@@ -122,22 +91,12 @@ const NEW_KETERANGAN_UI = `        {/* KETERANGAN — Kategori + Detail */}
           )}
         </View>`;
 
-if (content.includes(OLD_KETERANGAN_UI)) {
-  content = content.replace(OLD_KETERANGAN_UI, NEW_KETERANGAN_UI);
+const idx = content.indexOf('{/* KETERANGAN */}');
+if (idx !== -1) {
+  const endIdx = content.indexOf('</View>', idx) + 7;
+  content = content.slice(0, idx) + NEW_KETERANGAN_UI + content.slice(endIdx);
   console.log('Keterangan UI replaced OK');
-} else {
-  console.log('WARNING: Keterangan UI pattern not found, trying fallback...');
-  // Fallback: cari lebih fleksibel
-  const fallbackOld = `{/* KETERANGAN */}\n        <View style={styles.fieldGroup}>\n          <Text style={styles.label}>Keterangan Tambahan</Text>`;
-  const idx = content.indexOf('{/* KETERANGAN */}');
-  if (idx !== -1) {
-    const endIdx = content.indexOf('</View>', idx) + 7;
-    content = content.slice(0, idx) + NEW_KETERANGAN_UI + content.slice(endIdx);
-    console.log('Keterangan UI replaced via fallback OK');
-  } else {
-    console.log('ERROR: Cannot find keterangan UI block');
-  }
 }
 
 fs.writeFileSync('../mobile-app/app/operator/laporan.tsx', content);
-console.log('Mobile laporan.tsx patched OK');
+console.log('Mobile laporan.tsx patched OK (Logic moved to Website Receiver)');
