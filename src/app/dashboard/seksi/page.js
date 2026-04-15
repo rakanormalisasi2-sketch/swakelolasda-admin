@@ -12,16 +12,21 @@ export default function SeksiDashboard() {
 
   useEffect(() => {
     async function load() {
-      const [asgn, ops, alatReady, alatMaint, reports] = await Promise.all([
-        supabase.from('assignments').select('id', { count: 'exact', head: true }).eq('status', 'active'),
-        supabase.from('user_profiles').select('id', { count: 'exact', head: true }).eq('role', 'operator'),
-        supabase.from('heavy_equipment').select('id', { count: 'exact', head: true }).eq('status', 'ready'),
-        supabase.from('heavy_equipment').select('id', { count: 'exact', head: true }).eq('status', 'maintenance'),
-        supabase.from('daily_reports').select('*, assignment:assignments(operator:user_profiles!assignments_operator_id_fkey(full_name), location_village, location_district, job_type').order('created_at', { ascending: false }).limit(5),
-      ]);
-      setStats({ activeAssignments: asgn.count || 0, totalOps: ops.count || 0, readyAlat: alatReady.count || 0, maintenance: alatMaint.count || 0 });
-      setRecentReports(reports.data || []);
-      setLoading(false);
+      try {
+        const [asgn, ops, alatReady, alatMaint, reports] = await Promise.all([
+          supabase.from('assignments').select('id', { count: 'exact', head: true }).eq('status', 'active'),
+          supabase.from('user_profiles').select('id', { count: 'exact', head: true }).eq('role', 'operator'),
+          supabase.from('heavy_equipment').select('id', { count: 'exact', head: true }).eq('status', 'ready'),
+          supabase.from('heavy_equipment').select('id', { count: 'exact', head: true }).eq('status', 'maintenance'),
+          supabase.from('daily_reports').select('*, assignment:assignments(operator:user_profiles!assignments_operator_id_fkey(full_name), location_village, location_district, job_type)').order('created_at', { ascending: false }).limit(5),
+        ]);
+        setStats({ activeAssignments: asgn.count || 0, totalOps: ops.count || 0, readyAlat: alatReady.count || 0, maintenance: alatMaint.count || 0 });
+        setRecentReports(reports.data || []);
+      } catch (err) {
+        console.error('Dashboard load error:', err);
+      } finally {
+        setLoading(false);
+      }
     }
     load();
   }, []);

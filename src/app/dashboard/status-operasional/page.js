@@ -30,35 +30,38 @@ export default function StatusOperasionalPage() {
 
   const load = useCallback(async () => {
     setLoading(true);
+    try {
+      // Build query - filter berdasarkan role yang login
+      let asgnQuery = supabase.from('assignments').select(`
+          *,
+          operator:user_profiles!assignments_operator_id_fkey(full_name),
+          helper:user_profiles!assignments_helper_id_fkey(full_name),
+          equipment:heavy_equipment(name, merk_type, nomor_lambung, status)
+        `).eq('status', 'active').order('start_date', { ascending: false });
 
-    // Build query - filter berdasarkan role yang login
-    let asgnQuery = supabase.from('assignments').select(`
-        *,
-        operator:user_profiles!assignments_operator_id_fkey(full_name),
-        helper:user_profiles!assignments_helper_id_fkey(full_name),
-        equipment:heavy_equipment(name, merk_type, nomor_lambung, status)
-      `).eq('status', 'active').order('start_date', { ascending: false });
+      const [asgnRes, opsRes, alatRes, logsRes] = await Promise.all([
+        asgnQuery,
+        supabase.from('user_profiles').select('*').eq('role', 'operator').order('full_name'),
+        supabase.from('heavy_equipment').select('*').order('name'),
+        supabase.from('maintenance_logs').select('*').neq('progress_status', 'selesai').order('reported_at', { ascending: false })
+      ]);
 
-    const [asgnRes, opsRes, alatRes, logsRes] = await Promise.all([
-      asgnQuery,
-      supabase.from('user_profiles').select('*').eq('role', 'operator').order('full_name'),
-      supabase.from('heavy_equipment').select('*').order('name'),
-      supabase.from('maintenance_logs').select('*').neq('progress_status', 'selesai').order('reported_at', { ascending: false })
-    ]);
-
-    setAssignments(asgnRes.data || []);
-    setOperators(opsRes.data || []);
-    setAlat(alatRes.data || []);
-    
-    // Group logs
-    const logsMap = {};
-    (logsRes.data || []).forEach(l => {
-      if (!logsMap[l.equipment_id]) logsMap[l.equipment_id] = [];
-      logsMap[l.equipment_id].push(l);
-    });
-    setLogs(logsMap);
-
-    setLoading(false);
+      setAssignments(asgnRes.data || []);
+      setOperators(opsRes.data || []);
+      setAlat(alatRes.data || []);
+      
+      // Group logs
+      const logsMap = {};
+      (logsRes.data || []).forEach(l => {
+        if (!logsMap[l.equipment_id]) logsMap[l.equipment_id] = [];
+        logsMap[l.equipment_id].push(l);
+      });
+      setLogs(logsMap);
+    } catch (err) {
+      console.error('Error loading operational status:', err);
+    } finally {
+      setLoading(false);
+    }
   }, [profile]);
 
   useEffect(() => { load(); }, [load]);

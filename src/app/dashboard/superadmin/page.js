@@ -11,14 +11,20 @@ export default function SuperadminDashboard() {
 
   useEffect(() => {
     async function load() {
-      const [u, a, p, m] = await Promise.all([
-        supabase.from('user_profiles').select('id', { count: 'exact', head: true }),
-        supabase.from('heavy_equipment').select('id', { count: 'exact', head: true }),
-        supabase.from('assignments').select('id', { count: 'exact', head: true }).eq('status', 'active'),
-        supabase.from('heavy_equipment').select('id', { count: 'exact', head: true }).eq('status', 'maintenance'),
-      ]);
-      setStats({ users: u.count || 0, alat: a.count || 0, penugasan: p.count || 0, maintenance: m.count || 0 });
-      setLoading(false);
+      setLoading(true);
+      try {
+        const [u, a, p, m] = await Promise.all([
+          supabase.from('user_profiles').select('id', { count: 'exact', head: true }),
+          supabase.from('heavy_equipment').select('id', { count: 'exact', head: true }),
+          supabase.from('assignments').select('id', { count: 'exact', head: true }).eq('status', 'active'),
+          supabase.from('heavy_equipment').select('id', { count: 'exact', head: true }).eq('status', 'maintenance'),
+        ]);
+        setStats({ users: u.count || 0, alat: a.count || 0, penugasan: p.count || 0, maintenance: m.count || 0 });
+      } catch (err) {
+        console.error('Error loading superadmin stats:', err);
+      } finally {
+        setLoading(false);
+      }
     }
     load();
   }, []);

@@ -40,33 +40,38 @@ export default function PeralatanPage() {
 
   const load = useCallback(async () => {
     setLoading(true);
-    // Fetch Equipment
-    const { data: alatData } = await supabase.from('heavy_equipment').select(`
-      *,
-      assignments (
-        id, status, job_type, location_district, location_village,
-        operator:user_profiles!assignments_operator_id_fkey(full_name)
-      )
-    `).order('name');
-    
-    // Fetch Logs
-    const { data: logsData } = await supabase
-      .from('maintenance_logs')
-      .select('*, equipment:heavy_equipment(name, merk_type, nomor_lambung)')
-      .order('reported_at', { ascending: false });
+    try {
+      // Fetch Equipment
+      const { data: alatData } = await supabase.from('heavy_equipment').select(`
+        *,
+        assignments (
+          id, status, job_type, location_district, location_village,
+          operator:user_profiles!assignments_operator_id_fkey(full_name)
+        )
+      `).order('name');
+      
+      // Fetch Logs
+      const { data: logsData } = await supabase
+        .from('maintenance_logs')
+        .select('*, equipment:heavy_equipment(name, merk_type, nomor_lambung)')
+        .order('reported_at', { ascending: false });
 
-    setAlat(alatData || []);
-    setSemuaLogs(logsData || []);
-    
-    const logsMap = {};
-    (logsData || []).forEach(l => {
-      if (!logsMap[l.equipment_id]) logsMap[l.equipment_id] = [];
-      logsMap[l.equipment_id].push(l);
-    });
-    setLogsByEq(logsMap);
-    // Hitung pending kerusakan dari operator (progress_status='pelaporan')
-    setPendingDamageCount((logsData || []).filter(l => l.progress_status === 'pelaporan').length);
-    setLoading(false);
+      setAlat(alatData || []);
+      setSemuaLogs(logsData || []);
+      
+      const logsMap = {};
+      (logsData || []).forEach(l => {
+        if (!logsMap[l.equipment_id]) logsMap[l.equipment_id] = [];
+        logsMap[l.equipment_id].push(l);
+      });
+      setLogsByEq(logsMap);
+      // Hitung pending kerusakan dari operator (progress_status='pelaporan')
+      setPendingDamageCount((logsData || []).filter(l => l.progress_status === 'pelaporan').length);
+    } catch (err) {
+      console.error('Error loading equipment data:', err);
+    } finally {
+      setLoading(false);
+    }
   }, []);
 
   useEffect(() => { load(); }, [load]);
