@@ -8,7 +8,7 @@
  * - Google Sheets config TIDAK akan dihapus saat clear/restore
  */
 
-import { supabaseAdmin } from './supabase-admin';
+import { supabase } from './supabase';
 
 // =====================================================
 // GOOGLE SHEETS CONFIG - TIDAK AKAN DIHAPUS
@@ -21,23 +21,23 @@ const GOOGLE_SHEETS_STORAGE_KEYS = ['sheets_normalisasi', 'sheets_embung', 'shee
 export async function getStorageUsage() {
   try {
     // Get database size approximation from assignments count
-    const { count: assignmentsCount } = await supabaseAdmin
+    const { count: assignmentsCount } = await supabase
       .from('assignments')
       .select('*', { count: 'exact', head: true });
     
-    const { count: equipmentCount } = await supabaseAdmin
+    const { count: equipmentCount } = await supabase
       .from('heavy_equipment')
       .select('*', { count: 'exact', head: true });
     
-    const { count: usersCount } = await supabaseAdmin
+    const { count: usersCount } = await supabase
       .from('user_profiles')
       .select('*', { count: 'exact', head: true });
     
-    const { count: absensiCount } = await supabaseAdmin
+    const { count: absensiCount } = await supabase
       .from('absensi')
       .select('*', { count: 'exact', head: true });
     
-    const { count: progressCount } = await supabaseAdmin
+    const { count: progressCount } = await supabase
       .from('progress_laporan')
       .select('*', { count: 'exact', head: true });
 
@@ -97,42 +97,42 @@ export async function exportAllData() {
     };
 
     // 1. Export assignments
-    const { data: assignments, error: aErr } = await supabaseAdmin
+    const { data: assignments, error: aErr } = await supabase
       .from('assignments')
       .select('*');
     exportData.tables.assignments = { data: assignments || [], count: assignments?.length || 0 };
     console.log('[Backup] Assignments:', assignments?.length || 0);
 
     // 2. Export heavy_equipment
-    const { data: equipment, error: eErr } = await supabaseAdmin
+    const { data: equipment, error: eErr } = await supabase
       .from('heavy_equipment')
       .select('*');
     exportData.tables.heavy_equipment = { data: equipment || [], count: equipment?.length || 0 };
     console.log('[Backup] Equipment:', equipment?.length || 0);
 
     // 3. Export user_profiles
-    const { data: users, error: uErr } = await supabaseAdmin
+    const { data: users, error: uErr } = await supabase
       .from('user_profiles')
       .select('*');
     exportData.tables.user_profiles = { data: users || [], count: users?.length || 0 };
     console.log('[Backup] Users:', users?.length || 0);
 
     // 4. Export absensi
-    const { data: absensi, error: abErr } = await supabaseAdmin
+    const { data: absensi, error: abErr } = await supabase
       .from('absensi')
       .select('*');
     exportData.tables.absensi = { data: absensi || [], count: absensi?.length || 0 };
     console.log('[Backup] Absensi:', absensi?.length || 0);
 
     // 5. Export progress_laporan
-    const { data: progress, error: pErr } = await supabaseAdmin
+    const { data: progress, error: pErr } = await supabase
       .from('progress_laporan')
       .select('*');
     exportData.tables.progress_laporan = { data: progress || [], count: progress?.length || 0 };
     console.log('[Backup] Progress:', progress?.length || 0);
 
     // 6. Export work_logs
-    const { data: workLogs, error: wErr } = await supabaseAdmin
+    const { data: workLogs, error: wErr } = await supabase
       .from('user_work_logs')
       .select('*');
     exportData.tables.user_work_logs = { data: workLogs || [], count: workLogs?.length || 0 };
@@ -359,7 +359,7 @@ export async function restoreToSupabase(backupData) {
     const upsertTable = async (tableName, data) => {
       if (!data || data.length === 0) return { table: tableName, inserted: 0 };
       
-      const { error } = await supabaseAdmin.from(tableName).upsert(data, { 
+      const { error } = await supabase.from(tableName).upsert(data, { 
         onConflict: 'id',
         ignoreDuplicates: false 
       });
@@ -425,7 +425,7 @@ export async function clearSupabaseData(clearUsers = false) {
     const results = [];
     
     for (const table of tablesToClear) {
-      const { error } = await supabaseAdmin.from(table).delete().neq('id', '00000000-0000-0000-0000-000000000000');
+      const { error } = await supabase.from(table).delete().neq('id', '00000000-0000-0000-0000-000000000000');
       
       if (error) {
         console.error(`[Clear] Error clearing ${table}:`, error);
