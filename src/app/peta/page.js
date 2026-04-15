@@ -88,9 +88,21 @@ async function buildMapItems(assignments, equipment) {
     let lat = null, lng = null, coordSource = null;
 
     // =============================================
-    // PRIORITAS 1: AUTO-GEOCODING (dari nama desa/kecamatan)
+    // PRIORITAS 1: MANUAL KOORDINAT (Input Presisi)
+    // Jika user/operator mengisi angka koordinat, gunakan ini!
     // =============================================
-    if (locDesa && locKec) {
+    if (assignment?.latitude && assignment?.longitude) {
+      lat = parseFloat(assignment.latitude);
+      lng = parseFloat(assignment.longitude);
+      coordSource = 'manual';
+      console.log(`[Map] Using MANUAL coordinates for ${e.name}: ${lat}, ${lng}`);
+    }
+
+    // =============================================
+    // PRIORITAS 2: AUTO-GEOCODING (Fallback)
+    // Hanya jika koordinat manual tidak diisi
+    // =============================================
+    if ((lat === null || lng === null) && locDesa && locKec) {
       const cacheKey = `${locDesa}|${locKec}`;
       
       // Check cache first
@@ -115,16 +127,6 @@ async function buildMapItems(assignments, equipment) {
       }
     }
 
-    // =============================================
-    // PRIORITAS 2: MANUAL KOORDINAT (fallback jika auto gagal)
-    // =============================================
-    if ((lat === null || lng === null) && assignment?.latitude && assignment?.longitude) {
-      lat = parseFloat(assignment.latitude);
-      lng = parseFloat(assignment.longitude);
-      coordSource = 'manual';
-      console.log(`[Map] Using MANUAL coordinates for ${e.name}: ${lat}, ${lng}`);
-    }
-
     items.push({
       id: e.id,
       alatName: e.name,
@@ -141,6 +143,7 @@ async function buildMapItems(assignments, equipment) {
       lat: lat ?? KANTOR_COORDS.lat,
       lng: lng ?? KANTOR_COORDS.lng,
       isAtOffice: lat === null,
+      isAtJobLocation: lat !== null, // Flag untuk maintenance di lokasi
       coordSource,
     });
   }

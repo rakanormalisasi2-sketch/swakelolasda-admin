@@ -3,6 +3,7 @@ import { useEffect, useState, useCallback } from 'react';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/context/AuthContext';
 import WILAYAH from '@/lib/wilayah';
+import { geocodeLocation } from '@/lib/geocoder';
 
 export default function PenugasanPage() {
   const { profile } = useAuth();
@@ -13,6 +14,7 @@ export default function PenugasanPage() {
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [geocoding, setGeocoding] = useState(false); // Status pencarian koordinat
   const [error, setError] = useState('');
   const [desaList, setDesaList] = useState([]);
   const [form, setForm] = useState({
@@ -21,6 +23,26 @@ export default function PenugasanPage() {
     location_district: '', location_village: '',
     latitude: '', longitude: '',
   });
+
+  // Auto-geocode when village changes
+  useEffect(() => {
+    async function autoGeocode() {
+      if (form.location_village && form.location_district && !form.latitude && !form.longitude) {
+        setGeocoding(true);
+        console.log(`[Penugasan] Auto-geocoding: ${form.location_village}, ${form.location_district}`);
+        const result = await geocodeLocation(form.location_village, form.location_district);
+        if (result) {
+          setForm(f => ({
+            ...f,
+            latitude: result.lat.toString(),
+            longitude: result.lng.toString()
+          }));
+        }
+        setGeocoding(false);
+      }
+    }
+    autoGeocode();
+  }, [form.location_village, form.location_district]);
   const [editId, setEditId] = useState(null);
   const [originalEquipmentId, setOriginalEquipmentId] = useState(null);
 
@@ -348,7 +370,15 @@ export default function PenugasanPage() {
                   </div>
                 </div>
                 <div style={{marginTop: -8, marginBottom: 16, fontSize: 12, color: 'var(--text-muted)'}}>
-                  <p>Kosongkan jika ingin Map menggunakan koordinat otomatis berdasarkan Desa. Isi jika titik otomatis salah sasaran atau tidak akurat.</p>
+                  <p>
+                    {geocoding ? (
+                      <span style={{ color: 'var(--primary)', fontWeight: '600', animation: 'pulse 1.5s infinite' }}>
+                        📡 Sedang mencari koordinat otomatis Desa {form.location_village}...
+                      </span>
+                    ) : (
+                      'Kosongkan jika ingin Map menggunakan koordinat otomatis berdasarkan Desa. Isi jika titik otomatis salah sasaran atau tidak akurat.'
+                    )}
+                  </p>
                 </div>
 
               </div>

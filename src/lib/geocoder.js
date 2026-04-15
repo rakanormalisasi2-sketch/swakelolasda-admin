@@ -166,16 +166,14 @@ async function geocodeWithGeoapify(desa, kecamatan) {
   try {
     // Query formats - prioritas spesifik Bojonegoro
     const queries = [
-      // Prioritas 1: Full specific address (Desa + Kecamatan + Bojonegoro)
-      `${normalizeName(desa)}, ${normalizeName(kecamatan)}, Bojonegoro, Jawa Timur, Indonesia`,
-      // Prioritas 2: Village + Regencies
-      `Desa ${normalizeName(desa)}, Bojonegoro, East Java`,
-      // Prioritas 3: Just village + regencies
+      // Prioritas 1: Desa + Kecamatan + Kabupaten + Provinsi (Sangat spesifik)
+      `Desa ${normalizeName(desa)}, Kecamatan ${normalizeName(kecamatan)}, Kabupaten Bojonegoro, Jawa Timur`,
+      // Prioritas 2: Kantor Desa (biasanya titik pusat pemerintahan yang akurat)
+      `Kantor Desa ${normalizeName(desa)}, Bojonegoro`,
+      // Prioritas 3: Nama Desa + Kecamatan + Bojonegoro
+      `${normalizeName(desa)}, ${normalizeName(kecamatan)}, Bojonegoro`,
+      // Prioritas 4: Nama Desa + Bojonegoro
       `${normalizeName(desa)}, Bojonegoro, East Java`,
-      // Prioritas 4: District + Regencies
-      `${normalizeName(kecamatan)}, Bojonegoro, Jawa Timur`,
-      // Prioritas 5: Village + District
-      `Desa ${normalizeName(desa)}, Kecamatan ${normalizeName(kecamatan)}, Bojonegoro`,
     ];
 
     for (const query of queries) {
