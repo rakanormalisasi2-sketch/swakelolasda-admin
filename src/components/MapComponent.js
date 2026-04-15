@@ -10,8 +10,17 @@ const STATUS_COLORS = {
   maintenance: { color: '#7c3aed', bg: '#ede9fe', label: 'Maintenance' },
 };
 
+// Google Maps API Key
+const GOOGLE_MAPS_API_KEY = 'AIzaSyBVt5R7mBdiQ_sLauyOBZUzrUyVfJt9Be4';
+
 function buildRouteUrl(lat, lng) {
-  return `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(`${lat},${lng}`)}`;
+  // Google Maps Directions API
+  return `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(`${lat},${lng}`)}&travelmode=driving`;
+}
+
+function buildEmbedMapUrl(lat, lng) {
+  // Google Maps Embed untuk preview lokasi
+  return `https://www.google.com/maps?q=${lat},${lng}&z=16&output=embed`;
 }
 
 function getEquipmentSvg(name = '') {
@@ -34,11 +43,27 @@ function getEquipmentSvg(name = '') {
   return `<svg width="18" height="18" viewBox="0 0 24 24" fill="${name ? 'currentColor' : 'currentColor'}"><path d="M22.7 19l-9.1-9.1c.9-2.3.4-5-1.5-6.9-2-2-5-2.4-7.4-1.3L9 6 6 9 1.6 4.7C.4 7.1.9 10.1 2.9 12.1c1.9 1.9 4.6 2.4 6.9 1.5l9.1 9.1c.4.4 1 .4 1.4 0l2.3-2.3c.5-.4.5-1.1.1-1.4z"/></svg>`;
 }
 
-function createIconHtml(status, isAtOffice, alatName) {
+function createIconHtml(status, isAtOffice, isAtJobLocation, alatName) {
   const cfg = STATUS_COLORS[status] || STATUS_COLORS.ready;
-  const color = isAtOffice ? '#64748b' : cfg.color;
-  const bg = isAtOffice ? '#f1f5f9' : cfg.bg;
-  const label = isAtOffice ? 'Kantor' : cfg.label;
+  
+  // Priority: Di Kantor > Di Lokasi Pekerjaan > Status Normal
+  let color, bg, label;
+  
+  if (isAtOffice) {
+    color = '#64748b';
+    bg = '#f1f5f9';
+    label = 'Kantor';
+  } else if (isAtJobLocation) {
+    // Maintenance tapi masih di lokasi pekerjaan
+    color = cfg.color;
+    bg = cfg.bg;
+    label = cfg.label;
+  } else {
+    color = cfg.color;
+    bg = cfg.bg;
+    label = cfg.label;
+  }
+  
   const svgHtml = getEquipmentSvg(alatName);
 
   return `<div style="position:relative;width:48px;height:48px;">
@@ -50,34 +75,64 @@ function createIconHtml(status, isAtOffice, alatName) {
     <div style="position:absolute;top:-16px;left:50%;transform:translateX(-50%);background:${color};color:#fff;font-size:10px;font-weight:700;padding:2px 8px;border-radius:999px;white-space:nowrap;box-shadow:0 2px 6px rgba(0,0,0,0.3);z-index:3;">${label}</div>
   </div>`;
 }
+
 function buildPopupHtml(item) {
   const cfg = STATUS_COLORS[item.status] || STATUS_COLORS.ready;
   const color = item.isAtOffice ? '#64748b' : cfg.color;
   const bg = item.isAtOffice ? '#f1f5f9' : cfg.bg;
   const statusLabel = item.isAtOffice ? 'Di Kantor' : cfg.label;
 
-  const isOperating = item.status === 'operating' && !item.isAtOffice;
+  // Tampilkan GIS data jika di lokasi pekerjaan (bukan di kantor)
+  const isAtJob = !item.isAtOffice;
   
-  // Render rows based on status (idle/maintenance = skip GIS data)
-  const rows = isOperating ? [
-    item.merk ? `<div class="map-popup-row"><span class="map-popup-label">Merk/Tipe</span><span class="map-popup-value">${item.merk}</span></div>` : '',
-    item.nomorLambung ? `<div class="map-popup-row"><span class="map-popup-label">No. Lambung</span><span class="map-popup-value map-popup-mono">${item.nomorLambung}</span></div>` : '',
-    item.desa ? `<div class="map-popup-row"><span class="map-popup-label">Desa</span><span class="map-popup-value">${item.desa}</span></div>` : '',
-    item.kecamatan ? `<div class="map-popup-row"><span class="map-popup-label">Kecamatan</span><span class="map-popup-value">${item.kecamatan}</span></div>` : '',
-    item.pekerjaan ? `<div class="map-popup-row"><span class="map-popup-label">Pekerjaan</span><span class="map-popup-value">${item.pekerjaan}</span></div>` : '',
-    item.operator ? `<div class="map-popup-row"><span class="map-popup-label">Operator</span><span class="map-popup-value">${item.operator}</span></div>` : '',
-    item.kondisi ? `<div class="map-popup-row"><span class="map-popup-label">Kondisi</span><span class="map-popup-value">${item.kondisi}</span></div>` : '',
-  ] : [
-    item.merk ? `<div class="map-popup-row"><span class="map-popup-label">Merk/Tipe</span><span class="map-popup-value">${item.merk}</span></div>` : '',
-    item.nomorLambung ? `<div class="map-popup-row"><span class="map-popup-label">No. Lambung</span><span class="map-popup-value map-popup-mono">${item.nomorLambung}</span></div>` : '',
-    item.kondisi ? `<div class="map-popup-row"><span class="map-popup-label">Kondisi</span><span class="map-popup-value">${item.kondisi}</span></div>` : '',
-  ];
+  // Row info alat
+  let rows = [];
+  
+  // Selalu tampilkan info alat
+  if (item.merk) {
+    rows.push(`<div class="map-popup-row"><span class="map-popup-label">Merk/Tipe</span><span class="map-popup-value">${item.merk}</span></div>`);
+  }
+  if (item.nomorLambung) {
+    rows.push(`<div class="map-popup-row"><span class="map-popup-label">No. Lambung</span><span class="map-popup-value map-popup-mono">${item.nomorLambung}</span></div>`);
+  }
+  
+  // Info lokasi jika di lokasi pekerjaan
+  if (isAtJob) {
+    if (item.desa) {
+      rows.push(`<div class="map-popup-row"><span class="map-popup-label">Desa</span><span class="map-popup-value">${item.desa}</span></div>`);
+    }
+    if (item.kecamatan) {
+      rows.push(`<div class="map-popup-row"><span class="map-popup-label">Kecamatan</span><span class="map-popup-value">${item.kecamatan}</span></div>`);
+    }
+    if (item.pekerjaan) {
+      rows.push(`<div class="map-popup-row"><span class="map-popup-label">Pekerjaan</span><span class="map-popup-value">${item.pekerjaan}</span></div>`);
+    }
+    if (item.operator) {
+      rows.push(`<div class="map-popup-row"><span class="map-popup-label">Operator</span><span class="map-popup-value">${item.operator}</span></div>`);
+    }
+    if (item.helper) {
+      rows.push(`<div class="map-popup-row"><span class="map-popup-label">Helper</span><span class="map-popup-value">${item.helper}</span></div>`);
+    }
+  }
+  
+  // Info kondisi
+  if (item.kondisi) {
+    rows.push(`<div class="map-popup-row"><span class="map-popup-label">Kondisi</span><span class="map-popup-value">${item.kondisi}</span></div>`);
+  }
+  
+  // Warning maintenance di lokasi
+  if (item.status === 'maintenance' && !item.isAtOffice) {
+    rows.push(`<div class="map-popup-row" style="color:#7c3aed;font-weight:600;"><span class="map-popup-label">⚠️ Status</span><span class="map-popup-value">Maintenance di Lokasi</span></div>`);
+  }
 
   const seksiBadge = item.seksi ? `<span style="display:block;font-size:11px;color:#1a56db;margin-top:2px;font-weight:600;">${item.seksi}</span>` : '';
 
-  const routeBtn = isOperating ? `<a href="${buildRouteUrl(item.lat, item.lng)}" target="_blank" rel="noopener noreferrer" class="map-popup-route">
+  // Tampilkan tombol rute jika di lokasi pekerjaan (termasuk maintenance di lokasi)
+  const showRoute = isAtJob && item.lat && item.lng;
+  
+  const routeBtn = showRoute ? `<a href="${buildRouteUrl(item.lat, item.lng)}" target="_blank" rel="noopener noreferrer" class="map-popup-route">
       <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 2L2 19h20L12 2z" fill="currentColor" opacity="0.2"/><path d="M12 2L2 19h20L12 2z"/></svg>
-      Buka Rute di Maps
+      Buka Rute di Google Maps
     </a>` : '';
 
   return `<div class="map-popup">
@@ -88,7 +143,7 @@ function buildPopupHtml(item) {
       </div>
       <span class="map-popup-status" style="background:${bg};color:${color}">${statusLabel}</span>
     </div>
-    <div class="map-popup-body">${rows.filter(Boolean).join('')}</div>
+    <div class="map-popup-body">${rows.join('')}</div>
     ${routeBtn}
   </div>`;
 }
@@ -159,7 +214,7 @@ export default function MapComponent({ mapItems, previewMode = false }) {
       });
 
       L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-        attribution: '&copy; OpenStreetMap',
+        attribution: '&copy; OpenStreetMap contributors',
         maxZoom: 18,
       }).addTo(map);
 
@@ -168,7 +223,7 @@ export default function MapComponent({ mapItems, previewMode = false }) {
         disableClusteringAtZoom: 16,
         spiderfyOnMaxZoom: true,
         showCoverageOnHover: false,
-        spiderfyDistanceMultiplier: 2.2, // Spread out wider to prevent overlap
+        spiderfyDistanceMultiplier: 2.2,
       });
       map.addLayer(clusterGroupRef.current);
 
@@ -206,20 +261,22 @@ export default function MapComponent({ mapItems, previewMode = false }) {
       const isClustered = group && group.length > 1;
       let offsetLat = 0, offsetLng = 0;
 
-      // Automatically organically spread points at identical locations
+      // Spread points at identical locations
       if (isClustered) {
         const groupIdx = group.findIndex(g => g._idx === item._idx);
         if (groupIdx > 0) {
           const angle = (groupIdx / group.length) * 2 * Math.PI;
-          // Radius of spread increases slightly with more items
           const radius = 0.0004 + (group.length * 0.00002);
           offsetLat = Math.cos(angle) * radius;
           offsetLng = Math.sin(angle) * radius;
         }
       }
 
+      // Determine icon based on location
+      const isAtJobLocation = item.status === 'maintenance' ? item.isAtJobLocation : !item.isAtOffice;
+      
       const icon = L.divIcon({
-        html: createIconHtml(item.status, item.isAtOffice, item.alatName),
+        html: createIconHtml(item.status, item.isAtOffice, isAtJobLocation, item.alatName),
         className: '',
         iconSize: [44, 44],
         iconAnchor: [22, 44],
@@ -228,7 +285,7 @@ export default function MapComponent({ mapItems, previewMode = false }) {
 
       const marker = L.marker([item.lat + offsetLat, item.lng + offsetLng], { icon });
       if (!previewMode) {
-        marker.bindPopup(buildPopupHtml(item), { maxWidth: 280, minWidth: 260 });
+        marker.bindPopup(buildPopupHtml({ ...item, isAtJobLocation }), { maxWidth: 300, minWidth: 280 });
       }
       markers.push(marker);
     });

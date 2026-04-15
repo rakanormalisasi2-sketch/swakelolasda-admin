@@ -2,6 +2,7 @@
 import { useEffect, useState } from 'react';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/context/AuthContext';
+import StorageWarning from '@/components/StorageWarning';
 
 export default function SuperadminDashboard() {
   const { profile } = useAuth();
@@ -38,6 +39,9 @@ export default function SuperadminDashboard() {
         </div>
       </div>
       <div className="page-body">
+        {/* STORAGE WARNING */}
+        <StorageWarning />
+        
         <div className="stats-grid">
           {statItems.map(s => (
             <div className="stat-card" key={s.label}>

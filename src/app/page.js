@@ -118,19 +118,44 @@ async function buildMapItems(assignments, equipment) {
     const locDesa = assignment?.location_village_override || assignment?.location_village;
     const locKec = assignment?.location_district_override || assignment?.location_district;
 
-    let lat = null, lng = null;
+    let lat = null, lng = null, coordSource = null;
 
+    // =============================================
+    // PRIORITAS 1: AUTO-GEOCODING (dari nama desa/kecamatan)
+    // =============================================
     if (locDesa && locKec) {
       const cacheKey = `${locDesa}|${locKec}`;
+      
+      // Check cache first
       if (geocodeCache[cacheKey] !== undefined) {
         const result = geocodeCache[cacheKey];
-        if (result) { lat = result.lat; lng = result.lng; }
+        if (result) {
+          lat = result.lat;
+          lng = result.lng;
+          coordSource = 'auto';
+        }
       } else {
-        geocodeCache[cacheKey] = undefined; // mark pending
+        // Geocode baru
+        geocodeCache[cacheKey] = undefined;
         const result = await geocodeLocation(locDesa, locKec);
         geocodeCache[cacheKey] = result;
-        if (result) { lat = result.lat; lng = result.lng; }
+        
+        if (result) {
+          lat = result.lat;
+          lng = result.lng;
+          coordSource = 'auto';
+        }
       }
+    }
+
+    // =============================================
+    // PRIORITAS 2: MANUAL KOORDINAT (fallback jika auto gagal)
+    // =============================================
+    if ((lat === null || lng === null) && assignment?.latitude && assignment?.longitude) {
+      lat = parseFloat(assignment.latitude);
+      lng = parseFloat(assignment.longitude);
+      coordSource = 'manual';
+      console.log(`[Homepage] Using MANUAL coordinates for ${e.name}: ${lat}, ${lng}`);
     }
 
     items.push({
@@ -141,6 +166,7 @@ async function buildMapItems(assignments, equipment) {
       status: e.status,
       kondisi: e.condition_percentage != null ? `${e.condition_percentage}%` : 'Baik',
       operator: assignment?.operator?.full_name || null,
+      helper: assignment?.helper?.full_name || null,
       pekerjaan: JOB_LABELS[assignment?.job_type] || assignment?.job_sub_type || 'Pekerjaan Lapangan',
       seksi: assignment?.created_by_role === 'seksi_embung' ? 'Seksi Embung' : (assignment?.created_by_role === 'seksi_normalisasi' ? 'Seksi Normalisasi' : null),
       desa: locDesa || null,
@@ -148,6 +174,7 @@ async function buildMapItems(assignments, equipment) {
       lat: lat ?? KANTOR_COORDS.lat,
       lng: lng ?? KANTOR_COORDS.lng,
       isAtOffice: lat === null,
+      coordSource,
     });
   }
 
@@ -169,6 +196,8 @@ function RootPageContent() {
     operatingEquipment: 0,
     maintenanceEquipment: 0,
     bySection: { seksi_normalisasi: 0, seksi_embung: 0 },
+    operatingOperators: [],
+    readyOperators: [],
   });
   const [recentAssignments, setRecentAssignments] = useState([]);
   const [mapItems, setMapItems] = useState([]);
@@ -196,29 +225,65 @@ function RootPageContent() {
 
     async function loadPublicOverview() {
       setPageLoading(true);
-      const [assignmentsRes, operatorsRes, equipmentRes] = await Promise.all([
-        supabase
-          .from('assignments')
-          .select(`
-            id, job_type, job_sub_type, created_by_role,
-            location_district, location_village,
-            location_district_override, location_village_override,
-            start_date, equipment_id,
-            equipment:heavy_equipment(name, merk_type, nomor_lambung),
-            operator:user_profiles!assignments_operator_id_fkey(full_name)
-          `)
-          .eq('status', 'active')
-          .order('start_date', { ascending: false }),
-        supabase.from('user_profiles').select('id', { count: 'exact', head: true }).eq('role', 'operator'),
-        supabase.from('heavy_equipment').select('*').order('name'),
-      ]);
+      
+      // Ambil data assignments dengan operator & helper lengkap
+      const assignmentsRes = await supabase
+        .from('assignments')
+        .select(`
+          id, job_type, job_sub_type, created_by_role,
+          location_district, location_village,
+          location_district_override, location_village_override,
+          latitude, longitude,
+          start_date, equipment_id,
+          equipment:heavy_equipment(name, merk_type, nomor_lambung, status),
+          operator:user_profiles!assignments_operator_id_fkey(id, full_name),
+          helper:user_profiles!assignments_helper_id_fkey(id, full_name)
+        `)
+        .eq('status', 'active')
+        .order('start_date', { ascending: false });
+      
+      // Ambil semua operator dengan data lengkap
+      const operatorsRes = await supabase
+        .from('user_profiles')
+        .select('id, full_name, role')
+        .eq('role', 'operator');
+      
+      // Ambil semua equipment
+      const equipmentRes = await supabase.from('heavy_equipment').select('*').order('name');
 
       const assignmentRows = assignmentsRes.data || [];
+      const operatorRows = operatorsRes.data || [];
       const equipmentRows = equipmentRes.data || [];
+      
+      // Buat mapping equipment_id -> assignment untuk cari operator yang beroperasi
+      const equipmentToAssignment = {};
+      assignmentRows.forEach(a => {
+        if (a.equipment_id) {
+          equipmentToAssignment[a.equipment_id] = a;
+        }
+      });
+      
+      // Pisahkan operator: beroperasi vs ready
+      const operatingOperators = [];
+      const readyOperators = [...operatorRows];
+      
+      // Hapus operator yang beroperasi dari daftar ready
+      assignmentRows.forEach(a => {
+        if (a.operator?.id) {
+          operatingOperators.push({
+            ...a.operator,
+            assignment: a,
+            equipment: a.equipment
+          });
+          // Hapus dari ready
+          const idx = readyOperators.findIndex(op => op.id === a.operator.id);
+          if (idx > -1) readyOperators.splice(idx, 1);
+        }
+      });
 
       setOverview({
         activeAssignments: assignmentRows.length,
-        totalOperators: operatorsRes.count || 0,
+        totalOperators: operatorRows.length,
         totalEquipment: equipmentRows.length,
         readyEquipment: equipmentRows.filter(item => item.status === 'ready').length,
         operatingEquipment: equipmentRows.filter(item => item.status === 'operating').length,
@@ -227,9 +292,13 @@ function RootPageContent() {
           seksi_normalisasi: assignmentRows.filter(item => item.created_by_role === 'seksi_normalisasi').length,
           seksi_embung: assignmentRows.filter(item => item.created_by_role === 'seksi_embung').length,
         },
+        equipmentList: equipmentRows,
+        assignmentList: assignmentRows,
+        operatingOperators,
+        readyOperators,
       });
 
-      setRecentAssignments(assignmentRows.slice(0, 6));
+      setRecentAssignments(assignmentRows.slice(0, 10));
 
       // Build map items asynchronously after first render
       const items = await buildMapItems(assignmentRows, equipmentRows);
@@ -280,10 +349,13 @@ function RootPageContent() {
       : 'Embung';
     return [
       `${overview.activeAssignments} pekerjaan lapangan sedang berjalan saat ini.`,
-      `${overview.operatingEquipment} alat sedang beroperasi dan ${overview.readyEquipment} alat siap ditugaskan.`,
+      `${overview.operatingEquipment} alat sedang beroperasi, ${overview.maintenanceEquipment} perawatan, dan ${overview.readyEquipment} alat siap ditugaskan.`,
       `Fokus pekerjaan saat ini didominasi oleh seksi ${dominantSection}.`,
     ];
   }, [overview]);
+
+  const operatingEquipments = overview.equipmentList?.filter(e => e.status === 'operating') || [];
+  const idleEquipments = overview.equipmentList?.filter(e => e.status !== 'operating') || [];
 
   if (authLoading || (user && profile?.role)) {
     return (
@@ -378,6 +450,77 @@ function RootPageContent() {
           </div>
         </section>
 
+        {/* PERSONIL SECTION */}
+        <section className="public-section">
+          <div className="card-header" style={{ marginBottom: 16 }}>
+            <span className="card-title">👷 Personil & Armada</span>
+            <div className="header-subtitle">Daftar operator dan alat berat yang beroperasi vs siap ditugaskan</div>
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: 16 }}>
+            {/* Kiri: Operator Beroperasi */}
+            <div className="card">
+              <div className="card-header" style={{ background: '#fef3c7' }}>
+                <span className="card-title">🔧 Operator Beroperasi ({overview.operatingOperators?.length || 0})</span>
+              </div>
+              <div className="card-body">
+                {pageLoading ? (
+                  <p style={{ color: 'var(--text-muted)' }}>Memuat...</p>
+                ) : overview.operatingOperators?.length > 0 ? (
+                  <div style={{ maxHeight: 300, overflowY: 'auto' }}>
+                    {overview.operatingOperators.map((op, idx) => (
+                      <div key={idx} style={{ padding: '10px 0', borderBottom: '1px solid var(--border)' }}>
+                        <div style={{ fontWeight: 600, marginBottom: 4 }}>
+                          {op.full_name || 'Operator'}
+                        </div>
+                        {op.assignment && (
+                          <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>
+                            <span style={{ background: '#dcfce7', color: '#166534', padding: '2px 6px', borderRadius: 4, fontSize: 10, marginRight: 6 }}>
+                              {op.assignment.location_village || op.assignment.location_village_override || '-'}
+                            </span>
+                            {op.assignment.equipment?.name && (
+                              <span style={{ color: '#1a56db' }}>
+                                {op.assignment.equipment.name}
+                              </span>
+                            )}
+                            {op.assignment.equipment?.merk_type && (
+                              <span style={{ color: '#64748b' }}> - {op.assignment.equipment.merk_type}</span>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p style={{ color: 'var(--text-muted)' }}>Belum ada operator beroperasi.</p>
+                )}
+              </div>
+            </div>
+
+            {/* Kanan: Operator Ready */}
+            <div className="card">
+              <div className="card-header" style={{ background: '#dcfce7' }}>
+                <span className="card-title">✅ Operator Siap Ditugaskan ({overview.readyOperators?.length || 0})</span>
+              </div>
+              <div className="card-body">
+                {pageLoading ? (
+                  <p style={{ color: 'var(--text-muted)' }}>Memuat...</p>
+                ) : overview.readyOperators?.length > 0 ? (
+                  <div style={{ maxHeight: 300, overflowY: 'auto' }}>
+                    {overview.readyOperators.map((op, idx) => (
+                      <div key={idx} style={{ padding: '10px 0', borderBottom: '1px solid var(--border)' }}>
+                        <div style={{ fontWeight: 600 }}>{op.full_name || 'Operator'}</div>
+                        <div style={{ fontSize: 12, color: '#16a34a' }}>Siap ditugaskan</div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p style={{ color: 'var(--text-muted)' }}>Semua operator sudah ditugaskan.</p>
+                )}
+              </div>
+            </div>
+          </div>
+        </section>
+
         {/* Highlights + Summary */}
         <section className="public-grid">
           <div className="card">
@@ -463,14 +606,90 @@ function RootPageContent() {
                       </span>
                     </div>
                     <h3>{item.job_sub_type || JOB_LABELS[item.job_type] || 'Pekerjaan Lapangan'}</h3>
-                    <p>
-                      Lokasi umum: Desa {item.location_village || '—'}, Kec. {locKec || '—'}.
-                      {equipment?.name ? ` Didukung armada ${equipment.name}.` : ''}
-                    </p>
+                    <div style={{fontSize: '13px', color: 'var(--text-muted)', marginTop: '6px', display: 'flex', flexDirection: 'column', gap: '3px'}}>
+                      <div><strong>Lokasi:</strong> Desa {item.location_village || '—'}, Kec. {locKec || '—'}</div>
+                      <div><strong>Armada:</strong> {equipment ? `(${equipment.nomor_lambung||'-'}) ${equipment.merk_type||''} - ${equipment.name}` : '—'}</div>
+                      <div><strong>Personil:</strong> Op. {item.operator?.full_name || '—'}{item.helper?.full_name ? ` & Hp. ${item.helper.full_name}` : ''}</div>
+                    </div>
                   </article>
                 );
               })
             )}
+          </div>
+        </section>
+
+        {/* Equipment Lists */}
+        <section className="public-grid" style={{ marginTop: '24px' }}>
+          <div className="card">
+            <div className="card-header">
+              <span className="card-title">Armada Beroperasi ({operatingEquipments.length})</span>
+            </div>
+            <div className="card-body" style={{ padding: '0' }}>
+              <div style={{ maxHeight: '400px', overflowY: 'auto' }}>
+                <table className="public-table" style={{ width: '100%', borderCollapse: 'collapse' }}>
+                  <thead style={{ position: 'sticky', top: 0, background: '#f8fafc' }}>
+                    <tr>
+                      <th style={{ padding: '12px 16px', textAlign: 'left', borderBottom: '1px solid #e2e8f0', fontSize: '13px' }}>Alat & Nomor</th>
+                      <th style={{ padding: '12px 16px', textAlign: 'left', borderBottom: '1px solid #e2e8f0', fontSize: '13px' }}>Personil</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {operatingEquipments.length === 0 ? (
+                      <tr><td colSpan={2} style={{ padding: '20px', textAlign: 'center', color: '#64748b' }}>Tidak ada alat beroperasi</td></tr>
+                    ) : operatingEquipments.map(eq => {
+                      const asgn = overview.assignmentList?.find(a => a.equipment_id === eq.id);
+                      return (
+                        <tr key={eq.id}>
+                          <td style={{ padding: '12px 16px', borderBottom: '1px solid #f1f5f9' }}>
+                            <div style={{ fontWeight: '500', fontSize: '14px', color: '#0f172a' }}>{eq.name}</div>
+                            <div style={{ fontSize: '12px', color: '#64748b' }}>({eq.nomor_lambung || '-'}) {eq.merk_type}</div>
+                          </td>
+                          <td style={{ padding: '12px 16px', borderBottom: '1px solid #f1f5f9' }}>
+                            <div style={{ fontSize: '13px', color: '#334155' }}>Op: {asgn?.operator?.full_name || '-'}</div>
+                            {asgn?.helper?.full_name && <div style={{ fontSize: '12px', color: '#64748b' }}>Hp: {asgn.helper.full_name}</div>}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+
+          <div className="card">
+            <div className="card-header">
+              <span className="card-title">Armada Siap / Maintenance ({idleEquipments.length})</span>
+            </div>
+            <div className="card-body" style={{ padding: '0' }}>
+              <div style={{ maxHeight: '400px', overflowY: 'auto' }}>
+                <table className="public-table" style={{ width: '100%', borderCollapse: 'collapse' }}>
+                  <thead style={{ position: 'sticky', top: 0, background: '#f8fafc' }}>
+                    <tr>
+                      <th style={{ padding: '12px 16px', textAlign: 'left', borderBottom: '1px solid #e2e8f0', fontSize: '13px' }}>Alat & Nomor</th>
+                      <th style={{ padding: '12px 16px', textAlign: 'left', borderBottom: '1px solid #e2e8f0', fontSize: '13px' }}>Status</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {idleEquipments.length === 0 ? (
+                      <tr><td colSpan={2} style={{ padding: '20px', textAlign: 'center', color: '#64748b' }}>Semua alat sedang beroperasi</td></tr>
+                    ) : idleEquipments.map(eq => (
+                      <tr key={eq.id}>
+                        <td style={{ padding: '12px 16px', borderBottom: '1px solid #f1f5f9' }}>
+                          <div style={{ fontWeight: '500', fontSize: '14px', color: '#0f172a' }}>{eq.name}</div>
+                          <div style={{ fontSize: '12px', color: '#64748b' }}>({eq.nomor_lambung || '-'}) {eq.merk_type}</div>
+                        </td>
+                        <td style={{ padding: '12px 16px', borderBottom: '1px solid #f1f5f9' }}>
+                          <span className={`badge ${STATUS_BADGE_CLASS[eq.status] || 'badge-neutral'}`} style={{ fontSize: '11px' }}>
+                            {eq.status === 'ready' ? 'Siap' : eq.status === 'maintenance' ? 'Maintenance' : eq.status}
+                          </span>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
           </div>
         </section>
       </main>

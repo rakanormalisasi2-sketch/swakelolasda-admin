@@ -85,19 +85,44 @@ async function buildMapItems(assignments, equipment) {
     const locDesa = assignment?.location_village_override || assignment?.location_village;
     const locKec = assignment?.location_district_override || assignment?.location_district;
 
-    let lat = null, lng = null;
+    let lat = null, lng = null, coordSource = null;
 
+    // =============================================
+    // PRIORITAS 1: AUTO-GEOCODING (dari nama desa/kecamatan)
+    // =============================================
     if (locDesa && locKec) {
       const cacheKey = `${locDesa}|${locKec}`;
+      
+      // Check cache first
       if (geocodeCache[cacheKey] !== undefined) {
         const result = geocodeCache[cacheKey];
-        if (result) { lat = result.lat; lng = result.lng; }
+        if (result) {
+          lat = result.lat;
+          lng = result.lng;
+          coordSource = 'auto';
+        }
       } else {
+        // Geocode baru
         geocodeCache[cacheKey] = undefined;
         const result = await geocodeLocation(locDesa, locKec);
         geocodeCache[cacheKey] = result;
-        if (result) { lat = result.lat; lng = result.lng; }
+        
+        if (result) {
+          lat = result.lat;
+          lng = result.lng;
+          coordSource = 'auto';
+        }
       }
+    }
+
+    // =============================================
+    // PRIORITAS 2: MANUAL KOORDINAT (fallback jika auto gagal)
+    // =============================================
+    if ((lat === null || lng === null) && assignment?.latitude && assignment?.longitude) {
+      lat = parseFloat(assignment.latitude);
+      lng = parseFloat(assignment.longitude);
+      coordSource = 'manual';
+      console.log(`[Map] Using MANUAL coordinates for ${e.name}: ${lat}, ${lng}`);
     }
 
     items.push({
@@ -108,6 +133,7 @@ async function buildMapItems(assignments, equipment) {
       status: e.status,
       kondisi: e.condition_percentage != null ? `${e.condition_percentage}%` : 'Baik',
       operator: assignment?.operator?.full_name || null,
+      helper: assignment?.helper?.full_name || null,
       pekerjaan: JOB_LABELS[assignment?.job_type] || assignment?.job_sub_type || 'Pekerjaan Lapangan',
       seksi: assignment?.created_by_role === 'seksi_embung' ? 'Seksi Embung' : (assignment?.created_by_role === 'seksi_normalisasi' ? 'Seksi Normalisasi' : null),
       desa: locDesa || null,
@@ -115,6 +141,7 @@ async function buildMapItems(assignments, equipment) {
       lat: lat ?? KANTOR_COORDS.lat,
       lng: lng ?? KANTOR_COORDS.lng,
       isAtOffice: lat === null,
+      coordSource,
     });
   }
 
@@ -146,6 +173,7 @@ export default function PetaPage() {
             id, job_type, job_sub_type, created_by_role,
             location_district, location_village,
             location_district_override, location_village_override,
+            latitude, longitude,
             start_date, equipment_id,
             equipment:heavy_equipment(name, merk_type, nomor_lambung),
             operator:user_profiles!assignments_operator_id_fkey(full_name)

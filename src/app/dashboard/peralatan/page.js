@@ -3,6 +3,7 @@ import { useEffect, useState, useCallback } from 'react';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/context/AuthContext';
 import * as XLSX from 'xlsx';
+import StorageWarning from '@/components/StorageWarning';
 
 const PROGRESS_STEPS = ['pelaporan', 'diterima', 'pengerjaan', 'selesai'];
 const STATUS_MAP = {
@@ -363,6 +364,9 @@ export default function PeralatanPage() {
       </div>
 
       <div className="page-body">
+        {/* STORAGE WARNING */}
+        <StorageWarning />
+        
         <div style={{display:'flex', gap: 10, marginBottom: 25, borderBottom: '2px solid #e2e8f0', paddingBottom: 10}}>
            <button onClick={()=>setMainTab('inventaris')} style={{fontSize:15, fontWeight:'bold', padding: '8px 16px', background: 'transparent', cursor:'pointer', border: 'none', color: mainTab === 'inventaris' ? '#1e3a8a' : '#64748b', borderBottom: mainTab === 'inventaris' ? '3px solid #1e3a8a' : '3px solid transparent'}}>
              📦 Manajemen Aset &amp; Status Operasional

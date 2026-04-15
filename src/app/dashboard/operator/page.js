@@ -16,14 +16,14 @@ export default function OperatorPage() {
       const [{ data: asgn }, { data: reps }] = await Promise.all([
         supabase.from('assignments').select(`
           *,
-          equipment:heavy_equipment(name, merk_type, status),
+          equipment:heavy_equipment(name, merk_type, nomor_lambung, status),
           helper:user_profiles!assignments_helper_id_fkey(full_name)
         `).or(`operator_id.eq.${profile.id},helper_id.eq.${profile.id}`).eq('status', 'active').maybeSingle(),
         supabase.from('daily_reports').select(`
           *,
           assignment:assignments(
             location_village, location_district,
-            equipment:heavy_equipment(name)
+            equipment:heavy_equipment(name, merk_type, nomor_lambung)
           )
         `).eq('assignment_id',
           // Will be filtered client side after assignment loaded
@@ -37,7 +37,7 @@ export default function OperatorPage() {
       if (asgn?.id) {
         const { data: actualReps } = await supabase
           .from('daily_reports')
-          .select('*, assignment:assignments(location_village, location_district, equipment:heavy_equipment(name))')
+          .select('*, assignment:assignments(location_village, location_district, equipment:heavy_equipment(name, merk_type, nomor_lambung))')
           .eq('assignment_id', asgn.id)
           .order('tanggal_laporan', { ascending: false });
         setReports(actualReps || []);
@@ -92,7 +92,7 @@ export default function OperatorPage() {
                 <div className="form-grid-3" style={{gap:20}}>
                   {[
                     { label: 'Jenis Pekerjaan', value: (SUB_LABELS[assignment.job_sub_type] || JOB_LABELS[assignment.job_type] || assignment.job_type) },
-                    { label: 'Alat Berat', value: `${assignment.equipment?.name} (${assignment.equipment?.merk_type || '—'})` },
+                    { label: 'Alat Berat', value: `(${assignment.equipment?.nomor_lambung || '—'}) ${assignment.equipment?.merk_type || '—'} - ${assignment.equipment?.name}` },
                     { label: 'Lokasi', value: `Desa ${assignment.location_village}, Kec. ${assignment.location_district}` },
                     { label: 'Helper / Operator 2', value: assignment.helper?.full_name || 'Tidak ada helper' },
                     { label: 'Keterangan Tambahan', value: assignment.custom_job_description || '—' },
@@ -131,7 +131,7 @@ export default function OperatorPage() {
                         return (
                           <tr key={r.id}>
                             <td className="text-sm">{new Date(r.tanggal_laporan).toLocaleDateString('id-ID',{day:'2-digit',month:'short',year:'numeric'})}</td>
-                            <td className="text-sm">{r.assignment?.equipment?.name||'—'}</td>
+                            <td className="text-sm">{r.assignment?.equipment ? `(${r.assignment.equipment.nomor_lambung||'-'}) ${r.assignment.equipment.name}` : '—'}</td>
                             <td className="text-sm">{r.progress_pekerjaan||'—'}</td>
                             <td className="text-sm">{r.panjang_pekerjaan||'—'} m</td>
                             <td className="text-sm">{r.hm_awal??'—'}</td>

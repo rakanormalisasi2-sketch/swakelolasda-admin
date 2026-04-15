@@ -19,6 +19,7 @@ export default function PenugasanPage() {
     operator_id: '', helper_id: '', equipment_id: '',
     job_type: 'normalisasi', job_sub_type: '', custom_job_description: '',
     location_district: '', location_village: '',
+    latitude: '', longitude: '',
   });
   const [editId, setEditId] = useState(null);
   const [originalEquipmentId, setOriginalEquipmentId] = useState(null);
@@ -108,6 +109,8 @@ export default function PenugasanPage() {
       custom_job_description: a.custom_job_description || '',
       location_district: a.location_district || '',
       location_village: a.location_village || '',
+      latitude: a.latitude || '',
+      longitude: a.longitude || '',
     });
     setDesaList(WILAYAH[a.location_district] || []);
     setError('');
@@ -128,6 +131,8 @@ export default function PenugasanPage() {
       custom_job_description: form.job_type === 'lainnya' ? form.custom_job_description : null,
       location_district: form.location_district,
       location_village: form.location_village,
+      latitude: form.latitude ? parseFloat(form.latitude) : null,
+      longitude: form.longitude ? parseFloat(form.longitude) : null,
       status: 'active',
       created_by_role: profile.role,
     };
@@ -175,7 +180,7 @@ export default function PenugasanPage() {
           <div className="header-subtitle">Rekrut dan tugaskan operator ke pekerjaan lapangan</div>
         </div>
         <div className="header-right">
-          <button className="btn btn-primary" onClick={() => { setEditId(null); setOriginalEquipmentId(null); setForm({ operator_id:'', helper_id:'', equipment_id:'', job_type: defaultJobType, job_sub_type:'', custom_job_description:'', location_district:'', location_village:'' }); setError(''); setShowModal(true); }}>
+          <button className="btn btn-primary" onClick={() => { setEditId(null); setOriginalEquipmentId(null); setForm({ operator_id:'', helper_id:'', equipment_id:'', job_type: defaultJobType, job_sub_type:'', custom_job_description:'', location_district:'', location_village:'', latitude:'', longitude:'' }); setError(''); setShowModal(true); }}>
             <svg fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24" style={{width:15,height:15}}><path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4"/></svg>
             Tugaskan Operator
           </button>
@@ -326,6 +331,21 @@ export default function PenugasanPage() {
                     </select>
                   </div>
                 </div>
+
+                <div className="form-grid">
+                  <div className="form-group">
+                    <label className="form-label">Latitude <span className="text-xs text-muted">(opsional)</span></label>
+                    <input type="number" step="any" className="form-control" value={form.latitude} onChange={e=>setForm({...form,latitude:e.target.value})} placeholder="Contoh: -7.1565312" />
+                  </div>
+                  <div className="form-group">
+                    <label className="form-label">Longitude <span className="text-xs text-muted">(opsional)</span></label>
+                    <input type="number" step="any" className="form-control" value={form.longitude} onChange={e=>setForm({...form,longitude:e.target.value})} placeholder="Contoh: 111.8928896" />
+                  </div>
+                </div>
+                <div style={{marginTop: -8, marginBottom: 16, fontSize: 12, color: 'var(--text-muted)'}}>
+                  <p>Kosongkan jika ingin Map menggunakan koordinat otomatis berdasarkan Desa. Isi jika titik otomatis salah sasaran atau tidak akurat.</p>
+                </div>
+
               </div>
               <div className="modal-footer">
                 <button type="button" className="btn btn-outline" onClick={()=>setShowModal(false)}>Batal</button>

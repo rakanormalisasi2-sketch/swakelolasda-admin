@@ -2,6 +2,7 @@
 import { useEffect, useState } from 'react';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/context/AuthContext';
+import StorageWarning from '@/components/StorageWarning';
 
 export default function SeksiDashboard() {
   const { profile } = useAuth();
@@ -16,7 +17,7 @@ export default function SeksiDashboard() {
         supabase.from('user_profiles').select('id', { count: 'exact', head: true }).eq('role', 'operator'),
         supabase.from('heavy_equipment').select('id', { count: 'exact', head: true }).eq('status', 'ready'),
         supabase.from('heavy_equipment').select('id', { count: 'exact', head: true }).eq('status', 'maintenance'),
-        supabase.from('daily_reports').select('*, assignment:assignments(operator:user_profiles!assignments_operator_id_fkey(full_name), location_village, location_district, job_type)').order('created_at', { ascending: false }).limit(5),
+        supabase.from('daily_reports').select('*, assignment:assignments(operator:user_profiles!assignments_operator_id_fkey(full_name), location_village, location_district, job_type').order('created_at', { ascending: false }).limit(5),
       ]);
       setStats({ activeAssignments: asgn.count || 0, totalOps: ops.count || 0, readyAlat: alatReady.count || 0, maintenance: alatMaint.count || 0 });
       setRecentReports(reports.data || []);
@@ -37,6 +38,9 @@ export default function SeksiDashboard() {
       </div>
 
       <div className="page-body">
+        {/* STORAGE WARNING */}
+        <StorageWarning />
+        
         <div className="stats-grid">
           {[
             { label: 'Penugasan Aktif', value: stats.activeAssignments, color: '#1a56db', bg: '#e8f0fe' },

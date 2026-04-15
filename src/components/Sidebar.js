@@ -14,6 +14,12 @@ const NAV_CONFIG = {
         { href: '/dashboard/superadmin/pengguna', label: 'Kelola Pengguna', icon: 'users' },
       ],
     },
+    {
+      section: 'Sistem',
+      items: [
+        { href: '/dashboard/superadmin/backup-restore', label: 'Backup & Restore', icon: 'database' },
+      ],
+    },
   ],
   peralatan: [
     {
@@ -110,6 +116,11 @@ const ICONS = {
   logout: (
     <svg fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
       <path strokeLinecap="round" strokeLinejoin="round" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+    </svg>
+  ),
+  database: (
+    <svg fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+      <path strokeLinecap="round" strokeLinejoin="round" d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4m0 5c0 2.21-3.582 4-8 4s-8-1.79-8-4" />
     </svg>
   ),
 };
