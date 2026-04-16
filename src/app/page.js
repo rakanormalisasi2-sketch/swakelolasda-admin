@@ -118,12 +118,20 @@ async function buildMapItems(assignments, equipment) {
     const locDesa = assignment?.location_village_override || assignment?.location_village;
     const locKec = assignment?.location_district_override || assignment?.location_district;
 
-    let lat = null, lng = null, coordSource = null;
+    // =============================================
+    // PRIORITAS 1: MANUAL KOORDINAT (Input Presisi)
+    // =============================================
+    if (assignment?.latitude && assignment?.longitude) {
+      lat = parseFloat(assignment.latitude);
+      lng = parseFloat(assignment.longitude);
+      coordSource = 'manual';
+      console.log(`[Homepage] Using MANUAL coordinates for ${e.name}: ${lat}, ${lng}`);
+    }
 
     // =============================================
-    // PRIORITAS 1: AUTO-GEOCODING (dari nama desa/kecamatan)
+    // PRIORITAS 2: AUTO-GEOCODING (Fallback dari nama desa/kecamatan)
     // =============================================
-    if (locDesa && locKec) {
+    if ((lat === null || lng === null) && locDesa && locKec) {
       const cacheKey = `${locDesa}|${locKec}`;
       
       // Check cache first
@@ -146,16 +154,6 @@ async function buildMapItems(assignments, equipment) {
           coordSource = 'auto';
         }
       }
-    }
-
-    // =============================================
-    // PRIORITAS 2: MANUAL KOORDINAT (fallback jika auto gagal)
-    // =============================================
-    if ((lat === null || lng === null) && assignment?.latitude && assignment?.longitude) {
-      lat = parseFloat(assignment.latitude);
-      lng = parseFloat(assignment.longitude);
-      coordSource = 'manual';
-      console.log(`[Homepage] Using MANUAL coordinates for ${e.name}: ${lat}, ${lng}`);
     }
 
     items.push({

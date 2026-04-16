@@ -1,14 +1,18 @@
 /**
  * GEOCODING UTILITY - PRIORITAS
  * 
- * PRIORITAS 1: AUTO-KOORDINAT (dari nama desa/kecamatan)
- *   - Koordinat HARUS di dalam area: Bojonegoro > Kecamatan > Desa
- *   - Validasi: Koordinat dalam batas Bojonegoro + address match Bojonegoro
+ * PRIORITAS 1: KOORDINAT EXCEL (Default source of truth)
+ *   - Menggunakan data dari wilayah_coords.json (hasil ekstrak Excel)
  * 
- * PRIORITAS 2: MANUAL KOORDINAT (dari input user)
- *   - Jika auto gagal, gunakan manual
- *   - Di handle di level page.js / peta/page.js
+ * PRIORITAS 2: AUTO-GEOCODING API (Fallback jika Excel tidak ada desa/kec)
+ *   - Menggunakan Geoapify, LocationIQ, Nominatim
+ *   - Koordinat HARUS di dalam area: Bojonegoro
+ * 
+ * PRIORITAS 3: MANUAL KOORDINAT (Input user)
+ *   - Dihandle di level page.js (Manual override)
  */
+
+import WILAYAH_COORDS from './wilayah_coords.json';
 
 const GEOCODER_CACHE = {};
 const CACHE_TTL_MS = 7 * 24 * 60 * 60 * 1000; // 7 days
@@ -372,6 +376,18 @@ export async function geocodeLocation(desa, kecamatan) {
   
   const key = cacheKey(desa, kecamatan);
   
+  // =====================================================
+  // PRIORITAS 1: LOOKUP EXCEL (wilayah_coords.json)
+  // =====================================================
+  const kecNorm = String(kecamatan).trim().toUpperCase();
+  const desaNorm = String(desa).trim().toUpperCase();
+  
+  if (WILAYAH_COORDS[kecNorm] && WILAYAH_COORDS[kecNorm][desaNorm]) {
+    const excelCoord = WILAYAH_COORDS[kecNorm][desaNorm];
+    console.log(`[Geocoder] ✅ EXCEL MATCH: ${desaNorm}, ${kecNorm} -> ${excelCoord.lat}, ${excelCoord.lng}`);
+    return { lat: excelCoord.lat, lng: excelCoord.lng, source: 'excel' };
+  }
+
   // Check in-memory cache
   if (GEOCODER_CACHE[key] && !isExpired(GEOCODER_CACHE[key])) {
     console.log(`[Geocoder] 💾 Cache hit: ${desa}, ${kecamatan}`);

@@ -382,7 +382,7 @@ export default function PenugasanPage() {
                         📡 Sedang mencari koordinat otomatis Desa {form.location_village}...
                       </span>
                     ) : (
-                      'Kosongkan jika ingin Map menggunakan koordinat otomatis berdasarkan Desa. Isi jika titik otomatis salah sasaran atau tidak akurat.'
+                      'Peta menggunakan koordinat sebaran (Database Excel). Isi Latitude/Longitude jika ingin menitikkan lokasi yang lebih akurat/spesifik.'
                     )}
                   </p>
                 </div>
