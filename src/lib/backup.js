@@ -90,69 +90,57 @@ export async function exportAllData() {
   try {
     console.log('[Backup] Starting full export...');
     
+    // Get localStorage config
+    const localConfig = {};
+    GOOGLE_SHEETS_STORAGE_KEYS.forEach(key => {
+      const val = localStorage.getItem(key);
+      if (val) localConfig[key] = JSON.parse(val);
+    });
+
     const exportData = {
       exportedAt: new Date().toISOString(),
-      version: '1.0',
-      tables: {}
+      version: '1.5',
+      tables: {},
+      localConfig: localConfig
     };
 
-    // 1. Export assignments
-    const { data: assignments, error: aErr } = await supabase
-      .from('assignments')
-      .select('*');
-    exportData.tables.assignments = { data: assignments || [], count: assignments?.length || 0 };
-    console.log('[Backup] Assignments:', assignments?.length || 0);
+    // Helper to fetch and add table to exportData
+    const exportTable = async (tableName) => {
+      const { data, error } = await supabase.from(tableName).select('*');
+      if (error) {
+        console.warn(`[Backup] Error exporting ${tableName}:`, error);
+        exportData.tables[tableName] = { data: [], count: 0, error: error.message };
+        return 0;
+      }
+      exportData.tables[tableName] = { data: data || [], count: data?.length || 0 };
+      console.log(`[Backup] ${tableName}:`, data?.length || 0);
+      return data?.length || 0;
+    };
 
-    // 2. Export heavy_equipment
-    const { data: equipment, error: eErr } = await supabase
-      .from('heavy_equipment')
-      .select('*');
-    exportData.tables.heavy_equipment = { data: equipment || [], count: equipment?.length || 0 };
-    console.log('[Backup] Equipment:', equipment?.length || 0);
+    // List of tables to export
+    const tables = [
+      'app_settings',
+      'section_settings',
+      'user_profiles',
+      'heavy_equipment',
+      'assignments',
+      'maintenance_logs',
+      'daily_reports',
+      'operator_logs',
+      'absensi',
+      'progress_laporan',
+      'user_work_logs'
+    ];
 
-    // 3. Export user_profiles
-    const { data: users, error: uErr } = await supabase
-      .from('user_profiles')
-      .select('*');
-    exportData.tables.user_profiles = { data: users || [], count: users?.length || 0 };
-    console.log('[Backup] Users:', users?.length || 0);
-
-    // 4. Export absensi
-    const { data: absensi, error: abErr } = await supabase
-      .from('absensi')
-      .select('*');
-    exportData.tables.absensi = { data: absensi || [], count: absensi?.length || 0 };
-    console.log('[Backup] Absensi:', absensi?.length || 0);
-
-    // 5. Export progress_laporan
-    const { data: progress, error: pErr } = await supabase
-      .from('progress_laporan')
-      .select('*');
-    exportData.tables.progress_laporan = { data: progress || [], count: progress?.length || 0 };
-    console.log('[Backup] Progress:', progress?.length || 0);
-
-    // 6. Export work_logs
-    const { data: workLogs, error: wErr } = await supabase
-      .from('user_work_logs')
-      .select('*');
-    exportData.tables.user_work_logs = { data: workLogs || [], count: workLogs?.length || 0 };
-    console.log('[Backup] Work Logs:', workLogs?.length || 0);
-
-    // Check for errors
-    const errors = [aErr, eErr, uErr, abErr, pErr, wErr].filter(Boolean);
-    if (errors.length > 0) {
-      console.error('[Backup] Some exports had errors:', errors);
+    let grandTotal = 0;
+    for (const table of tables) {
+      grandTotal += await exportTable(table);
     }
 
     return {
       success: true,
       data: exportData,
-      totalRecords: exportData.tables.assignments.count + 
-                    exportData.tables.heavy_equipment.count +
-                    exportData.tables.user_profiles.count +
-                    exportData.tables.absensi.count +
-                    exportData.tables.progress_laporan.count +
-                    exportData.tables.user_work_logs.count
+      totalRecords: grandTotal
     };
   } catch (error) {
     console.error('[Backup] Export failed:', error);
@@ -355,6 +343,14 @@ export async function restoreToSupabase(backupData) {
     console.log('[Restore] Starting restore to Supabase...');
     const results = [];
     
+    // 0. Restore localStorage config if present
+    if (backupData.localConfig) {
+      console.log('[Restore] Restoring local config...');
+      Object.entries(backupData.localConfig).forEach(([key, val]) => {
+        localStorage.setItem(key, JSON.stringify(val));
+      });
+    }
+
     // Helper function to upsert data
     const upsertTable = async (tableName, data) => {
       if (!data || data.length === 0) return { table: tableName, inserted: 0 };
@@ -375,9 +371,14 @@ export async function restoreToSupabase(backupData) {
 
     // Restore in order (respecting foreign keys)
     const tableOrder = [
+      'app_settings',
+      'section_settings',
       'user_profiles',
       'heavy_equipment',
       'assignments',
+      'maintenance_logs',
+      'daily_reports',
+      'operator_logs',
       'absensi',
       'progress_laporan',
       'user_work_logs'

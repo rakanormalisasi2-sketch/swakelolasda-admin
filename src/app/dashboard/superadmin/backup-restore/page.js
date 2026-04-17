@@ -147,6 +147,42 @@ export default function BackupRestorePage() {
     setClearing(false);
   };
 
+  const handleFileRestore = async (event) => {
+    const file = event.target.files[0];
+    if (!file) return;
+
+    if (!confirm('PERINGATAN! Restore dari file akan menimpa DATA SAAT INI di Supabase! Lanjutkan?')) {
+      event.target.value = '';
+      return;
+    }
+
+    setRestoring(true);
+    try {
+      const reader = new FileReader();
+      reader.onload = async (e) => {
+        try {
+          const backupData = JSON.parse(e.target.result);
+          const restoreResult = await restoreToSupabase(backupData);
+          if (restoreResult.success) {
+            alert('Restore dari file berhasil! ' + restoreResult.totalInserted + ' records di-restore.');
+            loadStorageUsage();
+          } else {
+            alert('Restore gagal: ' + restoreResult.error);
+          }
+        } catch (err) {
+          alert('Format file JSON tidak valid: ' + err.message);
+        }
+        setRestoring(false);
+        event.target.value = '';
+      };
+      reader.readAsText(file);
+    } catch (error) {
+      alert('Error membaca file: ' + error.message);
+      setRestoring(false);
+      event.target.value = '';
+    }
+  };
+
   const handleConnectSheets = (sectionId) => {
     const url = spreadsheetInput.trim();
     if (!url) {
@@ -321,6 +357,22 @@ export default function BackupRestorePage() {
               <button className="btn btn-outline" onClick={handleSaveLocal} disabled={exporting}>
                 Save to Local
               </button>
+              <div style={{ marginLeft: 'auto' }}>
+                <input 
+                  type="file" 
+                  id="restore-upload" 
+                  hidden 
+                  accept=".json" 
+                  onChange={handleFileRestore}
+                />
+                <button 
+                  className="btn btn-success" 
+                  onClick={() => document.getElementById('restore-upload').click()}
+                  disabled={restoring}
+                >
+                  {restoring ? 'Restoring...' : 'Restore from JSON File'}
+                </button>
+              </div>
             </div>
             <p style={{ fontSize: 12, color: 'var(--text-muted)' }}>
               Backup stored as JSON file, can be restored anytime.
