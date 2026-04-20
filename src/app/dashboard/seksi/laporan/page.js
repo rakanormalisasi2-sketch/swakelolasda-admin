@@ -63,6 +63,8 @@ export default function LaporanPelaksanaanPage() {
   const [customColumns, setCustomColumns] = useState([]);
   const [kolomManagerOpen, setKolomManagerOpen] = useState(false);
   const [savingKolom, setSavingKolom] = useState(false);
+  const [bbmMap, setBbmMap] = useState({}); // Kumpulan data BBM dari DB2
+
   
   // Modals Data & Flow
   const [filterTab, setFilterTab] = useState('semua');
@@ -146,8 +148,29 @@ export default function LaporanPelaksanaanPage() {
           });
         }
         setLogs(logsData || []);
+
+        // Fetch BBM data dari DB2 (API)
+        try {
+          const resBbm = await fetch(`/api/bbm/pemakaian?seksi=${profile.role}`);
+          if (resBbm.ok) {
+            const resultBbm = await resBbm.json();
+            const map = {};
+            (resultBbm.data || []).forEach(b => {
+              // Simpan berdasarkan assignment_id dan tanggal_kirim (format YYYY-MM-DD)
+              const tglStr = b.tanggal_kirim.split('T')[0];
+              const key = `${b.assignment_id}|${tglStr}`;
+              if (!map[key]) map[key] = [];
+              map[key].push(b);
+            });
+            setBbmMap(map);
+          }
+        } catch (e) {
+             console.warn('BBM API belum tersedia:', e);
+        }
+
       } else {
         setLogs([]);
+        setBbmMap({});
       }
     } catch (err) {
       console.error('Error loading reports data:', err);
@@ -456,8 +479,8 @@ export default function LaporanPelaksanaanPage() {
               <div>2. GREASE</div>
             </td>
             <td style="text-align:right">
-              <div style="margin-bottom:4px;">Liter</div>
-              <div>Kg</div>
+              <div style="margin-bottom:4px;"><b>${bbmMap[`${log.assignment_id}|${log.tanggal.split('T')[0]}`] ? bbmMap[`${log.assignment_id}|${log.tanggal.split('T')[0]}`].reduce((sum, b) => sum + Number(b.jumlah_liter), 0) : '......'}</b> Liter</div>
+              <div>...... Kg</div>
             </td>
           </tr>
           <tr>
@@ -989,6 +1012,19 @@ export default function LaporanPelaksanaanPage() {
                                   <input type="text" style={inputStyle} value={log.jam_kerja || ''} 
                                          onChange={e => handleInlineEdit(log.id, 'jam_kerja', e.target.value)} 
                                          onBlur={e => handleBlurSave(log.id, 'jam_kerja', e.target.value)} />
+                               </td>
+
+                               <td style={{padding:'4px 8px', border:'1px solid rgba(0,0,0,0.1)', minWidth: 200}}>
+                                 <textarea style={{...inputStyle, width:'100%', minHeight:34, resize:'vertical'}} value={log.keterangan_tambahan || ''} 
+                                        onChange={e => handleInlineEdit(log.id, 'keterangan_tambahan', e.target.value)} 
+                                        onBlur={e => handleBlurSave(log.id, 'keterangan_tambahan', e.target.value)} />
+                                 
+                                 {/* Tampilan BBM Otomatis */}
+                                 {bbmMap[`${log.assignment_id}|${log.tanggal?.split('T')[0]}`]?.map((bbm, i) => (
+                                   <div key={i} style={{ background: '#fef3c7', color: '#92400e', padding: '4px 8px', borderRadius: 4, fontSize: 11, fontWeight: 'bold', marginTop: 4, display:'inline-block'}}>
+                                     ⛽ BBM Diterima: {bbm.jumlah_liter} LTR
+                                   </div>
+                                 ))}
                                </td>
 
                                {/* Foto — link view untuk dibuka di tab baru */}
