@@ -1,7 +1,6 @@
 'use client';
 import { useEffect, useState, useCallback } from 'react';
 import { supabase } from '@/lib/supabase';
-import * as XLSX from 'xlsx';
 
 const PROGRESS_STEPS = ['pelaporan', 'diterima', 'pengerjaan', 'selesai'];
 const STEP_LABELS = { pelaporan: 'Laporan Masuk', diterima: 'Diterima', pengerjaan: 'Pengerjaan', selesai: 'Selesai' };
@@ -91,7 +90,7 @@ export default function RekapPerbaikanPage() {
   };
 
   // ============ EXPORT EXCEL ============
-  const exportExcel = () => {
+  const exportExcel = async () => {
     if (filtered.length === 0) return alert('Tidak ada data untuk diekspor.');
     const wsData = filtered.map((l, i) => ({
       'No': i + 1,
@@ -105,6 +104,8 @@ export default function RekapPerbaikanPage() {
       'Tanggal Selesai': l.resolved_at ? new Date(l.resolved_at).toLocaleDateString('id-ID') : '-',
       'Dari Operator': l.damage_description?.match(/\[Laporan Operator: ([^\]]+)\]/)?.[1] || '-',
     }));
+    
+    const XLSX = await import('xlsx');
     const ws = XLSX.utils.json_to_sheet(wsData);
     ws['!cols'] = [
       { wch: 4 }, { wch: 20 }, { wch: 14 }, { wch: 25 }, { wch: 20 },

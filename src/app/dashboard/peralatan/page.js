@@ -2,7 +2,6 @@
 import { useEffect, useState, useCallback } from 'react';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/context/AuthContext';
-import * as XLSX from 'xlsx';
 import StorageWarning from '@/components/StorageWarning';
 
 const PROGRESS_STEPS = ['pelaporan', 'diterima', 'pengerjaan', 'selesai'];
@@ -344,7 +343,7 @@ export default function PeralatanPage() {
 
 
   // ================= UTILS & EXPORT =================
-  const generateExcelArsip = () => {
+  const generateExcelArsip = async () => {
     if (semuaLogs.length === 0) return alert('Tidak ada data arsip');
     const wsData = semuaLogs.map(l => ({
       'Tanggal Laporan': new Date(l.reported_at).toLocaleString('id-ID'),
@@ -356,6 +355,8 @@ export default function PeralatanPage() {
       'Posisi Status': l.progress_status.toUpperCase(),
       'Waktu Selesai': l.resolved_at ? new Date(l.resolved_at).toLocaleString('id-ID') : 'Belum Selesai'
     }));
+    
+    const XLSX = await import('xlsx');
     const worksheet = XLSX.utils.json_to_sheet(wsData);
     const workbook = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(workbook, worksheet, "Arsip_Servis");
