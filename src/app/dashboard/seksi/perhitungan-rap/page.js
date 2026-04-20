@@ -1,5 +1,5 @@
 'use client';
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
 import { generateSmartSTA, CALC_CONSTANTS, doGoalSeek, calculateFuelPerHour, MASTER_EXCAVATOR_SPECS } from '@/utils/calcRapMath';
 import DrawCrossSection from '@/components/DrawCrossSection';

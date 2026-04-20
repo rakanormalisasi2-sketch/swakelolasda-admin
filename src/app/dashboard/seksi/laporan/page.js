@@ -1,4 +1,5 @@
 'use client';
+import React from 'react';
 import { useEffect, useState, useCallback, Fragment } from 'react';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/context/AuthContext';
