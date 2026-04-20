@@ -1,11 +1,10 @@
 'use client';
-import { useState, useEffect, useCallback } from 'react';
-import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
+import { useState, useEffect } from 'react';
+import { supabase } from '@/lib/supabase';
 import { generateSmartSTA, CALC_CONSTANTS, doGoalSeek, calculateFuelPerHour, MASTER_EXCAVATOR_SPECS } from '@/utils/calcRapMath';
 import DrawCrossSection from '@/components/DrawCrossSection';
 
 export default function PerhitunganRapPage() {
-  const supabase = createClientComponentClient();
   const [profile, setProfile] = useState(null);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('backup_volume');
