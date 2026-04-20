@@ -37,9 +37,9 @@ export default function PerhitunganRapPage() {
     jenisTanah: 'biasa'
   });
 
-  // State untuk Goalseek (TAB 2)
   const [planParams, setPlanParams] = useState({
-    targetVolBBM: 10080, // Volume BBM Limit (DB2)
+    targetVolBBM: 0, // Volume BBM Limit (DB2)
+    realisasiHOK: 0, // Jumlah Hari Realisasi Berdasarkan Bukti Log Absensi (DB1)
     selectedMasterAlat: 'PC200',
     hpTarget: 138, // Mesin (Merah)
     loadFactor: 0.65, // Beban (Merah)
@@ -58,6 +58,7 @@ export default function PerhitunganRapPage() {
   };
 
   // State Pedoman
+
   const [showPedoman, setShowPedoman] = useState(false);
   const [pedomanImage, setPedomanImage] = useState('');
 
@@ -125,10 +126,28 @@ export default function PerhitunganRapPage() {
            }
         } catch(e) {}
 
+        // Fetch DB1 Operator Logs for row-count (Hari Kerja Realisasi)
+        let logDayCountMap = {};
+        if(assignData && assignData.length > 0) {
+           const { data: logData } = await supabase
+             .from('operator_logs')
+             .select('assignment_id, tanggal')
+             .in('assignment_id', assignData.map(a => a.id));
+           
+           if(logData) {
+              // Group and count distinct dates
+              logData.forEach(row => {
+                  if(!logDayCountMap[row.assignment_id]) logDayCountMap[row.assignment_id] = new Set();
+                  logDayCountMap[row.assignment_id].add(row.tanggal);
+              });
+           }
+        }
+
         if(assignData) {
            const enriched = assignData.map(a => ({
                ...a,
-               totalBbm: bbmMapData[a.id] || 0
+               totalBbm: bbmMapData[a.id] || 0,
+               totalHokRealisasi: logDayCountMap[a.id] ? logDayCountMap[a.id].size : 0
            }));
            setAssignments(enriched);
         }
@@ -140,7 +159,11 @@ export default function PerhitunganRapPage() {
 
   const handleSelectReport = (assign) => {
      // Sinkronisasi otomatis ke UI (Kebutuhan Realisasi)
-     setPlanParams({...planParams, targetVolBBM: assign.totalBbm || 1});
+     setPlanParams({
+         ...planParams, 
+         targetVolBBM: assign.totalBbm || 1,
+         realisasiHOK: assign.totalHokRealisasi || 0
+     });
      
      // Otomatis susun field Kop Gambar
      const pekStr = `${assign.job_type} ${assign.job_sub_type}`.toUpperCase();
@@ -153,7 +176,7 @@ export default function PerhitunganRapPage() {
         kode_gambar: pekStr.split(' ').map(s=>s[0]).join('') + '-01'
      });
 
-     setSelectedJobText(`${pekStr} - ${lokStr} (Total BBM Realisasi: ${assign.totalBbm} Ltr)`);
+     setSelectedJobText(`${pekStr} - ${lokStr} (Realisasi: ${assign.totalBbm} Ltr | HOK Pekerja: ${assign.totalHokRealisasi} Hari)`);
      setShowSyncModal(false);
   };
 
@@ -347,8 +370,13 @@ export default function PerhitunganRapPage() {
                 </div>
 
                 <div className="card" style={{marginBottom: 20}}>
-                   <div className="card-header bg-slate-50"><strong className="card-title">2. Modul Termodinamika Alat & BBM (Cell Merah Mutlak)</strong></div>
+                   <div className="card-header bg-slate-50"><strong className="card-title">2. Modul Termodinamika Alat & BBM (Cell Merah)</strong></div>
                    <div className="modal-body">
+                      {/* Peringatan Teks Kunci Termodinamika */}
+                      <div style={{marginBottom:15, padding:10, background:'#fffbeb', borderLeft:'4px solid #f59e0b', fontSize:12, color:'#92400e'}}>
+                         <strong>Arahan Keamanan Formula:</strong> Input <b>L/kWh</b> dikunci manual untuk manipulasi presisi batas spesifik. Input <b>HP</b> & Kapasitas direkomendasikan otomatis. <b>Load Factor</b> wajib disesuaikan dengan kurva riil medan di lokasi pekerjaan (bukan rekayasa), dengan rentang 0.1 - 0.9.
+                      </div>
+                      
                       <div className="form-group" style={{marginBottom:15}}>
                          <label className="form-label">Standar Spek Kelas Alat Berat</label>
                          <select className="form-control" value={planParams.selectedMasterAlat} onChange={(e)=>handlePilihAlat(e.target.value)}>
@@ -359,24 +387,20 @@ export default function PerhitunganRapPage() {
                       </div>
                       <div className="form-grid">
                          <div className="form-group">
-                            <label className="form-label">
-                               Tenaga Mesin (Horsepower)
-                            </label>
+                            <label className="form-label">Tenaga Mesin (Horsepower)</label>
                             <input type="number" step="0.1" className="form-control" style={{background:'#fee2e2', border:'1px solid #ef4444'}} value={planParams.hpTarget} onChange={e=>setPlanParams({...planParams, hpTarget: Number(e.target.value)})} />
                          </div>
                          <div className="form-group">
                             <label className="form-label">
                                Engine Load Factor
-                               <span onClick={()=>{setPedomanImage('/assets/pedoman-bbm-ahsp.png'); setShowPedoman(true);}} style={{cursor:'pointer', marginLeft:4}} title="Lihat Pedoman Jurnal/AHSP">ℹ️</span>
+                               <span onClick={()=>{setPedomanImage('/assets/pedoman-bbm-ahsp.png'); setShowPedoman(true);}} style={{cursor:'pointer', marginLeft:4, color:'#3b82f6'}} title="Klik: Lihat Pedoman (0.1 - 0.9) berdasarkan jurnal & medan">ℹ️ (Lihat Panduan 0.1-0.9)</span>
                             </label>
-                            <input type="number" step="0.01" className="form-control" style={{background:'#fee2e2', border:'1px solid #ef4444'}} value={planParams.loadFactor} onChange={e=>setPlanParams({...planParams, loadFactor: Number(e.target.value)})} />
+                            <input type="number" step="0.01" min="0.1" max="0.9" placeholder="0.1 - 0.9" className="form-control" style={{background:'#fee2e2', border:'1px solid #ef4444'}} value={planParams.loadFactor} onChange={e=>setPlanParams({...planParams, loadFactor: Number(e.target.value)})} />
                          </div>
                       </div>
                       <div className="form-grid">
                          <div className="form-group">
-                            <label className="form-label">
-                               Konsumsi Spesifik SFC (L/kWh)
-                            </label>
+                            <label className="form-label">Konsumsi Spesifik SFC (L/kWh)</label>
                             <input type="number" step="0.01" className="form-control" style={{background:'#fee2e2', border:'1px solid #ef4444'}} value={planParams.sfc} onChange={e=>setPlanParams({...planParams, sfc: Number(e.target.value)})} />
                          </div>
                       </div>
@@ -389,7 +413,8 @@ export default function PerhitunganRapPage() {
                 </div>
 
                 <div className="card">
-                   <div className="card-header bg-slate-50"><strong className="card-title">3. Kapasitas Bucket & Faktor Lainnya</strong></div>
+                   <div className="card-header bg-slate-50"><strong className="card-title">3. Kapasitas Bucket & Faktor (Cell Merah)</strong></div>
+
                    <div className="modal-body">
                       <div className="form-grid">
                          <div className="form-group">
