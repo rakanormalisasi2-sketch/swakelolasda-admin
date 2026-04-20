@@ -41,6 +41,7 @@ const NAV_CONFIG = {
         { href: '/dashboard/status-operasional', label: 'Status Operasional', icon: 'truck' },
         { href: '/dashboard/seksi/laporan', label: 'Laporan Pelaksanaan', icon: 'file-text' },
         { href: '/dashboard/seksi/bbm', label: 'Manajemen BBM', icon: 'database' },
+        { href: '/dashboard/seksi/perhitungan-rap', label: 'Perhitungan RAP', icon: 'calculator' },
         { href: '/dashboard/seksi/proposal', label: 'Perencanaan Proposal', icon: 'book' },
         { href: '/dashboard/seksi/pengaturan', label: 'Pengaturan Sistem', icon: 'settings' },
       ],
@@ -123,6 +124,11 @@ const ICONS = {
   database: (
     <svg fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
       <path strokeLinecap="round" strokeLinejoin="round" d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4m0 5c0 2.21-3.582 4-8 4s-8-1.79-8-4" />
+    </svg>
+  ),
+  calculator: (
+    <svg fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+      <path strokeLinecap="round" strokeLinejoin="round" d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
     </svg>
   ),
 };
