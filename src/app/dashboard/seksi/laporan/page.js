@@ -159,11 +159,9 @@ export default function LaporanPelaksanaanPage() {
             const resultBbm = await resBbm.json();
             const map = {};
             (resultBbm.data || []).forEach(b => {
-              // Map by: Desa | Tipe Alat | Tanggal (karena manual input)
+              // Simpan berdasarkan assignment_id dan tanggal_kirim (format YYYY-MM-DD)
               const tglStr = b.tanggal_kirim.split('T')[0];
-              const desa = (b.desa || '').toLowerCase().trim();
-              const alat = (b.tipe_alat || '').toLowerCase().trim();
-              const key = `${desa}|${alat}|${tglStr}`;
+              const key = `${b.assignment_id}|${tglStr}`;
               if (!map[key]) map[key] = [];
               map[key].push(b);
             });
@@ -484,7 +482,7 @@ export default function LaporanPelaksanaanPage() {
               <div>2. GREASE</div>
             </td>
             <td style="text-align:right">
-              <div style="margin-bottom:4px;"><b>${bbmMap[bbmFoundKey] ? bbmMap[bbmFoundKey].reduce((sum, b) => sum + Number(b.jumlah_liter), 0) : '......'}</b> Liter</div>
+              <div style="margin-bottom:4px;"><b>${bbmMap[`${log.assignment_id}|${log.tanggal.split('T')[0]}`] ? bbmMap[`${log.assignment_id}|${log.tanggal.split('T')[0]}`].reduce((sum, b) => sum + Number(b.jumlah_liter), 0) : '......'}</b> Liter</div>
               <div>...... Kg</div>
             </td>
           </tr>
@@ -1031,18 +1029,11 @@ export default function LaporanPelaksanaanPage() {
                                         onBlur={e => handleBlurSave(log.id, 'keterangan_tambahan', e.target.value)} />
                                  
                                  {/* Tampilan BBM Otomatis */}
-                                 {(()=>{
-                                   const tglKey = log.tanggal?.split('T')[0];
-                                   const desaLaporan = (log.override_desa || log.assignment?.location_village || '').toLowerCase().trim();
-                                   const namaAlatLaporan = (log.override_alat || log.equipment?.name || '').toLowerCase().trim();
-                                   const bbmFoundKey = `${desaLaporan}|${namaAlatLaporan}|${tglKey}`;
-                                   const bbmData = bbmMap[bbmFoundKey] || [];
-                                   return bbmData.map((bbm, i) => (
-                                     <div key={i} style={{ background: '#fef3c7', color: '#92400e', padding: '4px 8px', borderRadius: 4, fontSize: 11, fontWeight: 'bold', marginTop: 4, display:'inline-block'}}>
-                                       ⛽ BBM Diterima: {bbm.jumlah_liter} LTR
-                                     </div>
-                                   ));
-                                 })()}
+                                 {bbmMap[`${log.assignment_id}|${log.tanggal?.split('T')[0]}`]?.map((bbm, i) => (
+                                   <div key={i} style={{ background: '#fef3c7', color: '#92400e', padding: '4px 8px', borderRadius: 4, fontSize: 11, fontWeight: 'bold', marginTop: 4, display:'inline-block'}}>
+                                     ⛽ BBM Diterima: {bbm.jumlah_liter} LTR
+                                   </div>
+                                 ))}
                                </td>
 
                                {/* Foto — link view untuk dibuka di tab baru */}

@@ -19,7 +19,7 @@ export default function BBMPage() {
     tanggal_pesan: '', tanggal_terima: '', jumlah_liter: '', keterangan: ''
   });
   const [formPemakaian, setFormPemakaian] = useState({
-    assignment_id: '00000000-0000-0000-0000-000000000000', kegiatan: '', tipe_alat: '', desa: '', kecamatan: '', 
+    assignment_id: '', kegiatan: '', tipe_alat: '', desa: '', kecamatan: '', 
     tanggal_kirim: '', jumlah_liter: '', keterangan: ''
   });
 
@@ -77,6 +77,47 @@ export default function BBMPage() {
   }, [profile, tahunAnggaran]);
 
   useEffect(() => { loadData(); }, [loadData]);
+
+  // Handle assignment selection to auto-fill Pemakaian form
+  const handleAssignmentChange = (aId) => {
+    if (aId === '00000000-0000-0000-0000-000000000000') {
+      setFormPemakaian({
+        ...formPemakaian,
+        assignment_id: aId,
+        kegiatan: '',
+        tipe_alat: '',
+        desa: '',
+        kecamatan: ''
+      });
+      return;
+    }
+
+    const asgn = assignments.find(a => a.id === aId);
+    if(!asgn) {
+      setFormPemakaian({...formPemakaian, assignment_id: aId});
+      return;
+    }
+    
+    let kegiatanStr = '';
+    if (asgn.job_type === 'lainnya') {
+      kegiatanStr = `${asgn.custom_job_description} Desa ${asgn.location_village} Kec. ${asgn.location_district}`;
+    } else {
+      const rincian = SUB_LABELS[asgn.job_sub_type] || asgn.job_type;
+      kegiatanStr = `${rincian} Desa ${asgn.location_village} Kec. ${asgn.location_district}`;
+    }
+
+    const alatStr = asgn.equipment ? 
+      `${asgn.equipment.nomor_lambung || ''} (${asgn.equipment.merk_type || ''}) ${asgn.equipment.name || ''}`.trim() : '';
+
+    setFormPemakaian({
+      ...formPemakaian,
+      assignment_id: aId,
+      kegiatan: kegiatanStr.toUpperCase(),
+      tipe_alat: alatStr,
+      desa: asgn.location_village || '',
+      kecamatan: asgn.location_district || ''
+    });
+  };
 
   const handleSavePemakaian = async (e) => {
     e.preventDefault();
@@ -180,7 +221,7 @@ export default function BBMPage() {
             <option value="2026">2026</option>
             <option value="2027">2027</option>
           </select>
-          <button className="btn btn-primary" onClick={() => { setModalType('pemakaian'); setShowModal(true); setFormPemakaian({assignment_id:'00000000-0000-0000-0000-000000000000', kegiatan:'', tipe_alat:'', desa:'', kecamatan:'', tanggal_kirim:'', jumlah_liter:'', keterangan:''})}}>
+          <button className="btn btn-primary" onClick={() => { setModalType('pemakaian'); setShowModal(true); setFormPemakaian({...formPemakaian, assignment_id:'', tanggal_kirim:'', jumlah_liter:'', keterangan:''})}}>
             + Input Pemakaian
           </button>
           <button className="btn btn-outline" onClick={() => { setModalType('pengadaan'); setShowModal(true); }}>
@@ -296,8 +337,20 @@ export default function BBMPage() {
                 <form onSubmit={handleSavePemakaian}>
                    <div className="modal-body">
                       <div className="form-group">
+                         <label className="form-label">Penugasan Terkait *</label>
+                         <select className="form-control" required value={formPemakaian.assignment_id} onChange={(e) => handleAssignmentChange(e.target.value)}>
+                           <option value="">— Pilih Penugasan (Atau Pilih Manual) —</option>
+                           <option value="00000000-0000-0000-0000-000000000000" style={{fontWeight:'bold', color:'#2563eb'}}>✏️ INPUT MANUAL (TANPA PENUGASAN)</option>
+                           <optgroup label="Daftar Penugasan Aktif & Selesai">
+                           {assignments.map(a => (
+                             <option key={a.id} value={a.id}>{a.location_village} — {a.equipment?.name || 'Alat'} ({new Date(a.start_date).toLocaleDateString('id-ID')})</option>
+                           ))}
+                           </optgroup>
+                         </select>
+                      </div>
+                      <div className="form-group">
                          <label className="form-label">Rincian Kegiatan *</label>
-                         <textarea className="form-control" rows={2} required value={formPemakaian.kegiatan} onChange={e=>setFormPemakaian({...formPemakaian, kegiatan: e.target.value})} placeholder="Contoh: Normalisasi Sungai Desa Sambongrejo" />
+                         <textarea className="form-control" rows={2} required value={formPemakaian.kegiatan} onChange={e=>setFormPemakaian({...formPemakaian, kegiatan: e.target.value})} placeholder="Sistem akan otomatis mengisi sesuai penugasan..." />
                       </div>
                       <div className="form-grid">
                          <div className="form-group">
