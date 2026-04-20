@@ -1,7 +1,5 @@
 'use client';
 import { useEffect, useState, useCallback, Fragment } from 'react';
-import React from 'react';
-import * as XLSX from 'xlsx';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/context/AuthContext';
 import { MASTER_EXCAVATOR_SPECS, calculateFuelPerHour } from '@/utils/calcRapMath';
@@ -334,7 +332,7 @@ export default function LaporanPelaksanaanPage() {
 
 
   // ============ SPREADSHEET & PDF GENERATORS ============
-  const executeExcelBatch = () => {
+  const executeExcelBatch = async () => {
     if (printSelectedIds.length === 0) return alert('Pilih minimal 1 baris log laporan terlebih dahulu.');
     
     // 1. Dapatkan daftar Log yang difilter dari Checkbox
@@ -415,6 +413,7 @@ export default function LaporanPelaksanaanPage() {
     // Grand Total
     ws1Data.push(["D", "JUMLAH HARGA TENAGA, BAHAN DAN ALAT (A + B + C)", "", "", "", "", totalSemua]);
 
+    const XLSX = await import('xlsx');
     const worksheet = XLSX.utils.aoa_to_sheet(ws1Data);
     const workbook = XLSX.utils.book_new();
 

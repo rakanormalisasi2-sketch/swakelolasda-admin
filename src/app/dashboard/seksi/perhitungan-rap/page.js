@@ -1,6 +1,5 @@
 'use client';
-import React, { useState, useEffect } from 'react';
-import * as XLSX from 'xlsx';
+import { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
 import { generateSmartSTA, CALC_CONSTANTS, doGoalSeek, calculateFuelPerHour, MASTER_EXCAVATOR_SPECS } from '@/utils/calcRapMath';
 import DrawCrossSection from '@/components/DrawCrossSection';
@@ -222,7 +221,7 @@ export default function PerhitunganRapPage() {
     window.print();
   };
 
-  const handleExportExcel = () => {
+  const handleExportExcel = async () => {
     // Susun Data Lembar 1: Rekapitulasi RAB (Kolom Vertikal)
     const ws1Data = [
        ["RENCANA ANGGARAN PELAKSANAAN (RAP) - KEBUTUHAN REALISASI"],
@@ -261,6 +260,7 @@ export default function PerhitunganRapPage() {
        ws2Data.push([i+1, s.sta, s.wDasar.toFixed(3), s.h.toFixed(3), params.mSlope, s.lengthAt.toFixed(2)]);
     });
 
+    const XLSX = await import('xlsx');
     const wb = XLSX.utils.book_new();
     const ws1 = XLSX.utils.aoa_to_sheet(ws1Data);
     const ws2 = XLSX.utils.aoa_to_sheet(ws2Data);
