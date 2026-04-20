@@ -58,16 +58,29 @@ export default function PerhitunganRapPage() {
   };
 
   // State Pedoman
-
   const [showPedoman, setShowPedoman] = useState(false);
   const [pedomanImage, setPedomanImage] = useState('');
+
+  // State Keuangan (Harga Satuan Default bisa diganti sewaktu-waktu)
+  const [financeParams, setFinanceParams] = useState({
+     hargaSolar: 15000,
+     hargaSewa: 250000,
+     upahMandor: 125000,
+     upahPekerja: 100000,
+     hargaPelumas: 60000
+  });
 
   // Hitungan Output Efek Kupu-kupu (Kuning)
   const [dominoEffects, setDominoEffects] = useState({
      fuelPerJam: 0,
      totalJamOperasional: 0,
      q1Target: 0,
-     waktuSiklusT1: 0
+     waktuSiklusT1: 0,
+     // Financials
+     totalCostBbm: 0,
+     totalCostSewa: 0,
+     totalCostPersonil: 0,
+     grandTotalRab: 0
   });
 
   // Domino Effect Chain Recalculator
@@ -86,8 +99,18 @@ export default function PerhitunganRapPage() {
          faktorKembang: planParams.fvFaktorKembang
      });
      
-     setDominoEffects({ fuelPerJam: lJam, totalJamOperasional: totalJam, q1Target: q1, waktuSiklusT1: t1 });
-  }, [planParams, totalVol]);
+     // 5. Rekonsiliasi Keuangan (Konversi Rupiah mutlak)
+     const costBbm = planParams.targetVolBBM * financeParams.hargaSolar;
+     const costSewa = totalJam * financeParams.hargaSewa;
+     // Asumsi 1 Mandor dan 1 Pekerja Helper untuk setiap Hari Pelaksanaan (HOK)
+     const costPersonil = planParams.realisasiHOK * (financeParams.upahMandor + financeParams.upahPekerja);
+     const grandTotal = costBbm + costSewa + costPersonil;
+
+     setDominoEffects({ 
+         fuelPerJam: lJam, totalJamOperasional: totalJam, q1Target: q1, waktuSiklusT1: t1,
+         totalCostBbm: costBbm, totalCostSewa: costSewa, totalCostPersonil: costPersonil, grandTotalRab: grandTotal
+     });
+  }, [planParams, totalVol, financeParams]);
 
   // Output State
   const [stas, setStas] = useState([]);
@@ -472,6 +495,102 @@ export default function PerhitunganRapPage() {
                 </div>
              </div>
            </div>
+        )}
+
+        {/* ======================= TAB 3: KEBUTUHAN REALISASI & REKONSILIASI KEUANGAN ======================= */}
+        {activeTab === 'kebutuhan_realisasi' && (
+        <div style={{display:'flex', gap: 20}}>
+          <div style={{flex:1}}>
+              <div className="card" style={{marginBottom: 20}}>
+                   <div className="card-header bg-emerald-50"><strong className="card-title text-emerald-800">1. Honorarium & Sinkronisasi Laporan</strong></div>
+                   <div className="modal-body">
+                      {planParams.targetVolBBM === 0 ? (
+                         <div style={{color:'#94a3b8', fontSize:14}}>&larr; Harap tekan tombol "Pilih Laporan Mingguan..." di Tab 2 terlebih dahulu untuk menghubungkan log pelaporan dari DB Pekerja.</div>
+                      ) : (
+                         <>
+                            <div className="form-group" style={{marginBottom: 20}}>
+                               <label className="form-label text-slate-500">Total Jam Operasional Termodinamika (Jam Paksa)</label>
+                               <div style={{fontWeight:'bold', fontSize:16, color:'#475569'}}>{dominoEffects.totalJamOperasional.toFixed(2)} Jam <span style={{fontSize:12, fontWeight:'normal'}}>(Dari BBM Limit {planParams.targetVolBBM} Ltr)</span></div>
+                               <small className="text-muted">Jam Paksa ini akan menjadi pengali mutlak biaya sewa Excavator agar akur.</small>
+                            </div>
+
+                            <div style={{background:'#ecfdf5', border:'1px solid #10b981', padding:15, borderRadius:8}}>
+                               <div style={{fontSize:12, fontWeight:'bold', color:'#065f46', marginBottom:5}}>HOK Realisasi (Logika DB Baris Laporan)</div>
+                               <div style={{fontSize:36, fontWeight:'bold', color:'#047857'}}>{planParams.realisasiHOK} <span style={{fontSize:16}}>HOK Pelaksanaan</span></div>
+                               <div style={{marginTop:10, fontSize:12, color:'#064e3b'}}>
+                                  Ini adalah ekstraksi jumlah hari unik {planParams.realisasiHOK} baris pelaporan alat berat. Akan menjadi standar patokan pembayaran UPAH Mandor & Pekerja.
+                               </div>
+                            </div>
+                         </>
+                      )}
+                   </div>
+              </div>
+
+              {/* HARGA SATUAN DASAR */}
+              <div className="card">
+                   <div className="card-header bg-yellow-50"><strong className="card-title text-yellow-800">2. Harga Satuan Dasar Eksekusi Keuangan (Cell Kuning)</strong></div>
+                   <div className="modal-body">
+                      <div className="form-grid">
+                         <div className="form-group">
+                            <label className="form-label">HSD Solar Industri / Liter (Rp)</label>
+                            <input type="number" className="form-control" style={{background:'#fef9c3', border:'1px solid #eab308'}} value={financeParams.hargaSolar} onChange={e=>setFinanceParams({...financeParams, hargaSolar: Number(e.target.value)})} />
+                         </div>
+                         <div className="form-group">
+                            <label className="form-label">Sewa Excavator / Jam (Rp)</label>
+                            <input type="number" className="form-control" style={{background:'#fef9c3', border:'1px solid #eab308'}} value={financeParams.hargaSewa} onChange={e=>setFinanceParams({...financeParams, hargaSewa: Number(e.target.value)})} />
+                         </div>
+                      </div>
+                      <div className="form-grid">
+                         <div className="form-group">
+                            <label className="form-label">Upah Mandor / Hari (Rp)</label>
+                            <input type="number" className="form-control" style={{background:'#fef9c3', border:'1px solid #eab308'}} value={financeParams.upahMandor} onChange={e=>setFinanceParams({...financeParams, upahMandor: Number(e.target.value)})} />
+                         </div>
+                         <div className="form-group">
+                            <label className="form-label">Upah Pekerja / Hari (Rp)</label>
+                            <input type="number" className="form-control" style={{background:'#fef9c3', border:'1px solid #eab308'}} value={financeParams.upahPekerja} onChange={e=>setFinanceParams({...financeParams, upahPekerja: Number(e.target.value)})} />
+                         </div>
+                      </div>
+                   </div>
+              </div>
+
+          </div>
+          
+          <div style={{flex:1}}>
+              <div className="card" style={{marginBottom: 20}}>
+                   <div className="card-header bg-blue-50"><strong className="card-title text-blue-800">3. Rekapitulasi Rencana Anggaran Keuangan (RAB Final)</strong></div>
+                   <div className="modal-body">
+                      <table style={{width:'100%', borderCollapse:'collapse', fontSize:14}} className="table">
+                        <tbody>
+                          <tr style={{borderBottom:'1px solid #e2e8f0'}}>
+                            <td style={{padding:8}}>BBM Solar Khusus ({planParams.targetVolBBM} Ltr)</td>
+                            <td style={{padding:8, textAlign:'right', fontWeight:'bold'}}>Rp. {dominoEffects.totalCostBbm.toLocaleString('id-ID')}</td>
+                          </tr>
+                          <tr style={{borderBottom:'1px solid #e2e8f0'}}>
+                            <td style={{padding:8}}>Sewa Excavator ({dominoEffects.totalJamOperasional.toFixed(2)} Jam)</td>
+                            <td style={{padding:8, textAlign:'right', fontWeight:'bold'}}>Rp. {dominoEffects.totalCostSewa.toLocaleString('id-ID')}</td>
+                          </tr>
+                          <tr style={{borderBottom:'1px solid #e2e8f0'}}>
+                            <td style={{padding:8}}>Upah Personil HOK ({planParams.realisasiHOK} HOK)</td>
+                            <td style={{padding:8, textAlign:'right', fontWeight:'bold'}}>Rp. {dominoEffects.totalCostPersonil.toLocaleString('id-ID')}</td>
+                          </tr>
+                          <tr style={{background:'#eff6ff', borderTop:'2px solid #3b82f6'}}>
+                            <td style={{padding:12, fontWeight:'bold', color:'#1e3a8a'}}>GRAND TOTAL BIAYA (Tanpa PPN)</td>
+                            <td style={{padding:12, textAlign:'right', fontWeight:'bold', fontSize:18, color:'#1e3a8a'}}>Rp. {dominoEffects.grandTotalRab.toLocaleString('id-ID')}</td>
+                          </tr>
+                        </tbody>
+                      </table>
+                   </div>
+              </div>
+
+              <div className="card">
+                   <div className="card-header bg-slate-50"><strong className="card-title">Cetak Lembar Keuangan & Realisasi</strong></div>
+                   <div className="modal-body" style={{textAlign:'center', padding:20}}>
+                       <button className="btn btn-primary" onClick={handlePrint} style={{width:'100%', padding:20, fontSize:16}} disabled={planParams.targetVolBBM === 0}>🖨️ Cetak Dokumen RAP Lengkap (PDF)</button>
+                       <p className="text-muted text-xs" style={{marginTop:16}}>Dokumen akan merangkul Lembar RAB Final yang Absolut Sinkron dengan Cross-Section Geometri yang tervalidasi Goalseek.</p>
+                   </div>
+              </div>
+          </div>
+        </div>
         )}
 
       </div>
