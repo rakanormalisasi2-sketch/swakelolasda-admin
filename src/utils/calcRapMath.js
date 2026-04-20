@@ -7,6 +7,26 @@ export const CALC_CONSTANTS = {
   }
 };
 
+export const MASTER_EXCAVATOR_SPECS = {
+  'PC50': { name: 'Excavator Standard PC 50', hp: 39, bucket: 0.22 },
+  'PC75': { name: 'Excavator Standard PC 75', hp: 60, bucket: 0.30 },
+  'PC100': { name: 'Excavator Standard PC 100', hp: 75, bucket: 0.40 },
+  'PC200': { name: 'Excavator Standard PC 200', hp: 138, bucket: 0.90 },
+  'PC200LA': { name: 'Excavator PC 200 Long Arm', hp: 138, bucket: 0.50 }
+};
+
+/**
+ * Formula Konsumsi BBM (Modul Termodinamika AHSP 2026 / Jurnal)
+ * L/Jam = HP * Load Factor * Specific Fuel Consumption (SFC dalam L/kWh) * Konstanta Konversi HP ke kW
+ */
+export function calculateFuelPerHour(hp, loadFactor, sfc) {
+   const KW_PER_HP = 0.7457;
+   // Liter / Jam = Power_Dikeluarkan (kW) * Spesific Fuel Consumption (L/kWh)
+   // Power_Dikeluarkan (kW) = HP * Kw_Per_Hp * Load Factor   
+   const lJam = hp * KW_PER_HP * loadFactor * sfc;
+   return lJam;
+}
+
 /**
  * Fungsi Smart STA Splitter
  * Input: { panjangTotal, lebarDasar, kedalamanTarget, slopeRasio }

@@ -1,7 +1,7 @@
 'use client';
 import { useState, useEffect, useCallback } from 'react';
 import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
-import { generateSmartSTA, CALC_CONSTANTS, doGoalSeek } from '@/utils/calcRapMath';
+import { generateSmartSTA, CALC_CONSTANTS, doGoalSeek, calculateFuelPerHour, MASTER_EXCAVATOR_SPECS } from '@/utils/calcRapMath';
 import DrawCrossSection from '@/components/DrawCrossSection';
 
 export default function PerhitunganRapPage() {
@@ -39,31 +39,54 @@ export default function PerhitunganRapPage() {
 
   // State untuk Goalseek (TAB 2)
   const [planParams, setPlanParams] = useState({
-    targetVolBBM: 10080, // Volume Laporan/Riil untuk acuan Goalseek (Bisa ditarik dari DB1)
-    vKapasitasBucket: 0.22, // M3 (Merah)
+    targetVolBBM: 10080, // Volume BBM Limit (DB2)
+    selectedMasterAlat: 'PC200',
+    hpTarget: 138, // Mesin (Merah)
+    loadFactor: 0.65, // Beban (Merah)
+    sfc: 0.22, // L/KWh Konsumsi spesifik (Merah)
+    vKapasitasBucket: 0.90, // M3 (Merah)
     fbFaktorBucket: 1.0, // (Merah)
     faEfisiensi: 0.8, // (Merah)
     fvFaktorKembang: 1.2, // (Merah)
-    q1TargetGalian: 53.081 // Hasil GoalSeek
   });
+
+  const handlePilihAlat = (key) => {
+     const spek = MASTER_EXCAVATOR_SPECS[key];
+     if(spek) {
+        setPlanParams({...planParams, selectedMasterAlat: key, hpTarget: spek.hp, vKapasitasBucket: spek.bucket });
+     }
+  };
 
   // State Pedoman
   const [showPedoman, setShowPedoman] = useState(false);
   const [pedomanImage, setPedomanImage] = useState('');
 
-  // Hitungan Output (Kuning)
-  const [waktuSiklusT1, setWaktuSiklusT1] = useState(0);
+  // Hitungan Output Efek Kupu-kupu (Kuning)
+  const [dominoEffects, setDominoEffects] = useState({
+     fuelPerJam: 0,
+     totalJamOperasional: 0,
+     q1Target: 0,
+     waktuSiklusT1: 0
+  });
 
-  // Recalculate Goalseek anytime limits changes
+  // Domino Effect Chain Recalculator
   useEffect(() => {
-     let t1 = doGoalSeek(planParams.q1TargetGalian, {
+     // 1. Hukum Termodinamika Mesin
+     const lJam = calculateFuelPerHour(planParams.hpTarget, planParams.loadFactor, planParams.sfc);
+     // 2. Total Jam Operasional (Dipaksa oleh Total Kuota BBM)
+     const totalJam = (planParams.targetVolBBM > 0 && lJam > 0) ? (planParams.targetVolBBM / lJam) : 0;
+     // 3. Target Q1 (Hasil Galian / Jam)
+     const q1 = (totalJam > 0) ? (totalVol / totalJam) : 0;
+     // 4. Bisection Goalseek untuk Waktu Siklus (T1)
+     let t1 = doGoalSeek(q1, {
          kapasitasBucket: planParams.vKapasitasBucket,
          faktorBucket: planParams.fbFaktorBucket,
          efisiensiAlat: planParams.faEfisiensi,
          faktorKembang: planParams.fvFaktorKembang
      });
-     setWaktuSiklusT1(t1);
-  }, [planParams]);
+     
+     setDominoEffects({ fuelPerJam: lJam, totalJamOperasional: totalJam, q1Target: q1, waktuSiklusT1: t1 });
+  }, [planParams, totalVol]);
 
   // Output State
   const [stas, setStas] = useState([]);
@@ -323,8 +346,50 @@ export default function PerhitunganRapPage() {
                    </div>
                 </div>
 
+                <div className="card" style={{marginBottom: 20}}>
+                   <div className="card-header bg-slate-50"><strong className="card-title">2. Modul Termodinamika Alat & BBM (Cell Merah Mutlak)</strong></div>
+                   <div className="modal-body">
+                      <div className="form-group" style={{marginBottom:15}}>
+                         <label className="form-label">Standar Spek Kelas Alat Berat</label>
+                         <select className="form-control" value={planParams.selectedMasterAlat} onChange={(e)=>handlePilihAlat(e.target.value)}>
+                            {Object.entries(MASTER_EXCAVATOR_SPECS).map(([key, attr]) => (
+                               <option key={key} value={key}>{attr.name} (Kap: {attr.bucket}m³, Tenaga: {attr.hp} HP)</option>
+                            ))}
+                         </select>
+                      </div>
+                      <div className="form-grid">
+                         <div className="form-group">
+                            <label className="form-label">
+                               Tenaga Mesin (Horsepower)
+                            </label>
+                            <input type="number" step="0.1" className="form-control" style={{background:'#fee2e2', border:'1px solid #ef4444'}} value={planParams.hpTarget} onChange={e=>setPlanParams({...planParams, hpTarget: Number(e.target.value)})} />
+                         </div>
+                         <div className="form-group">
+                            <label className="form-label">
+                               Engine Load Factor
+                               <span onClick={()=>{setPedomanImage('/assets/pedoman-bbm-ahsp.png'); setShowPedoman(true);}} style={{cursor:'pointer', marginLeft:4}} title="Lihat Pedoman Jurnal/AHSP">ℹ️</span>
+                            </label>
+                            <input type="number" step="0.01" className="form-control" style={{background:'#fee2e2', border:'1px solid #ef4444'}} value={planParams.loadFactor} onChange={e=>setPlanParams({...planParams, loadFactor: Number(e.target.value)})} />
+                         </div>
+                      </div>
+                      <div className="form-grid">
+                         <div className="form-group">
+                            <label className="form-label">
+                               Konsumsi Spesifik SFC (L/kWh)
+                            </label>
+                            <input type="number" step="0.01" className="form-control" style={{background:'#fee2e2', border:'1px solid #ef4444'}} value={planParams.sfc} onChange={e=>setPlanParams({...planParams, sfc: Number(e.target.value)})} />
+                         </div>
+                      </div>
+                      <div style={{marginTop:15, padding:10, background:'#eff6ff', borderRadius:4, border:'1px solid #bfdbfe'}}>
+                        <small style={{display:'block', color:'#1e3a8a', fontWeight:'bold'}}>Otomatisasi Hitungan Fisika (Liter/Jam):</small>
+                        <div style={{fontSize:16, fontWeight:'bold', color:'#2563eb'}}>{dominoEffects.fuelPerJam.toFixed(3)} Liter / Jam</div>
+                        <small style={{color:'#60a5fa'}}>Rumus: HP * Konversi kW (0.7457) * Load Factor * SFC.</small>
+                      </div>
+                   </div>
+                </div>
+
                 <div className="card">
-                   <div className="card-header bg-slate-50"><strong className="card-title">2. Acuan Pedoman (Cell Merah AHSP)</strong></div>
+                   <div className="card-header bg-slate-50"><strong className="card-title">3. Kapasitas Bucket & Faktor Lainnya</strong></div>
                    <div className="modal-body">
                       <div className="form-grid">
                          <div className="form-group">
@@ -358,19 +423,24 @@ export default function PerhitunganRapPage() {
 
              <div style={{flex: 1}}>
                 <div className="card">
-                   <div className="card-header bg-slate-50"><strong className="card-title">3. Goalseek Algorithm (Cell Kuning)</strong></div>
+                   <div className="card-header bg-slate-50"><strong className="card-title">4. Siklus Efek Domino Goalseek (Output)</strong></div>
                    <div className="modal-body">
                       
                       <div className="form-group" style={{marginBottom: 20}}>
-                         <label className="form-label">Hasil Galian / Jam Target (m³/Jam)</label>
-                         <input type="number" step="0.001" className="form-control" value={planParams.q1TargetGalian} onChange={e=>setPlanParams({...planParams, q1TargetGalian: Number(e.target.value)})} />
+                         <label className="form-label text-slate-500">1. Total Jam Kerja (Dari BBM Total Limit / L/Jam)</label>
+                         <div style={{fontWeight:'bold', fontSize:14}}>{dominoEffects.totalJamOperasional.toFixed(2)} Jam Total</div>
+                      </div>
+
+                      <div className="form-group" style={{marginBottom: 20}}>
+                         <label className="form-label text-slate-500">2. Target Galian Per Jam (Volume Total / Jam Kerja)</label>
+                         <div style={{fontWeight:'bold', fontSize:14}}>{dominoEffects.q1Target.toFixed(3)} m³/Jam</div>
                       </div>
 
                       <div style={{background:'#fef9c3', border:'1px solid #eab308', padding:15, borderRadius:8}}>
-                         <div style={{fontSize:12, fontWeight:'bold', color:'#854d0e', marginBottom:5}}>Waktu Siklus Optimal Hasil Goalseek (T1)</div>
-                         <div style={{fontSize:36, fontWeight:'bold', color:'#a16207'}}>{waktuSiklusT1.toFixed(3)} <span style={{fontSize:16}}>menit</span></div>
+                         <div style={{fontSize:12, fontWeight:'bold', color:'#854d0e', marginBottom:5}}>Otomatisasi Hitungan Goalseek (T1)</div>
+                         <div style={{fontSize:36, fontWeight:'bold', color:'#a16207'}}>{dominoEffects.waktuSiklusT1.toFixed(3)} <span style={{fontSize:16}}>menit / Rit</span></div>
                          <div style={{marginTop:10, fontSize:12, color:'#713f12'}}>
-                            Nilai T1 ini secara matematis dipaksa mundur (Bisection) oleh sistem untuk memenuhi Target Galian Per Jam.
+                            Agar alat mencapai efisiensi L/Jam dan Kuota BBM sesuai laporan realisasi, **Waktu Siklus optimalnya harus persis begini (T1)**. Angka ini secara absolut terkunci.
                          </div>
                       </div>
                    </div>
