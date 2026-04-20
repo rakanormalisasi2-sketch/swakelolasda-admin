@@ -4,6 +4,7 @@ import React from 'react';
 import * as XLSX from 'xlsx';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/context/AuthContext';
+import { MASTER_EXCAVATOR_SPECS, calculateFuelPerHour } from '@/utils/calcRapMath';
 import KolomManager from './KolomManager';
 import DokumentasiModal from './DokumentasiModal';
 import HourmeterModal from './HourmeterModal';
@@ -333,53 +334,106 @@ export default function LaporanPelaksanaanPage() {
 
 
   // ============ SPREADSHEET & PDF GENERATORS ============
-  const generateExcel = () => {
-    if (Object.keys(mainTableGroups).length === 0) return alert('Tidak ada data untuk diunduh');
+  const executeExcelBatch = () => {
+    if (printSelectedIds.length === 0) return alert('Pilih minimal 1 baris log laporan terlebih dahulu.');
     
-    // Gunakan mainTableGroups agar urutan & pengelompokan sama persis dengan tabel web
-    const wsData = [];
-    Object.keys(mainTableGroups).forEach(gId => {
-      mainTableGroups[gId].forEach(log => {
-        const row = {
-          'Timestamp': new Date(log.reported_at).toLocaleString('id-ID'),
-          'Tanggal': log.tanggal ? new Date(log.tanggal).toLocaleDateString('id-ID') : '',
-          'Custom Nama Pekerjaan': log.custom_pekerjaan || '',
-          'Nama Operator': log.override_operator || log.operator?.full_name || log.operator_name || '',
-          'Nama Helper': log.assignment?.helper_override || log.assignment?.helper?.full_name || '',
-          'Kecamatan': log.override_kecamatan || log.assignment?.location_district || '',
-          'Desa': log.override_desa || log.assignment?.location_village || '',
-          'Jenis Alat Berat': log.override_alat || (
-            log.equipment ? [log.equipment.nomor_lambung, log.equipment.merk_type ? `(${log.equipment.merk_type})` : null, log.equipment.name].filter(Boolean).join(' ') : null
-          ) || log.jenis_alat || '',
-          'Progress Pekerjaan': log.progress_pekerjaan || '',
-          'HM Awal': log.hm_awal || '',
-          'HM Akhir': log.hm_akhir || '',
-          'Jam Kerja': log.jam_kerja || '',
-          'Foto Lapangan': log.foto_lapangan_urls || '',
-          'Panjang Pekerjaan': log.panjang_pekerjaan || '',
-          'Keterangan Tambahan': log.keterangan_tambahan || '',
-        };
+    // 1. Dapatkan daftar Log yang difilter dari Checkbox
+    const selectedLogs = logs.filter(row => printSelectedIds.includes(row.id));
+    
+    // 2. Kalkulasi Parameter (HOK)
+    const uniqueDates = new Set(selectedLogs.map(l => l.tanggal));
+    const realisasiHOK = uniqueDates.size;
+    
+    // Asumsi default Harga untuk Sheet Master jika diunduh dari Laporan BBM
+    const hargaSolar = 15000;
+    const hargaSewa = 250000;
+    const upahPekerja = 100000;
+    const upahMandor = 125000;
 
-        // Sertakan custom columns dinamis yang muncul di tabel
-        if (customColumns && customColumns.length > 0) {
-          customColumns.forEach(col => {
-            const customVal = (log.custom_fields || {})[col.column_key] ?? '';
-            if (col.column_type === 'formula') {
-              row[col.column_label] = evaluateFormula(col.formula, log) || '';
-            } else {
-              row[col.column_label] = customVal;
-            }
-          });
-        }
-        
-        wsData.push(row);
-      });
+    // Kalkulasi Total Liter BBM dan Total Jam menggunakan Termodinamika & Nilai HM
+    let totalLiterBbm = 0;
+    let totalJamKerja = 0;
+    let namaAlatTerkait = 'Excavator Master';
+
+    selectedLogs.forEach(log => {
+         // Coba ambil dari Log HM jika ada
+         const HMDiff = (log.hm_akhir || 0) - (log.hm_awal || 0);
+         const jam = Number(log.jam_kerja) || (HMDiff > 0 ? HMDiff : 0);
+         totalJamKerja += jam;
+         
+         const alatRaw = log.override_alat || log.equipment?.name || '';
+         if(alatRaw) namaAlatTerkait = alatRaw;
+         
+         // Jika ada bbm di custom_fields
+         let liter = Number((log.custom_fields || {}).volume_bbm) || 0;
+         
+         // Jika nol tapi ada Jam, konversi via Termodinamika default PC200
+         if(liter === 0 && jam > 0) {
+              const LJam_Termo = calculateFuelPerHour(138, 0.65, 0.22); // PC200 Load Biasa
+              liter = jam * LJam_Termo;
+         }
+         totalLiterBbm += liter;
     });
 
-    const worksheet = XLSX.utils.json_to_sheet(wsData);
+    // 3. Susun Kerangka Master Format PC200 (Analisa Harga Satuan Pekerjaan)
+    const ws1Data = [
+       ["ANALISA HARGA SATUAN PEKERJAAN (AHS)"],
+       ["REKAPITULASI PELAKSANAAN LOGISTIK & LAPORAN ALAT BERAT"],
+       [""],
+       ["Pekerjaan", ": " + (customPrintPekerjaan || "Normalisasi Sungai Realisasi")],
+       ["Alat Utama", ": " + namaAlatTerkait],
+       ["Periode", ": " + realisasiHOK + " HOK "],
+       [""],
+       ["NO", "URAIAN", "KODE", "SATUAN", "KUANTITAS", "HARGA SATUAN (Rp)", "JUMLAH HARGA (Rp)"]
+    ];
+
+    // Kolom Bahan
+    const costBbm = totalLiterBbm * hargaSolar;
+    ws1Data.push(["A", "BAHAN", "", "", "", "", ""]);
+    ws1Data.push(["1", "Minyak Solar / BBM (Limit Log)", "M.12a", "Liter", totalLiterBbm.toFixed(2), hargaSolar, costBbm]);
+    ws1Data.push(["", "", "", "", "Jumlah Harga Bahan", "", costBbm]);
+    ws1Data.push([""]);
+
+    // Kolom Tenaga Kerja
+    const costPekerja = realisasiHOK * upahPekerja;
+    const costMandor = realisasiHOK * upahMandor;
+    const totalTenaga = costPekerja + costMandor;
+    ws1Data.push(["B", "TENAGA KERJA", "", "", "", "", ""]);
+    ws1Data.push(["1", "Pekerja / Operator", "L.01", "Hari (OH)", realisasiHOK, upahPekerja, costPekerja]);
+    ws1Data.push(["2", "Mandor", "L.03", "Hari (OH)", realisasiHOK, upahMandor, costMandor]);
+    ws1Data.push(["", "", "", "", "Jumlah Harga Tenaga", "", totalTenaga]);
+    ws1Data.push([""]);
+
+    // Kolom Peralatan
+    const costAlat = totalJamKerja * hargaSewa;
+    const totalSemua = costBbm + totalTenaga + costAlat;
+    ws1Data.push(["C", "PERALATAN", "", "", "", "", ""]);
+    ws1Data.push(["1", namaAlatTerkait, "E.10", "Jam", totalJamKerja.toFixed(2), hargaSewa, costAlat]);
+    ws1Data.push(["", "", "", "", "Jumlah Harga Peralatan", "", costAlat]);
+    ws1Data.push([""]);
+    
+    // Grand Total
+    ws1Data.push(["D", "JUMLAH HARGA TENAGA, BAHAN DAN ALAT (A + B + C)", "", "", "", "", totalSemua]);
+
+    const worksheet = XLSX.utils.aoa_to_sheet(ws1Data);
     const workbook = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(workbook, worksheet, "Laporan_Pelaksanaan");
-    XLSX.writeFile(workbook, "Rekap_Laporan_Alat_Berat.xlsx");
+
+    // Set Lebar Kolom Biar Tampak Seperti Master
+    worksheet["!cols"] = [
+       { wch: 5 },  // No
+       { wch: 45 }, // Uraian
+       { wch: 10 }, // Kode
+       { wch: 15 }, // Satuan
+       { wch: 15 }, // Kuantitas
+       { wch: 20 }, // Harga Satuan
+       { wch: 20 }  // Jumlah Harga
+    ];
+
+    XLSX.utils.book_append_sheet(workbook, worksheet, "Format_Master_RAB");
+
+    // Download!
+    XLSX.writeFile(workbook, `Rekap_RAB_Alat_Berat_${new Date().getTime()}.xlsx`);
+    setPrintModalInfo({open:false, type:''});
   };
 
   const executePrintBatch = () => {
@@ -851,7 +905,6 @@ export default function LaporanPelaksanaanPage() {
         </div>
         <div className="header-right" style={{display:'flex', gap: 8, flexWrap:'wrap', justifyContent:'flex-end'}}>
            {saving && <span style={{marginRight: 10, color:'#1e3a5f', fontWeight:'bold', display:'flex', alignItems:'center'}}>💾 Memproses...</span>}
-           <button className="btn btn-primary" onClick={generateExcel}>📥 Unduh .xlsx</button>
            <button className="btn btn-outline" onClick={() => openPrintModal('harian')}>📄 Cetak Harian</button>
            <button className="btn btn-outline" onClick={() => openPrintModal('mingguan')}>📘 Cetak Mingguan</button>
            <button className="btn btn-outline" onClick={openDokumentasi}>📷 Buat Dokumentasi</button>
@@ -1164,7 +1217,8 @@ export default function LaporanPelaksanaanPage() {
                    <div style={{fontWeight:'bold', color:'#1e3a5f'}}>{printSelectedIds.length} baris dipilih</div>
                    <div>
                      <button className="btn btn-outline" style={{marginRight:10}} onClick={() => setPrintModalInfo({open:false, type:''})}>Batal</button>
-                     <button className="btn btn-primary" disabled={printSelectedIds.length===0} onClick={executePrintBatch}>🖨️ Mulai Print</button>
+                     <button className="btn btn-secondary" style={{marginRight:10, background:'#16a34a', color:'white', borderColor:'#16a34a'}} disabled={printSelectedIds.length===0} onClick={executeExcelBatch}>📊 Unduh XLSX Format Master</button>
+                     <button className="btn btn-primary" disabled={printSelectedIds.length===0} onClick={executePrintBatch}>🖨️ Mulai Print PDF</button>
                    </div>
                </div>
            </div>
