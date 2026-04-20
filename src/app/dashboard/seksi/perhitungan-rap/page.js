@@ -81,6 +81,9 @@ export default function PerhitunganRapPage() {
      totalCostPersonil: 0,
      grandTotalRab: 0
   });
+  // Output State
+  const [stas, setStas] = useState([]);
+  const [totalVol, setTotalVol] = useState(0);
 
   // Domino Effect Chain Recalculator
   useEffect(() => {
@@ -110,10 +113,6 @@ export default function PerhitunganRapPage() {
          totalCostBbm: costBbm, totalCostSewa: costSewa, totalCostPersonil: costPersonil, grandTotalRab: grandTotal
      });
   }, [planParams, totalVol, financeParams]);
-
-  // Output State
-  const [stas, setStas] = useState([]);
-  const [totalVol, setTotalVol] = useState(0);
 
   // Fetch Session
   useEffect(() => {

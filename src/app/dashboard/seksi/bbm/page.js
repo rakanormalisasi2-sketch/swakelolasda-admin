@@ -201,6 +201,50 @@ export default function BBMPage() {
     return groups;
   }, [bbmPemakaian]);
 
+  const generateExcelBBM = async () => {
+    const dataToExport = activeTab === 'pemakaian' ? bbmPemakaian : bbmPengadaan;
+    if (dataToExport.length === 0) return alert('Tidak ada data untuk diekspor!');
+
+    const wsData = dataToExport.map((row, i) => {
+      if (activeTab === 'pemakaian') {
+        return {
+          'No': i + 1,
+          'Tanggal': new Date(row.tanggal_kirim).toLocaleDateString('id-ID'),
+          'Pekerjaan': row.kegiatan || '-',
+          'Nama/Tipe Alat': row.tipe_alat || '-',
+          'Desa': row.desa || '-',
+          'Kecamatan': row.kecamatan || '-',
+          'Volume BBM (L/HARI)': row.jumlah_liter || 0,
+          'Total Uang (Rp)': (row.jumlah_liter * 11000).toLocaleString('id-ID'),
+          'Seksi PJ': row.seksi || '-',
+        };
+      } else {
+         return {
+          'No': i + 1,
+          'Tanggal Pesan': new Date(row.tanggal_pesan).toLocaleDateString('id-ID'),
+          'Tanggal Terima': new Date(row.tanggal_terima).toLocaleDateString('id-ID'),
+          'Jumlah Pengadaan (Liter)': row.jumlah_liter || 0,
+          'Keterangan / Supplier': row.keterangan || '-'
+        };
+      }
+    });
+
+    const XLSX = await import('xlsx');
+    const ws = XLSX.utils.json_to_sheet(wsData);
+    
+    ws['!cols'] = activeTab === 'pemakaian' ? [
+       {wch: 4}, {wch: 12}, {wch: 35}, {wch: 25}, {wch: 15}, {wch: 15}, {wch: 15}, {wch: 18}, {wch: 15}
+    ] : [
+       {wch: 4}, {wch: 15}, {wch: 15}, {wch: 20}, {wch: 30}
+    ];
+
+    const wb = XLSX.utils.book_new();
+    const sheetName = activeTab === 'pemakaian' ? 'BBM_Keluar' : 'BBM_Masuk';
+    XLSX.utils.book_append_sheet(wb, ws, sheetName);
+    
+    XLSX.writeFile(wb, `Laporan_${sheetName}_${tahunAnggaran}.xlsx`);
+  };
+
   const totalPengadaan = bbmPengadaan.reduce((sum, item) => sum + Number(item.jumlah_liter), 0);
   const totalPemakaian = bbmPemakaian.reduce((sum, item) => sum + Number(item.jumlah_liter), 0);
   const sisaStok = totalPengadaan - totalPemakaian;
@@ -227,6 +271,9 @@ export default function BBMPage() {
           </button>
           <button className="btn btn-outline" onClick={() => { setModalType('pengadaan'); setShowModal(true); }}>
             + Input Pengadaan
+          </button>
+          <button className="btn btn-primary" style={{background:'#10b981', borderColor:'#10b981'}} onClick={generateExcelBBM}>
+            📥 Unduh Excel
           </button>
         </div>
       </div>
