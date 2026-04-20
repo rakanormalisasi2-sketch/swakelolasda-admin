@@ -41,6 +41,7 @@ export default function BBMPage() {
         .from('assignments')
         .select('*, equipment:heavy_equipment(name, merk_type, nomor_lambung)')
         .eq('created_by_role', profile.role)
+        .eq('status', 'active')
         .order('start_date', { ascending: false });
       
       setAssignments(assignmentsData || []);
