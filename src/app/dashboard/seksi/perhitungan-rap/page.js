@@ -13,15 +13,20 @@ export default function PerhitunganRapPage() {
   // KOP Data (Title Block)
   const [kopData, setKopData] = useState({
     program: 'PROGRAM PENGELOLAAN SUMBER DAYA AIR (SDA)',
-    kegiatan: 'PENGELOLAAN SDA DAN BANGUNAN PENGAMAN PANTAI...',
-    pekerjaan: 'NORMALISASI SUNGAI X',
-    lokasi: 'DESA X, KECAMATAN Y',
+    kegiatan: 'PENGELOLAAN SDA DAN BANGUNAN PENGAMAN PANTAI PADA WILAYAH SUNGAI LINTAS DAERAH KABUPATEN/KOTA',
+    pekerjaan: 'NORMALISASI SUNGAI',
+    lokasi: '',
     tahun: new Date().getFullYear(),
     judul_gambar: 'CROSS SECTION',
     kode_gambar: 'NS-01',
     no_lembar: 1,
     jumlah_lembar: 5
   });
+
+  // DB Sync State
+  const [assignments, setAssignments] = useState([]);
+  const [showSyncModal, setShowSyncModal] = useState(false);
+  const [selectedJobText, setSelectedJobText] = useState('Pilih Laporan Lapangan...');
 
   // Input Parameter Utama Galian / Timbunan (TAB 1)
   const [params, setParams] = useState({
@@ -74,13 +79,60 @@ export default function PerhitunganRapPage() {
         
         // Auto isi program kegiatan berdasarkan seksi
         if(prof?.role === 'seksi_normalisasi') {
-          setKopData(prev => ({...prev, program: 'PROGRAM PENGELOLAAN SUMBER DAYA AIR (SDA)', kegiatan: 'PENGELOLAAN SDA DAN BANGUNAN PENGAMAN PANTAI PADA WILAYAH SUNGAI LINTAS DAERAH...'}));
+          setKopData(prev => ({...prev, program: 'PROGRAM PENGELOLAAN SUMBER DAYA AIR (SDA)', kegiatan: 'PENGELOLAAN SDA DAN BANGUNAN PENGAMAN PANTAI PADA WILAYAH SUNGAI LINTAS DAERAH KABUPATEN/KOTA'}));
+        }
+
+        // Fetch DB1 Assignments for Sync
+        const { data: assignData } = await supabase
+          .from('assignments')
+          .select('id, location_village, location_district, job_type, job_sub_type, equipment:heavy_equipment(name)')
+          .eq('created_by_role', prof?.role)
+          .eq('status', 'active');
+        
+        // Fetch DB2 BBM Data for Sync aggregation
+        let bbmMapData = {};
+        try {
+           const res = await fetch(`/api/bbm/pemakaian?seksi=${prof?.role}`);
+           if(res.ok) {
+              const bbmJson = await res.json();
+              (bbmJson.data || []).forEach(b => {
+                 if(!bbmMapData[b.assignment_id]) bbmMapData[b.assignment_id] = 0;
+                 bbmMapData[b.assignment_id] += Number(b.jumlah_liter || 0); // Aggregate total BBM
+              });
+           }
+        } catch(e) {}
+
+        if(assignData) {
+           const enriched = assignData.map(a => ({
+               ...a,
+               totalBbm: bbmMapData[a.id] || 0
+           }));
+           setAssignments(enriched);
         }
       }
       setLoading(false);
     }
     loadSession();
   }, [supabase]);
+
+  const handleSelectReport = (assign) => {
+     // Sinkronisasi otomatis ke UI (Kebutuhan Realisasi)
+     setPlanParams({...planParams, targetVolBBM: assign.totalBbm || 1});
+     
+     // Otomatis susun field Kop Gambar
+     const pekStr = `${assign.job_type} ${assign.job_sub_type}`.toUpperCase();
+     const lokStr = `DESA ${assign.location_village}, KEC. ${assign.location_district}`.toUpperCase();
+     
+     setKopData({
+        ...kopData,
+        pekerjaan: pekStr,
+        lokasi: lokStr,
+        kode_gambar: pekStr.split(' ').map(s=>s[0]).join('') + '-01'
+     });
+
+     setSelectedJobText(`${pekStr} - ${lokStr} (Total BBM Realisasi: ${assign.totalBbm} Ltr)`);
+     setShowSyncModal(false);
+  };
 
   // Recalculate STA anytime params change
   useEffect(() => {
@@ -259,11 +311,13 @@ export default function PerhitunganRapPage() {
                       {/* Simulasi Grouping/Bridging Laporan Lapangan */}
                       <div className="form-group">
                          <label className="form-label">Tarik Laporan Pelaksanaan Operator</label>
-                         <button className="btn btn-secondary" style={{width: '100%', justifyContent:'center'}}>Pilih Laporan Mingguan...</button>
-                         <span className="text-xs text-muted" style={{marginTop:8, display:'block'}}>Saat diklik, narik data dari `operator_logs` sebagai ceiling-limit Goalseek.</span>
+                         <button className="btn btn-secondary" style={{width: '100%', justifyContent:'center'}} onClick={()=>setShowSyncModal(true)}>
+                            {selectedJobText}
+                         </button>
+                         <span className="text-xs text-muted" style={{marginTop:8, display:'block'}}>Saat diklik, narik total BBM Kumulatif riil dari `DB2/BBM` sebagai patokan volume Goalseek. Pilihan ini juga akan merapikan auto-fill KOP Gambar.</span>
                       </div>
                       <div className="form-group" style={{marginTop:15}}>
-                         <label className="form-label" style={{color:'#0f766e'}}>Target Sinkronisasi Volume Realisasi (m³)</label>
+                         <label className="form-label" style={{color:'#0f766e'}}>Target Sinkronisasi Total Konsumsi BBM Logistik (Liter)</label>
                          <input type="number" className="form-control" style={{background:'#f0fdf4', border:'1px solid #16a34a', fontWeight:'bold'}} value={planParams.targetVolBBM} onChange={e=>setPlanParams({...planParams, targetVolBBM: Number(e.target.value)})} />
                       </div>
                    </div>
@@ -337,6 +391,44 @@ export default function PerhitunganRapPage() {
               <div style={{background:'#f8fafc', border:'1px dashed #cbd5e1', padding:40, textAlign:'center'}}>
                  <p style={{color:'#64748b', fontSize:14}}>[Image Placeholder]</p>
                  <p style={{color:'#94a3b8', fontSize:12}}>User diminta menyiapkan screenshot {pedomanImage} ke folder public/assets/</p>
+              </div>
+           </div>
+        </div>
+      )}
+
+      {/* MODAL PILIH SINKRONISASI LAPORAN */}
+      {showSyncModal && (
+        <div style={{position:'fixed', top:0, left:0, right:0, bottom:0, background:'rgba(0,0,0,0.5)', zIndex:999, display:'flex', justifyContent:'center', alignItems:'center'}}>
+           <div style={{background:'#fff', padding: 20, borderRadius:8, width: 700, maxWidth:'90%'}}>
+              <div style={{display:'flex', justifyContent:'space-between', marginBottom:15}}>
+                 <strong style={{fontSize:18}}>Pilih Rekap Pelaksanaan Lapangan (Sinkronisasi DB1 & DB2)</strong>
+                 <button onClick={()=>setShowSyncModal(false)} style={{fontWeight:'bold'}}>X Tutup</button>
+              </div>
+              <div style={{maxHeight: 400, overflowY:'auto', border:'1px solid #e2e8f0', borderRadius:6}}>
+                 {assignments.length === 0 ? <div style={{padding:20, textAlign:'center'}}>Tidak ada data penugasan aktif.</div> : (
+                   <table className="table" style={{width:'100%', borderCollapse:'collapse'}}>
+                     <thead style={{background:'#f8fafc', position:'sticky', top:0}}>
+                        <tr>
+                          <th style={{padding:10, textAlign:'left', borderBottom:'1px solid #cbd5e1'}}>Pekerjaan</th>
+                          <th style={{padding:10, textAlign:'left', borderBottom:'1px solid #cbd5e1'}}>Lokasi</th>
+                          <th style={{padding:10, textAlign:'center', borderBottom:'1px solid #cbd5e1'}}>Total Realisasi BBM (DB2)</th>
+                          <th style={{padding:10, textAlign:'center', borderBottom:'1px solid #cbd5e1'}}>Aksi</th>
+                        </tr>
+                     </thead>
+                     <tbody>
+                        {assignments.map(a => (
+                           <tr key={a.id} style={{borderBottom:'1px solid #e2e8f0'}}>
+                              <td style={{padding:10}}><b>{a.job_type}</b> {a.job_sub_type}<br/><small className="text-muted">{a.equipment?.name}</small></td>
+                              <td style={{padding:10}}>Desa {a.location_village}, Kec {a.location_district}</td>
+                              <td style={{padding:10, textAlign:'center', color:'#b91c1c', fontWeight:'bold'}}>{a.totalBbm} Ltr</td>
+                              <td style={{padding:10, textAlign:'center'}}>
+                                 <button className="btn btn-primary btn-sm" onClick={() => handleSelectReport(a)}>Pilih Tugas Ini</button>
+                              </td>
+                           </tr>
+                        ))}
+                     </tbody>
+                   </table>
+                 )}
               </div>
            </div>
         </div>
