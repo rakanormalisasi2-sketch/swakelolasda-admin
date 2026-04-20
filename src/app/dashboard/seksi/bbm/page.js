@@ -80,8 +80,23 @@ export default function BBMPage() {
 
   // Handle assignment selection to auto-fill Pemakaian form
   const handleAssignmentChange = (aId) => {
+    if (aId === '00000000-0000-0000-0000-000000000000') {
+      setFormPemakaian({
+        ...formPemakaian,
+        assignment_id: aId,
+        kegiatan: '',
+        tipe_alat: '',
+        desa: '',
+        kecamatan: ''
+      });
+      return;
+    }
+
     const asgn = assignments.find(a => a.id === aId);
-    if(!asgn) return;
+    if(!asgn) {
+      setFormPemakaian({...formPemakaian, assignment_id: aId});
+      return;
+    }
     
     let kegiatanStr = '';
     if (asgn.job_type === 'lainnya') {
@@ -324,10 +339,13 @@ export default function BBMPage() {
                       <div className="form-group">
                          <label className="form-label">Penugasan Terkait *</label>
                          <select className="form-control" required value={formPemakaian.assignment_id} onChange={(e) => handleAssignmentChange(e.target.value)}>
-                           <option value="">— Pilih Penugasan (Otomatis isi Rincian) —</option>
+                           <option value="">— Pilih Penugasan (Atau Pilih Manual) —</option>
+                           <option value="00000000-0000-0000-0000-000000000000" style={{fontWeight:'bold', color:'#2563eb'}}>✏️ INPUT MANUAL (TANPA PENUGASAN)</option>
+                           <optgroup label="Daftar Penugasan Aktif & Selesai">
                            {assignments.map(a => (
                              <option key={a.id} value={a.id}>{a.location_village} — {a.equipment?.name || 'Alat'} ({new Date(a.start_date).toLocaleDateString('id-ID')})</option>
                            ))}
+                           </optgroup>
                          </select>
                       </div>
                       <div className="form-group">

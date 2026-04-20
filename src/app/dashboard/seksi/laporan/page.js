@@ -64,6 +64,7 @@ export default function LaporanPelaksanaanPage() {
   const [kolomManagerOpen, setKolomManagerOpen] = useState(false);
   const [savingKolom, setSavingKolom] = useState(false);
   const [bbmMap, setBbmMap] = useState({}); // Kumpulan data BBM dari DB2
+  const [tahunLaporan, setTahunLaporan] = useState(new Date().getFullYear().toString());
 
   
   // Modals Data & Flow
@@ -124,6 +125,8 @@ export default function LaporanPelaksanaanPage() {
             equipment:heavy_equipment(name, merk_type, nomor_lambung)
           `)
           .in('assignment_id', assignmentIds)
+          .gte('tanggal', `${tahunLaporan}-01-01`)
+          .lte('tanggal', `${tahunLaporan}-12-31`)
           .order('assignment_id', { ascending: true })
           .order('tanggal', { ascending: true });
 
@@ -177,7 +180,7 @@ export default function LaporanPelaksanaanPage() {
     } finally {
       setLoading(false);
     }
-  }, [profile]);
+  }, [profile, filterTab, tahunLaporan]);
 
   useEffect(() => { loadData(); }, [loadData]);
 
@@ -858,7 +861,13 @@ export default function LaporanPelaksanaanPage() {
       </div>
 
       <div className="page-body" style={{padding: '0 20px 20px 20px'}}>
-        <div style={{display:'flex', gap: 10, marginBottom: 15}}>
+        <div style={{display:'flex', gap: 10, marginBottom: 15, alignItems:'center'}}>
+           <select className="form-control" style={{width:140, fontWeight:'bold'}} value={tahunLaporan} onChange={e=>setTahunLaporan(e.target.value)}>
+             <option value="2024">Tahun 2024</option>
+             <option value="2025">Tahun 2025</option>
+             <option value="2026">Tahun 2026</option>
+             <option value="2027">Tahun 2027</option>
+           </select>
            {['semua', 'active', 'finished'].map(t => (
               <button key={t} onClick={() => setFilterTab(t)} style={{
                   padding: '8px 16px', background: filterTab === t ? '#1e3a8a' : '#e2e8f0',
