@@ -1,5 +1,6 @@
 'use client';
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
+import * as XLSX from 'xlsx';
 import { supabase } from '@/lib/supabase';
 import { generateSmartSTA, CALC_CONSTANTS, doGoalSeek, calculateFuelPerHour, MASTER_EXCAVATOR_SPECS } from '@/utils/calcRapMath';
 import DrawCrossSection from '@/components/DrawCrossSection';
@@ -219,6 +220,55 @@ export default function PerhitunganRapPage() {
 
   const handlePrint = () => {
     window.print();
+  };
+
+  const handleExportExcel = () => {
+    // Susun Data Lembar 1: Rekapitulasi RAB (Kolom Vertikal)
+    const ws1Data = [
+       ["RENCANA ANGGARAN PELAKSANAAN (RAP) - KEBUTUHAN REALISASI"],
+       [""],
+       ["A. INFORMASI UMUM"],
+       ["Program", kopData.program],
+       ["Kegiatan", kopData.kegiatan],
+       ["Pekerjaan", kopData.pekerjaan],
+       ["Lokasi", kopData.lokasi],
+       ["Kelas Alat", MASTER_EXCAVATOR_SPECS[planParams.selectedMasterAlat]?.name || planParams.selectedMasterAlat],
+       [""],
+       ["B. PERHITUNGAN TERMODINAMIKA & KINERJA"],
+       ["Volume Total Geometris (m³)", totalVol.toFixed(3)],
+       ["Waktu Siklus T1 (Menit)", dominoEffects.waktuSiklusT1.toFixed(3)],
+       ["Target Galian Per Jam Q1 (m³/Jam)", dominoEffects.q1Target.toFixed(3)],
+       ["Total Jam Operasional Termodinamika (Jam)", dominoEffects.totalJamOperasional.toFixed(2)],
+       ["Total Hari Operasional Kehadiran DB (HOK)", planParams.realisasiHOK],
+       ["Volume BBM Laporan Logistik (Liter)", planParams.targetVolBBM],
+       [""],
+       ["C. REKAPITULASI BIAYA RAB (Rp)"],
+       ["Uraian", "Kuantitas", "Satuan", "Harga Satuan (Rp)", "Jumlah Harga (Rp)"],
+       ["BBM Solar Khusus", planParams.targetVolBBM, "Liter", financeParams.hargaSolar, dominoEffects.totalCostBbm],
+       ["Sewa Alat Excavator", Number(dominoEffects.totalJamOperasional.toFixed(2)), "Jam", financeParams.hargaSewa, dominoEffects.totalCostSewa],
+       ["Upah Personil HOK", planParams.realisasiHOK, "HOK", (financeParams.upahMandor + financeParams.upahPekerja), dominoEffects.totalCostPersonil],
+       ["", "", "", "SUB-TOTAL BIAYA", dominoEffects.grandTotalRab]
+    ];
+    
+    // Susun Data Lembar 2: Rincian Dimensi STA Geometris
+    const ws2Data = [
+       ["RINCIAN PENAMPANG LINTANG (CROSS SECTION) PER STA"],
+       ["Panjang Total (m)", params.panjang],
+       [""],
+       ["No", "Label STA", "Lebar Dasar - B (m)", "Kedalaman - H (m)", "Slope (1:m)", "Titik Kumulatif (m)"]
+    ];
+    stas.forEach((s, i) => {
+       ws2Data.push([i+1, s.sta, s.wDasar.toFixed(3), s.h.toFixed(3), params.mSlope, s.lengthAt.toFixed(2)]);
+    });
+
+    const wb = XLSX.utils.book_new();
+    const ws1 = XLSX.utils.aoa_to_sheet(ws1Data);
+    const ws2 = XLSX.utils.aoa_to_sheet(ws2Data);
+    
+    XLSX.utils.book_append_sheet(wb, ws1, "RAB Realisasi");
+    XLSX.utils.book_append_sheet(wb, ws2, "Dimensi Geometris");
+    
+    XLSX.writeFile(wb, `Laporan_RAP_${kopData.kode_gambar}.xlsx`);
   };
 
   if (loading) return <div style={{padding:40, textAlign:'center'}}>Memuat modul perhitungan...</div>;
@@ -584,7 +634,8 @@ export default function PerhitunganRapPage() {
               <div className="card">
                    <div className="card-header bg-slate-50"><strong className="card-title">Cetak Lembar Keuangan & Realisasi</strong></div>
                    <div className="modal-body" style={{textAlign:'center', padding:20}}>
-                       <button className="btn btn-primary" onClick={handlePrint} style={{width:'100%', padding:20, fontSize:16}} disabled={planParams.targetVolBBM === 0}>🖨️ Cetak Dokumen RAP Lengkap (PDF)</button>
+                       <button className="btn btn-primary" onClick={handlePrint} style={{width:'100%', padding:20, fontSize:16, marginBottom:10}} disabled={planParams.targetVolBBM === 0}>🖨️ Cetak Dokumen RAP Lengkap (PDF)</button>
+                       <button className="btn btn-secondary" onClick={handleExportExcel} style={{width:'100%', padding:15, fontSize:14, background:'#16a34a', color:'white', borderColor:'#15803d'}} disabled={planParams.targetVolBBM === 0}>📊 Unduh Format Excel (.XLSX)</button>
                        <p className="text-muted text-xs" style={{marginTop:16}}>Dokumen akan merangkul Lembar RAB Final yang Absolut Sinkron dengan Cross-Section Geometri yang tervalidasi Goalseek.</p>
                    </div>
               </div>
