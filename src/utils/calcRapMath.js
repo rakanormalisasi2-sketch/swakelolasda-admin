@@ -1,125 +1,777 @@
-export const CALC_CONSTANTS = {
-  // AHSP SNI Soil Factors
-  SOIL_FACTOR: {
-    biasa: 1.20, // Swelling 20%
-    keras: 1.25, // Formasi 25%
-    lumpur: 1.50
+'use client';
+
+/**
+ * calcRapMath.js
+ * Core Engine untuk Modul Perhitungan RAP
+ *
+ * Implementasi sesuai WORKFLOW_GUIDE.md dan FINAL_IMPLEMENTATION_PLAN.md
+ * Goal: Sisa BBM = 40-100 liter, bukan 0
+ */
+
+// =====================
+// SNI REFERENCE TABLES
+// =====================
+
+/**
+ * Tabel Waktu Siklus SNI untuk validasi hasil GoalSeek
+ * Format: { min, max, standar, keterangan }
+ *
+ * Referensi: Tabel standar SNI untuk excavator
+ * - Jika T.1 < min: Equipment terlalu efisien (perlu verifikasi)
+ * - Jika T.1 > max: Ada waktu non-produktif
+ */
+export const SNI_WAKTU_SIKLUS = {
+  'PC50': {
+    min: 0.28,
+    max: 0.35,
+    standar: 0.3108,
+    keterangan: 'PC 50 - Mini Excavator'
+  },
+  'PC75': {
+    min: 0.58,
+    max: 0.72,
+    standar: 0.6454,
+    keterangan: 'PC 75 - Standard'
+  },
+  'PC100': {
+    min: 1.14,
+    max: 1.40,
+    standar: 1.2727,
+    keterangan: 'PC 100 - Medium'
+  },
+  'PC200': {
+    min: 0.31,
+    max: 0.66,
+    standar: 0.6594,
+    keterangan: 'PC 200 - Standard'
+  },
+  'PC200LA': {
+    min: 2.59,
+    max: 3.17,
+    standar: 2.8763,
+    keterangan: 'PC 200 Long Arm'
   }
 };
 
-export const MASTER_EXCAVATOR_SPECS = {
-  'PC50': { name: 'Excavator Standard PC 50', hp: 39, bucket: 0.22 },
-  'PC75': { name: 'Excavator Standard PC 75', hp: 60, bucket: 0.30 },
-  'PC100': { name: 'Excavator Standard PC 100', hp: 75, bucket: 0.40 },
-  'PC200': { name: 'Excavator Standard PC 200', hp: 138, bucket: 0.90 },
-  'PC200LA': { name: 'Excavator PC 200 Long Arm', hp: 138, bucket: 0.50 }
+/**
+ * Load Factor berdasarkan jenis excavator
+ */
+export const LOAD_FACTOR = {
+  'PC50': 0.28,
+  'PC75': 0.28,
+  'PC100': 0.28,
+  'PC200': 0.28,
+  'PC200LA': 0.40  // Long Arm lebih boros
 };
 
 /**
- * Formula Konsumsi BBM (Modul Termodinamika AHSP 2026 / Jurnal)
- * L/Jam = HP * Load Factor * Specific Fuel Consumption (SFC dalam L/kWh) * Konstanta Konversi HP ke kW
+ * Master Excavator Specifications (SESUAI EXCEL MASTER)
  */
-export function calculateFuelPerHour(hp, loadFactor, sfc) {
-   const KW_PER_HP = 0.7457;
-   // Liter / Jam = Power_Dikeluarkan (kW) * Spesific Fuel Consumption (L/kWh)
-   // Power_Dikeluarkan (kW) = HP * Kw_Per_Hp * Load Factor   
-   const lJam = hp * KW_PER_HP * loadFactor * sfc;
-   return lJam;
+export const MASTER_EXCAVATOR_SPECS = {
+  'PC50': {
+    name: 'Excavator PC 50',
+    hp: 41.7,
+    bucket: 0.22,
+    fb: 1.0,    // Faktor Bucket
+    fa: 0.8,    // Efisiensi Alat
+    loadFactor: 0.28
+  },
+  'PC75': {
+    name: 'Excavator PC 75',
+    hp: 57,
+    bucket: 0.31,
+    fb: 1.0,
+    fa: 0.8,
+    loadFactor: 0.28
+  },
+  'PC100': {
+    name: 'Excavator PC 100',
+    hp: 94,
+    bucket: 0.65,
+    fb: 1.0,
+    fa: 0.8,
+    loadFactor: 0.28
+  },
+  'PC200': {
+    name: 'Excavator PC 200',
+    hp: 148,    // BENAR, bukan 138
+    bucket: 0.9,
+    fb: 1.0,
+    fa: 0.7,   // BENAR
+    loadFactor: 0.28
+  },
+  'PC200LA': {
+    name: 'Excavator PC 200 Long Arm',
+    hp: 148,
+    bucket: 0.46,
+    fb: 1.0,
+    fa: 0.75,
+    loadFactor: 0.40   // Load Factor lebih tinggi untuk Long Arm
+  }
+};
+
+/**
+ * Tabel SNI untuk Bucket Factor (Fb)
+ */
+export const SNI_BUCKET_FACTOR = {
+  pasir: { min: 0.8, max: 1.0, difficulty: 'Mudah' },
+  tanahBiasa: { min: 0.6, max: 0.8, difficulty: 'Sedang' },
+  berbatu: { min: 0.5, max: 0.6, difficulty: 'Agak Sulit' },
+  batu: { min: 0.4, max: 0.5, difficulty: 'Sulit' }
+};
+
+/**
+ * Tabel SNI untuk Efisiensi Alat (Fa)
+ */
+export const SNI_EFFICIENCY_FACTOR = {
+  baikSekali: [0.83, 0.81, 0.76],
+  baik: [0.78, 0.75, 0.71],
+  sedang: [0.72, 0.69, 0.65]
+};
+
+// =====================
+// CALCULATION FUNCTIONS
+// =====================
+
+/**
+ * Hitung Kapasitas Produksi per Jam (Q1)
+ * Rumus: Q1 = (V × Fb × Fa × 60) / (T.1 × Fv × Fk)
+ */
+export function calculateQ1(v, fb, fa, t1, fv, fk) {
+  if (t1 === 0) return 0;
+  return (v * fb * fa * 60) / (t1 * fv * fk);
 }
 
 /**
- * Fungsi Smart STA Splitter
- * Input: { panjangTotal, lebarDasar, kedalamanTarget, slopeRasio }
- * Output: Array of 5 STA Objek [{ sta: "0+x", w, h, area, vol }, ...]
- * Requirement: Total agregat Volume harus sama absolut dengan volume master!
+ * Hitung Kapasitas Produksi per Hari (Q2)
+ * Rumus: Q2 = Q1 × Tk
  */
-export function generateSmartSTA(panjang, wDasar, hTarget, mSlope) {
-    const segments = 5;
-    const interval = panjang / (segments - 1);
-    
-    // Target murni dari 1 Prisma ideal
-    const wAtasTarget = wDasar + 2 * (mSlope * hTarget);
-    const areaTarget = ((wDasar + wAtasTarget) / 2) * hTarget;
-    const volumeTarget = areaTarget * panjang; // Target master mutlak
-
-    let stas = [];
-    let cumulativeLength = 0;
-
-    // 1. Generate Raw Variations (Deviasi max 5%)
-    for(let i=0; i<segments; i++) {
-        let label = `0+${String(Math.round(cumulativeLength)).padStart(3, '0')}`;
-        
-        // Pseudo-random variance between 0.95 and 1.05
-        let varianceW = 1 + (Math.sin(i * 13) * 0.05); 
-        let varianceH = 1 + (Math.cos(i * 17) * 0.05);
-
-        let curW = wDasar * varianceW;
-        let curH = hTarget * varianceH;
-
-        stas.push({
-            sta: label,
-            wDasar: curW,
-            h: curH,
-            lengthAt: cumulativeLength
-        });
-
-        cumulativeLength += interval;
-    }
-
-    // 2. Hitung Raw Volume dengan Rumus Kesalahan (Average End Area)
-    let rawTotalVolume = 0;
-    for(let i=0; i<segments-1; i++) {
-        let s1 = stas[i];
-        let s2 = stas[i+1];
-        
-        // Hitung luas s1
-        let wa1 = s1.wDasar + 2*(mSlope * s1.h);
-        let a1 = ((s1.wDasar + wa1)/2) * s1.h;
-
-        // Hitung luas s2
-        let wa2 = s2.wDasar + 2*(mSlope * s2.h);
-        let a2 = ((s2.wDasar + wa2)/2) * s2.h;
-
-        let volPias = ((a1 + a2)/2) * interval;
-        rawTotalVolume += volPias;
-    }
-
-    // 3. Kalkulasi Equalizer (Normalization Ratio)
-    // Karena Volume proporsional secara kubik/kuadratik terhadap dimensi (A ~ w*h)
-    // Kita gunakan perbandingan akar untuk normalisasi dimensi
-    const ratioArea = volumeTarget / rawTotalVolume;
-    const ratioLinier = Math.sqrt(ratioArea);
-
-    // 4. Terapkan Equalizer agar totalnya sama persis
-    stas = stas.map(s => ({
-        ...s,
-        wDasar: s.wDasar * ratioLinier,
-        h: s.h * ratioLinier
-    }));
-
-    return stas;
+export function calculateQ2(q1, tk = 8) {
+  return q1 * tk;
 }
 
 /**
- * Fungsi Goalseek (Bisection Method)
- * Mencari Waktu Siklus (T1) agar Volume Galian/Jam sesuai dengan target
+ * Hitung kW dari HP
+ * Rumus: kW = HP × 0.7457
  */
-export function doGoalSeek(targetGalianPerJam, { kapasitasBucket, faktorBucket, efisiensiAlat, faktorKembang }) {
-    // Rumus Dasar Produksi Excavator: Q = (V * Fb * Fa * 60) / (T1 * Fv)
-    // targetGalianPerJam = Q
-    // T1 = (V * Fb * Fa * 60) / (Q * Fv)
-    
-    // Dalam metode Bisection murni kita mencari f(x) = 0
-    // Namun karena fungsinya linier kebalikan (1/x), kita bisa pecah langsung secara analitis:
-    
-    let V = kapasitasBucket; // m3
-    let Fb = faktorBucket; 
-    let Fa = efisiensiAlat;
-    let Fv = faktorKembang; // Soil Swelling (1.2 normal)
+export function calculateKW(hp) {
+  return hp * 0.7457;
+}
 
-    if(targetGalianPerJam === 0) return 0;
+/**
+ * Hitung Konsumsi BBM per Jam (H)
+ * Rumus: H = Fd × Fe × LoadFactor × kW
+ * - Fd = Faktor Daya = waktu_gali / (T.1 × 60)
+ * - Fe = Faktor Efisiensi = 45 / 60 = 0.75 (45 menit efektif dari 60)
+ */
+export function calculateBBMConsumption(hp, loadFactor, waktuGali, t1) {
+  const kW = calculateKW(hp);
+  const Fe = 45 / 60; // 0.75
+  const Fd = waktuGali / (t1 * 60);
+  const H = Fd * Fe * loadFactor * kW;
+  return H;
+}
 
-    let targetMenitT1 = (V * Fb * Fa * 60) / (targetGalianPerJam * Fv);
-    
-    return targetMenitT1;
+/**
+ * Hitung Konsumsi BBM per Jam (Fuel per Hour)
+ * Digunakan untuk laporan Hourmeter
+ * Rumus: L/jam = HP × LoadFactor × Specific Fuel Consumption
+ */
+export function calculateFuelPerHour(hp, loadFactor, specificFuelConsumption = 0.22) {
+  return hp * loadFactor * specificFuelConsumption;
+}
+
+/**
+ * Hitung semua parameter analisa perencanaan
+ */
+export function calculateAnalisaRencana(volumeTarget, params) {
+  const {
+    hp = 148,
+    bucket = 0.9,
+    fb = 1.0,
+    fa = 0.7,
+    fv = 0.8,
+    fk = 0.8,
+    loadFactor = 0.28,
+    feMenit = 45,
+    waktuGali = 38,
+    tk = 8
+  } = params;
+
+  // Hitung T.1 (Waktu Siklus) dari GoalSeek
+  // Target: Q1 = Volume / (tk × estimasiHari)
+  // Q1 = Volume / (tk × estimasiHari)
+  // T.1 = (bucket × fb × fa × 60) / (Q1 × fv × fk)
+
+  // Untuk initial calculation, gunakan T.1 standar
+  const t1Standar = SNI_WAKTU_SIKLUS['PC200'].standar;
+
+  // Hitung Q1
+  const q1 = calculateQ1(bucket, fb, fa, t1Standar, fv, fk);
+
+  // Hitung Q2
+  const q2 = calculateQ2(q1, tk);
+
+  // Hitung estimasi hari
+  const estimasiHari = Math.ceil(volumeTarget / q2);
+
+  // Hitung kW
+  const kW = calculateKW(hp);
+
+  // Hitung Fe
+  const Fe = feMenit / 60;
+
+  // Hitung Fd
+  const Fd = waktuGali / (t1Standar * 60);
+
+  // Hitung H (BBM per jam)
+  const H = Fd * Fe * loadFactor * kW;
+
+  // Hitung h2 (BBM per hari)
+  const h2 = H * tk;
+
+  // Hitung koefisien BBM
+  const koefBBM = H / q1;
+
+  // Hitung total solar
+  const totalSolar = volumeTarget * koefBBM;
+
+  return {
+    tk,
+    fk,
+    hp,
+    bucket,
+    fb,
+    fa,
+    fv,
+    loadFactor,
+    feMenit,
+    waktuGali,
+    t1: t1Standar,
+    fd: Fd,
+    kW,
+    fe: Fe,
+    q1,
+    q2,
+    H,
+    h2,
+    koefBBM,
+    estimasiHari,
+    totalSolar,
+    volumeTarget
+  };
+}
+
+// =====================
+// GOALSEEK FUNCTIONS
+// =====================
+
+/**
+ * GoalSeek untuk TAB 3: Kebutuhan Realisasi
+ *
+ * Target:
+ * 1. Sisa BBM akhir = 40-100 liter (ideal: 70 liter)
+ * 2. Total Galian ≈ Target Volume (±5%)
+ * 3. Sisa BBM TIDAK boleh minus
+ */
+export function goalSeekSisaBBM(input, params) {
+  const { totalBBMditerima, totalJamKerja, targetVolume, targetSisaIdeal = 70 } = input;
+  const { hp, bucket, fb, fa, fv, fk, loadFactor, feMenit, waktuGali } = params;
+
+  // STEP 1: Target BBM terpakai
+  const bbmTerpakaiTarget = totalBBMditerima - targetSisaIdeal;
+
+  // STEP 2: H (BBM/Jam) yang dibutuhkan
+  const H = bbmTerpakaiTarget / totalJamKerja;
+
+  // STEP 3: kW dan Fe
+  const kW = calculateKW(hp);
+  const Fe = feMenit / 60;
+
+  // STEP 4: Fd dari H
+  // H = Fd × Fe × LoadFactor × kW
+  // Fd = H / (Fe × LoadFactor × kW)
+  const Fd = H / (Fe * loadFactor * kW);
+
+  // STEP 5: T.1 dari Fd
+  // Fd = waktuGali / (T.1 × 60)
+  // T.1 = waktuGali / (Fd × 60)
+  const t1 = waktuGali / (Fd * 60);
+
+  // STEP 6: Q1 dari T.1
+  const q1 = calculateQ1(bucket, fb, fa, t1, fv, fk);
+
+  // STEP 7: Hitung Total Galian dengan Q1 hasil GoalSeek
+  const totalGalian = q1 * totalJamKerja;
+
+  // STEP 8: Validasi deviasi
+  const deviasi = Math.abs((totalGalian - targetVolume) / targetVolume * 100);
+
+  // STEP 9: Jika deviasi > 5%, adjust
+  if (deviasi > 5) {
+    // Adjust: cari H yang membuat volume cocok
+    const q1Target = targetVolume / totalJamKerja;
+
+    // Q1 = (V × Fb × Fa × 60) / (T.1 × Fv × Fk)
+    // T.1 = (V × Fb × Fa × 60) / (Q1 × Fv × Fk)
+    const t1ForVolume = (bucket * fb * fa * 60) / (q1Target * fv * fk);
+
+    // Fd = waktuGali / (T.1 × 60)
+    const fdForVolume = waktuGali / (t1ForVolume * 60);
+
+    // H = Fd × Fe × LoadFactor × kW
+    const hForVolume = fdForVolume * Fe * loadFactor * kW;
+
+    // Sisa = Diterima - (H × Total Jam)
+    const sisaAkhir = totalBBMditerima - (hForVolume * totalJamKerja);
+
+    return {
+      success: sisaAkhir >= 40 && sisaAkhir <= 100,
+      h: hForVolume,
+      q1: q1Target,
+      t1: t1ForVolume,
+      fd: fdForVolume,
+      totalGalian: targetVolume,
+      totalBBMterpakai: hForVolume * totalJamKerja,
+      sisaAkhir,
+      targetSisa: targetSisaIdeal,
+      adjustReason: 'Volume deviation > 5%, adjusted to match volume'
+    };
+  }
+
+  return {
+    success: true,
+    h: H,
+    q1,
+    t1,
+    fd: Fd,
+    totalGalian,
+    totalBBMterpakai: H * totalJamKerja,
+    sisaAkhir: targetSisaIdeal,
+    targetSisa: targetSisaIdeal,
+    adjustReason: null
+  };
+}
+
+/**
+ * GoalSeek untuk TAB 4: Verifikasi T.1
+ *
+ * Input: H dari TAB 3 (yang sudah di-GoalSeek)
+ * Output: T.1 yang menghasilkan H tersebut + validasi SNI
+ */
+export function goalSeekT1Verifikasi(hDariTab3, params, selectedAlat = 'PC200') {
+  const { hp, feMenit, waktuGali } = params;
+
+  const kW = calculateKW(hp);
+  const Fe = feMenit / 60;
+  const LoadFactor = LOAD_FACTOR[selectedAlat] || 0.28;
+
+  // Fd = H / (Fe × LoadFactor × kW)
+  const Fd = hDariTab3 / (Fe * LoadFactor * kW);
+
+  // T.1 = waktuGali / (Fd × 60)
+  const t1 = waktuGali / (Fd * 60);
+
+  // Validasi terhadap standar SNI
+  const sniRange = SNI_WAKTU_SIKLUS[selectedAlat] || SNI_WAKTU_SIKLUS['PC200'];
+
+  const dalamRange = t1 >= sniRange.min && t1 <= sniRange.max;
+
+  let status, warning;
+  if (t1 < sniRange.min) {
+    status = 'TERLALU_CEPAT';
+    warning = '⚠️ T.1 lebih cepat dari standar. Equipment sangat efisien atau data perlu diverifikasi.';
+  } else if (t1 > sniRange.max) {
+    status = 'TERLALU_LAMBAT';
+    warning = '⚠️ T.1 lebih lambat dari standar. Ada waktu non-produktif (istirahat, maintenance, dll).';
+  } else {
+    status = 'WAJAR';
+    warning = null;
+  }
+
+  return {
+    t1,
+    fd: Fd,
+    h: hDariTab3,
+    kW,
+    dalamRange,
+    status,
+    warning,
+    sniMin: sniRange.min,
+    sniMax: sniRange.max,
+    sniStandar: sniRange.standar
+  };
+}
+
+// =====================
+// STA GENERATION FUNCTIONS
+// =====================
+
+/**
+ * Generate STA untuk Perencanaan
+ * Input: parameter geometri
+ * Output: array of 5 STA dengan variasi ±5%
+ */
+export function generateSTAPerencanaan(params) {
+  const {
+    panjang = 500,
+    b1 = 4.0,
+    b2 = 2.857,
+    b3 = 6.857,
+    h = 1.0,
+    hPrime = 2.5,
+    slope = 1,
+    lebarStripping = 3.0,
+    kedalamanStripping = 0.1
+  } = params;
+
+  const nSTA = 5;
+  const interval = panjang / (nSTA - 1); // 500/4 = 125m antar STA
+
+  let stas = [];
+  let cumulative = 0;
+
+  // Generate STA dengan variasi
+  for (let i = 0; i < nSTA; i++) {
+    // Variasi ±5% menggunakan sinus
+    const variansi = 1 + (Math.sin(i * 13) * 0.05);
+
+    const curB1 = b1 * variansi;
+    const curH = h * variansi;
+    // b2 dan b3 dihitung ulang berdasarkan slope
+    const curB2 = Math.max(curB1 - 2 * (slope * curH), 0.1);
+    const curB3 = curB1 + 2 * (slope * curH);
+
+    // Luasan trapezoid
+    const luas = ((curB1 + curB3) / 2) * curH;
+
+    stas.push({
+      sta: `0+${String(Math.round(cumulative)).padStart(3, '0')}`,
+      b1: curB1,
+      b2: curB2,
+      b3: curB3,
+      h: curH,
+      hPrime,
+      luas,
+      isSTA0: i === 0,
+      index: i
+    });
+
+    cumulative += interval;
+  }
+
+  // Hitung volume antar STA (average end area method)
+  let totalVolume = 0;
+  for (let i = 0; i < nSTA - 1; i++) {
+    const vol = ((stas[i].luas + stas[i + 1].luas) / 2) * interval;
+    stas[i].volume = vol;
+    stas[i].jarak = interval;
+    totalVolume += vol;
+  }
+  // STA terakhir
+  stas[nSTA - 1].volume = 0;
+  stas[nSTA - 1].jarak = 0;
+
+  // Hitung stripping
+  const totalStripping = (lebarStripping * kedalamanStripping * panjang);
+
+  return { stas, totalVolume, totalStripping };
+}
+
+/**
+ * Generate STA untuk Pelaksanaan
+ * Constraint: STA 0 = STA 0 TAB 1, Total = targetVolume
+ */
+export function generateSTAPelaksanaan(panjang, refSTA0, targetVolume) {
+  const nSTA = 5;
+  const interval = panjang / (nSTA - 1);
+
+  // STA 0 = sama persis dengan refSTA0
+  let stas = [{
+    ...refSTA0,
+    isSTA0: true
+  }];
+
+  // Volume STA 0
+  const volSTA0 = refSTA0.volume || 0;
+
+  // Volume sisa untuk STA 1-4
+  const volumeSisa = targetVolume - volSTA0;
+  const avgVolumePerSTA = volumeSisa / (nSTA - 1);
+
+  let cumulative = interval;
+
+  for (let i = 1; i < nSTA; i++) {
+    // Variasi 95%-105% dari rata-rata
+    const variansi = 0.95 + (Math.sin(i * 17) * 0.05);
+    const targetVol = avgVolumePerSTA * variansi;
+
+    // Reverse engineer dimensi dari target volume
+    // Luas = Volume / Interval
+    const luasTarget = targetVol / interval;
+
+    // Ambil dimensi dari refSTA0 sebagai base
+    const baseB1 = refSTA0.b1;
+    const baseH = refSTA0.h;
+    const slope = 1;
+
+    // Hitung faktor scaling untuk mencapai luasTarget
+    // Luas = ((b1 + b3) / 2) × h
+    // b3 = b1 + 2 × slope × h
+    // Luas = ((b1 + b1 + 2 × slope × h) / 2) × h
+    // Luas = (b1 + slope × h) × h
+    // Ini adalah persamaan kuadrat, tapi untuk simplify kita pakai scaling
+
+    const baseLuas = refSTA0.luas;
+    const scaleFactor = Math.sqrt(luasTarget / baseLuas);
+
+    const curB1 = baseB1 * scaleFactor;
+    const curH = baseH * scaleFactor;
+    const curB3 = curB1 + 2 * slope * curH;
+    const curB2 = curB1 - 2 * slope * curH;
+
+    stas.push({
+      sta: `0+${String(Math.round(cumulative)).padStart(3, '0')}`,
+      b1: curB1,
+      b2: Math.max(curB2, 0.1),
+      b3: curB3,
+      h: curH,
+      hPrime: refSTA0.hPrime,
+      luas: ((curB1 + curB3) / 2) * curH,
+      volume: targetVol,
+      jarak: interval,
+      isSTA0: false,
+      index: i
+    });
+
+    cumulative += interval;
+  }
+
+  // Normalisasi final agar total persis = targetVolume
+  const currentTotal = stas.reduce((sum, s) => sum + s.volume, 0);
+
+  if (Math.abs(currentTotal - targetVolume) > 0.01) {
+    const adjustment = targetVolume / currentTotal;
+    stas.forEach(s => {
+      s.volume *= adjustment;
+      s.luas *= adjustment;
+    });
+  }
+
+  return { stas, totalVolume: targetVolume };
+}
+
+// =====================
+// CROSS SECTION DATA GENERATION
+// =====================
+
+/**
+ * Generate koordinat untuk garis eksisting (meliuk-liuk natural)
+ */
+export function generateKonturEksisting(sta, numPoints = 15) {
+  const { b3, hPrime } = sta;
+  const points = [];
+
+  for (let i = 0; i < numPoints; i++) {
+    const x = (i / (numPoints - 1)) * b3;
+    // Add slight undulation (±10% dari tinggi)
+    const undulation = Math.sin(i * 1.5) * 0.1 * hPrime;
+    const y = hPrime + undulation;
+
+    points.push({ x, y });
+  }
+
+  return points;
+}
+
+/**
+ * Generate koordinat untuk garis rencana (trapesium)
+ */
+export function generateKonturRencana(sta) {
+  const { b1, b2, b3, h, hPrime, slope } = sta;
+
+  // Koordinat trapesium (searah jarum jam dari kiri atas)
+  return [
+    { x: 0, y: hPrime },                        // Kiri atas
+    { x: b3, y: hPrime },                       // Kanan atas
+    { x: b1 + (slope * h), y: hPrime - h },    // Kanan bawah
+    { x: -(slope * h), y: hPrime - h }         // Kiri bawah
+  ];
+}
+
+/**
+ * Generate path string SVG untuk kontur eksisting (smooth curve)
+ */
+export function generateEksistingPath(konturEksisting) {
+  if (!konturEksisting || konturEksisting.length < 2) return '';
+
+  // Create smooth curve menggunakan quadratic bezier
+  let path = `M ${konturEksisting[0].x} ${konturEksisting[0].y}`;
+
+  for (let i = 1; i < konturEksisting.length - 1; i++) {
+    const midX = (konturEksisting[i].x + konturEksisting[i + 1].x) / 2;
+    const midY = (konturEksisting[i].y + konturEksisting[i + 1].y) / 2;
+    path += ` Q ${konturEksisting[i].x} ${konturEksisting[i].y} ${midX} ${midY}`;
+  }
+
+  // Last segment
+  const last = konturEksisting[konturEksisting.length - 1];
+  path += ` L ${last.x} ${last.y}`;
+
+  return path;
+}
+
+/**
+ * Generate path string SVG untuk kontur rencana (trapesium)
+ */
+export function generateRencanaPath(konturRencana) {
+  return konturRencana.map((p, i) =>
+    i === 0 ? `M ${p.x} ${p.y}` : `L ${p.x} ${p.y}`
+  ).join(' ') + ' Z';
+}
+
+// =====================
+// EXPORT FORMAT HELPERS
+// =====================
+
+/**
+ * Format angka untuk Excel
+ */
+export function formatExcelNumber(num, decimals = 3) {
+  return Number(num.toFixed(decimals));
+}
+
+/**
+ * Generate data untuk sheet ANALISA perencanaan
+ */
+export function generateAnalisaPerencanaanSheet(rapState) {
+  const { geometri, analisaRencana } = rapState;
+
+  const data = [];
+
+  // Header
+  data.push(["ANALISA HARGA SATUAN"]);
+  data.push(["PEKERJAAN: " + (geometri.kopData?.pekerjaan || '-')]);
+  data.push(["LOKASI: " + (geometri.kopData?.lokasi || '-')]);
+  data.push([]);
+
+  // Bagian I: Asumsi
+  data.push(["I. ASUMSI"]);
+  data.push(["1.", "Jam Kerja Efektif per hari", "Tk", 8, "Jam"]);
+  data.push(["2.", "Faktor Pengembangan Material", "Fk", 0.8, "-"]);
+  data.push([]);
+
+  // Bagian II: Urutan Kerja
+  data.push(["II. URUTAN KERJA"]);
+  data.push(["Pekerjaan galian tanah dengan Excavator dan penimbunan kembali"]);
+  data.push([]);
+
+  // Bagian III: Uraian Peralatan
+  data.push(["III. URAIAN PERALATAN"]);
+  data.push([1, "Tenaga", "Pw", analisaRencana.hp || 148, "HP"]);
+  data.push([2, "Kapasitas Bucket", "V (Cp)", analisaRencana.bucket || 0.9, "m3"]);
+  data.push([3, "Jam Operasi per Tahun", "w", 2000, "Jam"]);
+  data.push([4, "Faktor Bucket", "Fb", analisaRencana.fb || 1.0, "-"]);
+  data.push([5, "Faktor Efisiensi Alat", "Fa", analisaRencana.fa || 0.7, "-"]);
+  data.push([6, "Faktor Konversi Galian", "Fv", analisaRencana.fv || 0.8, "-"]);
+  data.push([7, "Waktu Siklus", "T.1", formatExcelNumber(analisaRencana.t1), "menit", "CELL KUNING"]);
+  data.push([8, "Kap. Produksi/Jam", "Q1", formatExcelNumber(analisaRencana.q1), "m3/jam"]);
+  data.push([9, "Kap. Produksi/Hari", "Q.2", formatExcelNumber(analisaRencana.q2), "m3/hari"]);
+  data.push([]);
+
+  // Bagian IV: Biaya Operasi
+  data.push(["IV. BIAYA OPERASI/JAM"]);
+  data.push(["kW", "=", analisaRencana.hp || 148, "x 0.7457", "=", formatExcelNumber(analisaRencana.kW)]);
+  data.push(["Load Factor", "L/kWh", analisaRencana.loadFactor || 0.28]);
+  data.push(["Fe", "=", 45, "/ 60", "=", formatExcelNumber(analisaRencana.fe || 0.75)]);
+  data.push(["Fd", "=", analisaRencana.waktuGali || 38, "/ (T.1 x 60)", "=", formatExcelNumber(analisaRencana.fd)]);
+  data.push(["H", "=", "Fd x Fe x L/kWh x kW", "=", formatExcelNumber(analisaRencana.H), "Liter/jam"]);
+  data.push(["h2", "=", "H x 8", "=", formatExcelNumber(analisaRencana.h2), "Liter/hari"]);
+  data.push([]);
+
+  // Bagian V: Estimasi
+  data.push(["V. ESTIMASI PEKERJAAN"]);
+  data.push(["Volume", "V", formatExcelNumber(geometri.totalVolume), "m3"]);
+  data.push(["Estimasi Waktu", "T.pek", Math.ceil(analisaRencana.estimasiHari), "Hari"]);
+  data.push(["Total Kebutuhan Solar", "Ks", formatExcelNumber(analisaRencana.totalSolar), "Liter"]);
+
+  return data;
+}
+
+/**
+ * Generate data untuk sheet backup volume rencana
+ */
+export function generateBackupVolumeRencanaSheet(rapState) {
+  const { geometri } = rapState;
+  const data = [];
+
+  data.push(["BACKUP VOLUME RENCANA"]);
+  data.push([]);
+  data.push(["STA", "b1(m)", "b2(m)", "b3(m)", "h(m)", "h'(m)", "Luas(m2)", "Volume(m3)"]);
+
+  geometri.stas.forEach(sta => {
+    data.push([
+      sta.sta,
+      formatExcelNumber(sta.b1),
+      formatExcelNumber(sta.b2),
+      formatExcelNumber(sta.b3),
+      formatExcelNumber(sta.h),
+      formatExcelNumber(sta.hPrime),
+      formatExcelNumber(sta.luas),
+      formatExcelNumber(sta.volume || 0)
+    ]);
+  });
+
+  data.push([]);
+  data.push(["TOTAL", "", "", "", "", "", "", formatExcelNumber(geometri.totalVolume)]);
+
+  return data;
+}
+
+/**
+ * Generate data untuk sheet Kebutuhan Realisasi
+ */
+export function generateKebutuhanRealisasiSheet(rapState) {
+  const { kebutuhanRealisasi, geometri, analisaRencana } = rapState;
+  const data = [];
+
+  // Header
+  data.push(["RINCIAN KEBUTUHAN DAN HASIL PELAKSANAAN"]);
+  data.push(["SUB KEGIATAN:", geometri.kopData?.program || '-']);
+  data.push(["PEKERJAAN:", geometri.kopData?.pekerjaan || '-']);
+  data.push(["LOKASI:", geometri.kopData?.lokasi || '-']);
+  data.push([]);
+
+  // Tabel Header
+  data.push(["No", "Tgl", "Bln", "Thn", "Jam Kerja", "Galian/Jam", "Galian/Hari", "BBM/Jam", "BBM/Hari", "Diterima", "Sisa"]);
+
+  // Data Rows
+  let totalGalian = 0;
+  let totalBBM = 0;
+  let totalDiterima = 0;
+
+  kebutuhanRealisasi.dailyData?.forEach((d, i) => {
+    const tgl = new Date(d.tanggal);
+    data.push([
+      i + 1,
+      tgl.getDate(),
+      tgl.toLocaleString('id-ID', { month: 'long' }),
+      tgl.getFullYear(),
+      formatExcelNumber(d.jam, 1),
+      formatExcelNumber(d.q1 || analisaRencana.q1),
+      formatExcelNumber(d.galian || 0),
+      formatExcelNumber(analisaRencana.H),
+      formatExcelNumber(d.bbmHarian || 0),
+      d.diterima || '',
+      formatExcelNumber(d.sisa || 0)
+    ]);
+    totalGalian += d.galian || 0;
+    totalBBM += d.bbmHarian || 0;
+    totalDiterima += d.diterima || 0;
+  });
+
+  // Total Row
+  data.push(["TOTAL", "", "", "", "", "", formatExcelNumber(totalGalian), "", formatExcelNumber(totalBBM), totalDiterima, formatExcelNumber(kebutuhanRealisasi.sisaAkhir || 0)]);
+
+  return data;
 }
