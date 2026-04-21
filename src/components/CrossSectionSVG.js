@@ -334,7 +334,7 @@ const CrossSectionSVG = ({
 
       {/* Garis dimensi b3 */}
       <line
-        x1={toSvg(0, hPrime).y}
+        x1={toSvg(0, hPrime).x}
         y1={toSvg(0, hPrime).y - 30}
         x2={toSvg(b3, hPrime).x}
         y2={toSvg(b3, hPrime).y - 30}

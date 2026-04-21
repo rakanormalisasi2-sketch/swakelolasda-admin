@@ -14,6 +14,8 @@ import {
 } from '@/utils/calcRapMath';
 import { downloadExcel } from '@/utils/rapExport';
 import { printCrossSections } from '@/utils/rapPrint';
+import { HelpPanel, FieldWarning, InfoBox, RangeIndicator, EXCAVATOR_SPECS, DIMENSI_GUIDANCE, SNI_FAKTOR_BUCKET, SNI_FAKTOR_EFISIENSI, SNI_FAKTOR_KONVERSI } from '@/utils/FieldGuidance';
+import { DIMENSION_TOOLTIPS, EXCAVATOR_TOOLTIPS, DimensionTooltipModal } from '@/utils/DimensionTooltips';
 
 // Tab Configuration
 const TABS = [
@@ -41,6 +43,11 @@ export default function PerhitunganRapPage() {
   const [profile, setProfile] = useState(null);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('tab1');
+
+  // Dimension Tooltip Modal
+  const [activeTooltip, setActiveTooltip] = useState(null);
+  const openTooltip = (key) => setActiveTooltip(key);
+  const closeTooltip = () => setActiveTooltip(null);
 
   // Tab 1: Geometri
   const [geometri, setGeometri] = useState({
@@ -413,51 +420,161 @@ export default function PerhitunganRapPage() {
         {/* TAB 1: GEOMETRI */}
         {activeTab === 'tab1' && (
           <div className="space-y-6">
+            {/* Help Panel */}
+            <HelpPanel type="dimensi" />
+
+            {/* Warning Banner */}
+            <div className="bg-amber-50 border-l-4 border-amber-500 p-4 rounded-r-lg">
+              <div className="flex items-start gap-3">
+                <span className="text-2xl">⚠️</span>
+                <div>
+                  <h4 className="font-bold text-amber-800">Perhatian!</h4>
+                  <p className="text-sm text-amber-700 mt-1">
+                    Jangan mengisi nilai sembarangan! Gunakan nilai sesuai hasil pengukuran lapangan
+                    dan standar yang berlaku. Lihat <span className="underline cursor-pointer">panduan pengisian</span> di atas.
+                  </p>
+                </div>
+              </div>
+            </div>
+
             <div className="bg-white rounded-lg shadow p-6">
               <h2 className="text-lg font-bold mb-4">📐 Dimensi Saluran</h2>
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                <div>
-                  <label className="block text-sm font-medium mb-1">Panjang Total (m)</label>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                {/* Panjang */}
+                <div className="group">
+                  <label className="block text-sm font-medium mb-1 flex items-center gap-1">
+                    Panjang Total (m)
+                    <button
+                      type="button"
+                      onClick={() => openTooltip('panjang')}
+                      className="w-5 h-5 rounded-full bg-blue-100 text-blue-600 text-xs font-bold hover:bg-blue-200 flex items-center justify-center"
+                      title="Klik untuk melihat panduan"
+                    >?</button>
+                  </label>
                   <input type="number" value={geometri.panjang}
                     onChange={e => setGeometri({...geometri, panjang: Number(e.target.value)})}
-                    className="w-full border rounded px-3 py-2" />
+                    className="w-full border-2 border-gray-200 rounded-lg px-3 py-2 focus:border-blue-500 focus:outline-none transition" />
+                  <p className="text-xs text-gray-500 mt-1">STA 0+000 sampai STA akhir</p>
                 </div>
-                <div>
-                  <label className="block text-sm font-medium mb-1">b₁ Lebar Dasar (m)</label>
+
+                {/* b1 */}
+                <div className="group">
+                  <label className="block text-sm font-medium mb-1 flex items-center gap-1">
+                    b₁ Lebar Dasar (m)
+                    <button
+                      type="button"
+                      onClick={() => openTooltip('b1')}
+                      className="w-5 h-5 rounded-full bg-emerald-100 text-emerald-600 text-xs font-bold hover:bg-emerald-200 flex items-center justify-center"
+                      title="Klik untuk lihat diagram"
+                    >?</button>
+                  </label>
                   <input type="number" step="0.001" value={geometri.b1}
                     onChange={e => setGeometri({...geometri, b1: Number(e.target.value)})}
-                    className="w-full border rounded px-3 py-2" />
+                    className="w-full border-2 border-emerald-200 rounded-lg px-3 py-2 focus:border-emerald-500 focus:outline-none transition" />
+                  <p className="text-xs text-emerald-600 mt-1 font-medium">★ Di DASAR saluran (paling sempit)</p>
                 </div>
-                <div>
-                  <label className="block text-sm font-medium mb-1">b₂ Lebar Bawah (m)</label>
+
+                {/* b2 */}
+                <div className="group">
+                  <label className="block text-sm font-medium mb-1 flex items-center gap-1">
+                    b₂ Lebar Tengah (m)
+                    <span className="text-gray-400 cursor-help" title="b₂ = b₁ + 2×(slope×h)">ℹ️</span>
+                  </label>
                   <input type="number" step="0.001" value={geometri.b2}
                     onChange={e => setGeometri({...geometri, b2: Number(e.target.value)})}
-                    className="w-full border rounded px-3 py-2" />
+                    className="w-full border-2 border-gray-200 rounded-lg px-3 py-2 bg-gray-50 focus:border-blue-500 focus:outline-none transition" />
+                  <p className="text-xs text-gray-400 mt-1">Auto: b₁ + 2×(slope×h)</p>
                 </div>
-                <div>
-                  <label className="block text-sm font-medium mb-1">b₃ Lebar Atas (m)</label>
+
+                {/* b3 */}
+                <div className="group">
+                  <label className="block text-sm font-medium mb-1 flex items-center gap-1">
+                    b₃ Lebar Muka Tanah (m)
+                    <button
+                      type="button"
+                      onClick={() => openTooltip('b3')}
+                      className="w-5 h-5 rounded-full bg-violet-100 text-violet-600 text-xs font-bold hover:bg-violet-200 flex items-center justify-center"
+                    >?</button>
+                  </label>
                   <input type="number" step="0.001" value={geometri.b3}
                     onChange={e => setGeometri({...geometri, b3: Number(e.target.value)})}
-                    className="w-full border rounded px-3 py-2" />
+                    className="w-full border-2 border-violet-200 rounded-lg px-3 py-2 focus:border-violet-500 focus:outline-none transition" />
+                  <p className="text-xs text-violet-600 mt-1 font-medium">★ Di MUKA TANAH (paling lebar)</p>
                 </div>
-                <div>
-                  <label className="block text-sm font-medium mb-1">h Kedalaman Galian (m)</label>
+
+                {/* h */}
+                <div className="group">
+                  <label className="block text-sm font-medium mb-1 flex items-center gap-1">
+                    h Kedalaman Galian (m)
+                    <button
+                      type="button"
+                      onClick={() => openTooltip('h')}
+                      className="w-5 h-5 rounded-full bg-rose-100 text-rose-600 text-xs font-bold hover:bg-rose-200 flex items-center justify-center"
+                    >?</button>
+                  </label>
                   <input type="number" step="0.001" value={geometri.h}
                     onChange={e => setGeometri({...geometri, h: Number(e.target.value)})}
-                    className="w-full border rounded px-3 py-2" />
+                    className="w-full border-2 border-rose-200 rounded-lg px-3 py-2 focus:border-rose-500 focus:outline-none transition" />
+                  <FieldWarning value={geometri.h} fieldKey="h" type="dimensi" />
                 </div>
-                <div>
-                  <label className="block text-sm font-medium mb-1">h&apos; Tinggi Eksisting (m)</label>
+
+                {/* hPrime */}
+                <div className="group">
+                  <label className="block text-sm font-medium mb-1 flex items-center gap-1">
+                    h&apos; Tinggi Air Eksisting (m)
+                    <button
+                      type="button"
+                      onClick={() => openTooltip('hPrime')}
+                      className="w-5 h-5 rounded-full bg-cyan-100 text-cyan-600 text-xs font-bold hover:bg-cyan-200 flex items-center justify-center"
+                    >?</button>
+                  </label>
                   <input type="number" step="0.001" value={geometri.hPrime}
                     onChange={e => setGeometri({...geometri, hPrime: Number(e.target.value)})}
-                    className="w-full border rounded px-3 py-2" />
+                    className="w-full border-2 border-cyan-200 rounded-lg px-3 py-2 focus:border-cyan-500 focus:outline-none transition" />
+                  <p className="text-xs text-cyan-600 mt-1">Kedalaman air eksisting</p>
                 </div>
-                <div>
-                  <label className="block text-sm font-medium mb-1">Slope (1:m)</label>
+
+                {/* Slope */}
+                <div className="group">
+                  <label className="block text-sm font-medium mb-1 flex items-center gap-1">
+                    Slope (1:m)
+                    <button
+                      type="button"
+                      onClick={() => openTooltip('slope')}
+                      className="w-5 h-5 rounded-full bg-orange-100 text-orange-600 text-xs font-bold hover:bg-orange-200 flex items-center justify-center"
+                    >?</button>
+                  </label>
                   <input type="number" value={geometri.slope}
                     onChange={e => setGeometri({...geometri, slope: Number(e.target.value)})}
-                    className="w-full border rounded px-3 py-2" />
+                    className="w-full border-2 border-orange-200 rounded-lg px-3 py-2 focus:border-orange-500 focus:outline-none transition" />
+                  <FieldWarning value={geometri.slope} fieldKey="slope" type="dimensi" />
                 </div>
+              </div>
+
+              {/* Diagram Visual */}
+              <div className="mt-6 bg-gray-50 rounded-lg p-4 border border-gray-200">
+                <h4 className="text-sm font-semibold text-gray-700 mb-3">📊 Diagram Penampang Saluran - Trapesium Sama Kaki Terbalik</h4>
+                <pre className="text-xs text-gray-600 overflow-x-auto font-mono">
+{`
+            ← b₃ (Lebar Atas / Muka Tanah)
+         ╱─────────────────────────────╲
+        ╱                               ╲
+       ╱                                 ╲  ← Talud 1:${geometri.slope}
+      ╱                                   ╲
+     ╱─────────────────────────────────────╲
+    ↓           b₁ (Lebar Dasar)            ↓
+
+    Legenda:
+    • b₁ = lebar dasar saluran (bagian bawah)
+    • b₃ = lebar muka tanah (bagian atas)
+    • h  = kedalaman galian
+    • h' = tinggi air eksisting
+    • Slope = kemiringan talud (1:m)
+`}
+                </pre>
+                <p className="text-xs text-blue-600 mt-2">
+                  💡 Trapesium terbalik: dasar lebih kecil (b₁), atas lebih lebar (b₃)
+                </p>
               </div>
             </div>
 
@@ -534,6 +651,41 @@ export default function PerhitunganRapPage() {
         {/* TAB 2: EXCAVATOR */}
         {activeTab === 'tab2' && (
           <div className="space-y-6">
+            {/* Help Panel untuk Analisa */}
+            <HelpPanel type="analisa" />
+
+            {/* Referensi Tabel SNI */}
+            <div className="bg-gradient-to-r from-indigo-50 to-purple-50 rounded-xl p-5 border border-indigo-200 shadow-sm">
+              <h3 className="text-lg font-bold text-indigo-800 mb-3 flex items-center gap-2">
+                📚 Referensi SNI (SE DJBK No.47 Tahun 2026)
+              </h3>
+              <div className="grid md:grid-cols-3 gap-4 text-sm">
+                <div className="bg-white p-3 rounded-lg border border-indigo-100">
+                  <p className="font-medium text-gray-800">📊 Tabel A.10 - Faktor Bucket (Fb)</p>
+                  <ul className="mt-1 text-gray-600 text-xs space-y-1">
+                    <li>• Tanah Lunak: <strong>1.00</strong></li>
+                    <li>• Tanah Biasa: <strong>0.90</strong></li>
+                    <li>• Tanah Keras: <strong>0.80</strong></li>
+                  </ul>
+                </div>
+                <div className="bg-white p-3 rounded-lg border border-indigo-100">
+                  <p className="font-medium text-gray-800">📊 Tabel A.13 - Faktor Efisiensi (Fa)</p>
+                  <ul className="mt-1 text-gray-600 text-xs space-y-1">
+                    <li>• Sangat Baik: <strong>0.90</strong></li>
+                    <li>• Baik: <strong>0.83</strong></li>
+                    <li>• Sedang: <strong>0.75</strong></li>
+                  </ul>
+                </div>
+                <div className="bg-white p-3 rounded-lg border border-indigo-100">
+                  <p className="font-medium text-gray-800">📊 Tabel A.12 - Faktor Konversi (Fv)</p>
+                  <ul className="mt-1 text-gray-600 text-xs space-y-1">
+                    <li>• Normal (40-75%): <strong>1.00</strong></li>
+                    <li>• {'>'}75% kapasitas: <strong>0.85</strong></li>
+                  </ul>
+                </div>
+              </div>
+            </div>
+
             <div className="bg-white rounded-lg shadow p-6">
               <h2 className="text-lg font-bold mb-4">⚙️ Pilih Excavator</h2>
               <div className="grid grid-cols-5 gap-2">
@@ -555,54 +707,114 @@ export default function PerhitunganRapPage() {
 
             <div className="bg-white rounded-lg shadow p-6">
               <h2 className="text-lg font-bold mb-4">Parameter Alat (Cell Merah)</h2>
+              <p className="text-xs text-gray-500 mb-4">💡 Nilai default berdasarkan standar SNI. Klik ? untuk lihat panduan.</p>
               <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                 <div>
-                  <label className="block text-sm font-medium mb-1">HP (Tenaga)</label>
+                  <label className="block text-sm font-medium mb-1 flex items-center gap-1">
+                    HP (Tenaga)
+                    <button
+                      type="button"
+                      onClick={() => openTooltip('hp')}
+                      className="w-5 h-5 rounded-full bg-red-100 text-red-600 text-xs font-bold hover:bg-red-200 flex items-center justify-center"
+                    >?</button>
+                  </label>
                   <input type="number" value={analisaRencana.hp}
                     onChange={e => setAnalisaRencana({...analisaRencana, hp: Number(e.target.value)})}
-                    className="w-full border rounded px-3 py-2 bg-red-50" />
+                    className="w-full border-2 border-red-200 rounded-lg px-3 py-2 bg-red-50 focus:border-red-500 focus:outline-none" />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium mb-1">Bucket (m³)</label>
+                  <label className="block text-sm font-medium mb-1 flex items-center gap-1">
+                    Bucket (m³)
+                    <button
+                      type="button"
+                      onClick={() => openTooltip('bucket')}
+                      className="w-5 h-5 rounded-full bg-red-100 text-red-600 text-xs font-bold hover:bg-red-200 flex items-center justify-center"
+                    >?</button>
+                  </label>
                   <input type="number" step="0.01" value={analisaRencana.bucket}
                     onChange={e => setAnalisaRencana({...analisaRencana, bucket: Number(e.target.value)})}
-                    className="w-full border rounded px-3 py-2 bg-red-50" />
+                    className="w-full border-2 border-red-200 rounded-lg px-3 py-2 bg-red-50 focus:border-red-500 focus:outline-none" />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium mb-1">Fb (Faktor Bucket)</label>
+                  <label className="block text-sm font-medium mb-1 flex items-center gap-1">
+                    Fb (Faktor Bucket)
+                    <button
+                      type="button"
+                      onClick={() => openTooltip('fb')}
+                      className="w-5 h-5 rounded-full bg-red-100 text-red-600 text-xs font-bold hover:bg-red-200 flex items-center justify-center"
+                    >?</button>
+                  </label>
                   <input type="number" step="0.01" value={analisaRencana.fb}
                     onChange={e => setAnalisaRencana({...analisaRencana, fb: Number(e.target.value)})}
-                    className="w-full border rounded px-3 py-2 bg-red-50" />
+                    className="w-full border-2 border-red-200 rounded-lg px-3 py-2 bg-red-50 focus:border-red-500 focus:outline-none" />
+                  <p className="text-xs text-gray-500 mt-1">Default: 0.90 (Tanah Biasa)</p>
                 </div>
                 <div>
-                  <label className="block text-sm font-medium mb-1">Fa (Efisiensi)</label>
+                  <label className="block text-sm font-medium mb-1 flex items-center gap-1">
+                    Fa (Efisiensi)
+                    <button
+                      type="button"
+                      onClick={() => openTooltip('fa')}
+                      className="w-5 h-5 rounded-full bg-red-100 text-red-600 text-xs font-bold hover:bg-red-200 flex items-center justify-center"
+                    >?</button>
+                  </label>
                   <input type="number" step="0.01" value={analisaRencana.fa}
                     onChange={e => setAnalisaRencana({...analisaRencana, fa: Number(e.target.value)})}
-                    className="w-full border rounded px-3 py-2 bg-red-50" />
+                    className="w-full border-2 border-red-200 rounded-lg px-3 py-2 bg-red-50 focus:border-red-500 focus:outline-none" />
+                  <p className="text-xs text-gray-500 mt-1">Default: 0.83 (Baik)</p>
                 </div>
                 <div>
-                  <label className="block text-sm font-medium mb-1">Fv (Konversi)</label>
+                  <label className="block text-sm font-medium mb-1 flex items-center gap-1">
+                    Fv (Konversi)
+                    <button
+                      type="button"
+                      onClick={() => openTooltip('fv')}
+                      className="w-5 h-5 rounded-full bg-red-100 text-red-600 text-xs font-bold hover:bg-red-200 flex items-center justify-center"
+                    >?</button>
+                  </label>
                   <input type="number" step="0.01" value={analisaRencana.fv}
                     onChange={e => setAnalisaRencana({...analisaRencana, fv: Number(e.target.value)})}
-                    className="w-full border rounded px-3 py-2 bg-red-50" />
+                    className="w-full border-2 border-red-200 rounded-lg px-3 py-2 bg-red-50 focus:border-red-500 focus:outline-none" />
+                  <p className="text-xs text-gray-500 mt-1">Default: 1.00 (Normal)</p>
                 </div>
                 <div>
-                  <label className="block text-sm font-medium mb-1">Fk (Pengembangan)</label>
+                  <label className="block text-sm font-medium mb-1 flex items-center gap-1">
+                    Fk (Pengembangan)
+                    <button
+                      type="button"
+                      onClick={() => openTooltip('fk')}
+                      className="w-5 h-5 rounded-full bg-red-100 text-red-600 text-xs font-bold hover:bg-red-200 flex items-center justify-center"
+                    >?</button>
+                  </label>
                   <input type="number" step="0.01" value={analisaRencana.fk}
                     onChange={e => setAnalisaRencana({...analisaRencana, fk: Number(e.target.value)})}
-                    className="w-full border rounded px-3 py-2 bg-red-50" />
+                    className="w-full border-2 border-red-200 rounded-lg px-3 py-2 bg-red-50 focus:border-red-500 focus:outline-none" />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium mb-1">Load Factor (L/kWh)</label>
+                  <label className="block text-sm font-medium mb-1 flex items-center gap-1">
+                    Load Factor
+                    <button
+                      type="button"
+                      onClick={() => openTooltip('loadFactor')}
+                      className="w-5 h-5 rounded-full bg-red-100 text-red-600 text-xs font-bold hover:bg-red-200 flex items-center justify-center"
+                    >?</button>
+                  </label>
                   <input type="number" step="0.01" value={analisaRencana.loadFactor}
                     onChange={e => setAnalisaRencana({...analisaRencana, loadFactor: Number(e.target.value)})}
-                    className="w-full border rounded px-3 py-2 bg-red-50" />
+                    className="w-full border-2 border-red-200 rounded-lg px-3 py-2 bg-red-50 focus:border-red-500 focus:outline-none" />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium mb-1">Waktu Gali (detik)</label>
+                  <label className="block text-sm font-medium mb-1 flex items-center gap-1">
+                    Waktu Gali (detik)
+                    <button
+                      type="button"
+                      onClick={() => openTooltip('waktuGali')}
+                      className="w-5 h-5 rounded-full bg-red-100 text-red-600 text-xs font-bold hover:bg-red-200 flex items-center justify-center"
+                    >?</button>
+                  </label>
                   <input type="number" value={analisaRencana.waktuGali}
                     onChange={e => setAnalisaRencana({...analisaRencana, waktuGali: Number(e.target.value)})}
-                    className="w-full border rounded px-3 py-2 bg-red-50" />
+                    className="w-full border-2 border-red-200 rounded-lg px-3 py-2 bg-red-50 focus:border-red-500 focus:outline-none" />
                 </div>
               </div>
             </div>
@@ -1083,6 +1295,14 @@ export default function PerhitunganRapPage() {
           </div>
         </div>
       )}
+
+      {/* Dimension Tooltip Modal */}
+      <DimensionTooltipModal
+        isOpen={activeTooltip !== null}
+        onClose={closeTooltip}
+        dimensionKey={activeTooltip}
+        data={EXCAVATOR_TOOLTIPS[activeTooltip] || DIMENSION_TOOLTIPS[activeTooltip]}
+      />
     </div>
   );
 }
