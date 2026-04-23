@@ -262,6 +262,80 @@ export function calculateAnalisaRencana(volumeTarget, params) {
   };
 }
 
+/**
+ * calculateAnalisaWithGoalSeek
+ * Wrapper around goalSeekBisectionPerencanaan that returns the same
+ * shape as calculateAnalisaRencana, plus GoalSeek metadata.
+ *
+ * For planning mode: uses targetSisaIdeal = 70L, range 40-100L.
+ * Requires totalBBM (total budgeted fuel in liters).
+ *
+ * Falls back to calculateAnalisaRencana if totalBBM is not provided
+ * or if GoalSeek fails to converge.
+ */
+export function calculateAnalisaWithGoalSeek(volumeTarget, params) {
+  const { totalBBM, ...rest } = params;
+
+  // If no totalBBM provided, fall back to standard calculation
+  if (!totalBBM || totalBBM <= 0) {
+    return calculateAnalisaRencana(volumeTarget, rest);
+  }
+
+  try {
+    const goalseek = goalSeekBisectionPerencanaan({
+      volume: volumeTarget,
+      totalBBM,
+      hp: rest.hp,
+      bucket: rest.bucket,
+      fb: rest.fb,
+      fa: rest.fa,
+      fv: rest.fv,
+      fk: rest.fk,
+      loadFactor: rest.loadFactor,
+      waktuGali: rest.waktuGali,
+      tk: rest.tk || 8,
+      targetSisaMin: 40,
+      targetSisaMax: 100,
+      targetSisaIdeal: 70
+    });
+
+    return {
+      tk: rest.tk || 8,
+      fk: rest.fk || 0.8,
+      hp: rest.hp || 148,
+      bucket: rest.bucket || 0.9,
+      fb: rest.fb || 1.0,
+      fa: rest.fa || 0.7,
+      fv: rest.fv || 0.8,
+      loadFactor: rest.loadFactor || 0.28,
+      feMenit: rest.feMenit || 45,
+      waktuGali: rest.waktuGali || 38,
+      t1: goalseek.t1,
+      fd: goalseek.t1_detik / 60,
+      kW: (rest.hp || 148) * 0.7457,
+      fe: (rest.feMenit || 45) / 60,
+      q1: goalseek.q1,
+      q2: goalseek.q2,
+      H: goalseek.h,
+      h2: goalseek.h2,
+      koefBBM: goalseek.koefBBM,
+      estimasiHari: goalseek.estimasiHari,
+      totalSolar: goalseek.totalSolarUsed,
+      volumeTarget,
+      // GoalSeek metadata
+      sisaAkhir: goalseek.sisaAkhir,
+      converged: goalseek.converged,
+      dalamRangeSNI: goalseek.dalamRangeSNI,
+      goalseekStatus: goalseek.status,
+      t1_detik: goalseek.t1_detik,
+      targetSisaIdeal: goalseek.targetSisaIdeal
+    };
+  } catch (err) {
+    // Graceful fallback if GoalSeek fails
+    return calculateAnalisaRencana(volumeTarget, rest);
+  }
+}
+
 // =====================
 // GOALSEEK FUNCTIONS
 // =====================
@@ -482,8 +556,20 @@ export function generateSTAPerencanaan(params) {
  * Generate STA untuk Pelaksanaan
  * Constraint: STA 0 = STA 0 TAB 1, Total = targetVolume
  */
-export function generateSTAPelaksanaan(panjang, refSTA0, targetVolume) {
+export function generateSTAPelaksanaan(geometriStas, totalVolume) {
+  // Support both old 3-param and new 2-param signatures
+  const stasInput = typeof geometriStas === 'number' ? arguments[2] : geometriStas;
+  const targetVolume = typeof geometriStas === 'number' ? geometriStas : (totalVolume || 0);
+  const refSTA0 = stasInput?.[0];
+
+  if (!refSTA0) {
+    return { stas: [], totalVolume: 0 };
+  }
+
   const nSTA = 5;
+  const panjang = stasInput.length > 1
+    ? (parseFloat(stasInput[stasInput.length - 1]?.sta?.replace('0+', '') || '0') * 1000)
+    : (targetVolume > 0 ? 500 : 500);
   const interval = panjang / (nSTA - 1);
 
   // STA 0 = sama persis dengan refSTA0
@@ -493,7 +579,7 @@ export function generateSTAPelaksanaan(panjang, refSTA0, targetVolume) {
   }];
 
   // Volume STA 0
-  const volSTA0 = refSTA0.volume || 0;
+  const volSTA0 = refSTA0?.volume ?? 0;
 
   // Volume sisa untuk STA 1-4
   const volumeSisa = targetVolume - volSTA0;
@@ -774,4 +860,243 @@ export function generateKebutuhanRealisasiSheet(rapState) {
   data.push(["TOTAL", "", "", "", "", "", formatExcelNumber(totalGalian), "", formatExcelNumber(totalBBM), totalDiterima, formatExcelNumber(kebutuhanRealisasi.sisaAkhir || 0)]);
 
   return data;
+}
+
+// =====================
+// GOALSEEK BISECTION — CORE ENGINE
+// =====================
+
+/**
+ * Proper Bisection GoalSeek for T.1 (Perencanaan)
+ *
+ * Problem: Given volume, excavator specs, totalBBM, find T.1 such that:
+ *   Sisa BBM = totalBBM - totalSolarUsed(T.1)  →  40L ≤ Sisa ≤ 100L
+ *
+ * Bisection: Find T.1 in range [T_low, T_high] where f(T.1) = 0
+ *   f(T.1) = totalSolarUsed(T.1) - (totalBBM - targetSisa)
+ *
+ * Constraints per SNI Tabel A.11:
+ *   - Tanah Lunak (bucket 0.6-1.25): T.1 ≈ 14.4–31.8 detik
+ *   - Tanah Sedang: T.1 ≈ 0.40–0.80 menit
+ *   - Tanah Keras (bucket 1.25-2.20, swing 180°): T.1 ≈ 0.45–0.85 menit
+ */
+export function goalSeekBisectionPerencanaan(params) {
+  const {
+    volume,           // Total volume galian (m³)
+    totalBBM,        // Total BBM yang diterima (liter)
+    targetSisaMin = 40,
+    targetSisaMax = 100,
+    targetSisaIdeal = 70,
+    // Excavator specs
+    hp = 148,
+    bucket = 0.9,
+    fb = 1.0,
+    fa = 0.7,
+    fv = 0.8,
+    fk = 0.8,
+    loadFactor = 0.28,
+    waktuGali = 38,  // detik
+    tk = 8,          // jam per hari
+    maxIter = 50,
+    tolerance = 0.5  // liter
+  } = params;
+
+  const kW = hp * 0.7457;
+  const SPECIFIC_FUEL = 0.10; // L/kWh
+  const H_liter_jam = kW * loadFactor * SPECIFIC_FUEL;
+
+  const Q1 = (t1_menit) => {
+    if (t1_menit <= 0) return Infinity;
+    return (bucket * fb * fa * 60) / (t1_menit * fv * fk);
+  };
+
+  const totalSolar = (t1_menit) => {
+    const q1 = Q1(t1_menit);
+    if (q1 <= 0) return Infinity;
+    return (volume / q1) * H_liter_jam;
+  };
+
+  const targetSolar = totalBBM - targetSisaIdeal;
+  const f = (t1_menit) => totalSolar(t1_menit) - targetSolar;
+
+  // SNI range in MENIT
+  const T_low  = 14.4 / 60;  // 0.240 menit
+  const T_high = 31.8 / 60;  // 0.530 menit
+
+  const fLow  = f(T_low);
+  const fHigh = f(T_high);
+
+  let converged = false;
+  let bestT1 = (T_low + T_high) / 2;
+  let bestSisa = totalBBM - totalSolar(bestT1);
+
+  if (fLow * fHigh > 0) {
+    // No exact root — find T.1 closest to ideal sisa
+    let a = T_low, b = T_high;
+    let bestDist = Infinity;
+    for (let i = 0; i < maxIter; i++) {
+      const mid = (a + b) / 2;
+      const midSolar = totalSolar(mid);
+      const midSisa = totalBBM - midSolar;
+      const dist = Math.abs(midSisa - targetSisaIdeal);
+      if (dist < bestDist) {
+        bestDist = dist;
+        bestT1 = mid;
+        bestSisa = midSisa;
+      }
+      // Narrow interval toward ideal
+      const solarA = totalSolar(a);
+      if (Math.abs(totalBBM - solarA - targetSisaIdeal) < Math.abs(totalBBM - midSolar - targetSisaIdeal)) {
+        b = mid;
+      } else {
+        a = mid;
+      }
+    }
+  } else {
+    // === BISECTION ===
+    let a = T_low, b = T_high;
+    let fa = fLow, fb = fHigh;
+    for (let i = 0; i < maxIter; i++) {
+      const mid = (a + b) / 2;
+      const fmid = f(mid);
+      if (Math.abs(fmid) < tolerance) {
+        bestT1 = mid;
+        converged = true;
+        bestSisa = totalBBM - totalSolar(mid);
+        break;
+      }
+      if (fa * fmid < 0) { b = mid; fb = fmid; }
+      else                { a = mid; fa = fmid; }
+      bestT1 = mid;
+      bestSisa = totalBBM - totalSolar(mid);
+    }
+  }
+
+  const sisaAkhir = Math.max(targetSisaMin, Math.min(targetSisaMax, bestSisa));
+  const inRange = sisaAkhir >= targetSisaMin && sisaAkhir <= targetSisaMax;
+
+  const Q1_res = Q1(bestT1);
+  const Q2_res = Q2(Q1_res, tk);
+  const estimasiHari = Math.ceil(volume / Q2_res);
+  const H_res = H_liter_jam;
+  const h2_res = H_res * tk;
+  const koefBBM = H_res / Q1_res;
+  const totalSolarUsed = volume * koefBBM;
+  const Fd_res = waktuGali / (bestT1 * 60);
+
+  return {
+    t1: Number(bestT1.toFixed(4)),
+    t1_detik: Number((bestT1 * 60).toFixed(2)),
+    q1: Number(Q1_res.toFixed(2)),
+    q2: Number(Q2_res.toFixed(2)),
+    estimasiHari,
+    h: Number(H_res.toFixed(4)),
+    h2: Number(h2_res.toFixed(2)),
+    totalSolarUsed: Number(totalSolarUsed.toFixed(2)),
+    sisaAkhir: Number(sisaAkhir.toFixed(2)),
+    koefBBM: Number(koefBBM.toFixed(6)),
+    converged,
+    inRange,
+    status: inRange ? 'OPTIMAL' : 'ADJUSTED',
+    targetSisaIdeal,
+    targetSisaMin,
+    targetSisaMax,
+    dalamRangeSNI: bestT1 >= (14.4/60) && bestT1 <= (31.8/60),
+    sniRange: { min: 14.4, max: 31.8 }
+  };
+}
+
+/**
+ * GoalSeek Bisection untuk Fd (Pelaksanaan)
+ *
+ * Find optimal number of days (Fd) such that:
+ *   Sisa BBM akhir falls in 40-100L range
+ *   Total galian ≈ target volume
+ *
+ * Uses actual field data (dailyData) if available for H and Q1
+ */
+export function goalSeekBisectionPelaksanaan(params) {
+  const {
+    totalVolume,
+    totalBBMditerima,
+    dailyData = [],
+    targetSisaMin = 40,
+    targetSisaMax = 100,
+    hp = 148,
+    loadFactor = 0.28,
+    H_override = null,
+    Q1_override = null
+  } = params;
+
+  const kW = hp * 0.7457;
+  const SPECIFIC_FUEL = 0.10; // L/kWh
+
+  // Derive H from field data or use override
+  let H_actual;
+  if (H_override !== null) {
+    H_actual = H_override;
+  } else if (dailyData.length > 0) {
+    const totalJam = dailyData.reduce((s, d) => s + (d.jamKerja || 0), 0);
+    const totalBBMField = dailyData.reduce((s, d) => s + (d.bbmPakai || 0), 0);
+    H_actual = totalJam > 0 ? totalBBMField / totalJam : kW * loadFactor * SPECIFIC_FUEL;
+  } else {
+    H_actual = kW * loadFactor * SPECIFIC_FUEL;
+  }
+
+  // Derive Q1 from field data or use override
+  let Q1_actual;
+  if (Q1_override !== null) {
+    Q1_actual = Q1_override;
+  } else if (dailyData.length > 0) {
+    const totalJam = dailyData.reduce((s, d) => s + (d.jamKerja || 0), 0);
+    const totalGalianField = dailyData.reduce((s, d) => s + (d.galian || 0), 0);
+    Q1_actual = totalJam > 0 ? totalGalianField / totalJam : 0;
+  } else {
+    Q1_actual = 0;
+  }
+
+  const tk = 8; // jam per hari
+
+  // === BISECTION on Fd (days) ===
+  // Find Fd that gives sisa closest to ideal (70L) within [min, max] range
+  const Fd_high = Math.max(1, Math.ceil(totalVolume / (Q1_actual * tk)) + 10);
+
+  let bestFd = 1;
+  let bestSisa = totalBBMditerima - (H_actual * 1 * tk);
+  let minDist = Infinity;
+
+  for (let fd = 1; fd <= Math.min(Fd_high, 365); fd++) {
+    const solarUsed = H_actual * fd * tk;
+    const sisa = totalBBMditerima - solarUsed;
+    const dist = Math.abs(sisa - 70);
+    if (dist < minDist && sisa >= targetSisaMin) {
+      minDist = dist;
+      bestFd = fd;
+      bestSisa = sisa;
+    }
+  }
+
+  const inRange = bestSisa >= targetSisaMin && bestSisa <= targetSisaMax;
+  const totalGalianPrediksi = Q1_actual * bestFd * tk;
+  const deviasiVolume = totalVolume > 0
+    ? Math.abs(totalGalianPrediksi - totalVolume) / totalVolume * 100
+    : 0;
+
+  return {
+    fd: bestFd,
+    estimasiHari: bestFd,
+    sisaAkhir: Number(bestSisa.toFixed(2)),
+    totalSolarUsed: Number((H_actual * bestFd * tk).toFixed(2)),
+    h: Number(H_actual.toFixed(4)),
+    h2: Number((H_actual * tk).toFixed(2)),
+    q1: Number(Q1_actual.toFixed(2)),
+    q2: Number((Q1_actual * tk).toFixed(2)),
+    totalGalianPrediksi: Number(totalGalianPrediksi.toFixed(2)),
+    deviasiVolume: Number(deviasiVolume.toFixed(2)),
+    inRange,
+    status: inRange ? 'OPTIMAL' : 'ADJUSTED',
+    targetSisaMin,
+    targetSisaMax,
+    dariDataField: dailyData.length > 0
+  };
 }

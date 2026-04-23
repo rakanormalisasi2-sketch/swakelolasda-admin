@@ -1,573 +1,300 @@
 'use client';
 
 /**
- * CrossSectionSVG.js
- * Government-standard Cross-Section Technical Drawing
- *
- * Reference: gambar teknik.png + SUNGAI SEMAR MENDEM
- * Features:
- * - Kop Government VERTICAL di KIRI (DINAS PU SUMBER DAYA AIR)
- * - Cross-section dengan Arsiran VERTIKAL (│ │ │ │) untuk area galian
- * - Legenda dengan 3 item: Kontur Eksisting, Rencana Galian, Area Galian
- * - Dimension labels: b₁, b₂, b₃, h, Slope 1:n
- * - Skala indicator
- * - Stamp area: CHECKED/DRAWN/BY
+ * CrossSectionSVG.js v4.0 (Antigravity CAD Style)
+ * Government-standard Technical Drawing (Hitam-Putih Kaku)
+ * ALGORITMA GEOMETRI DIPERBAIKI: area galian (h') benar-benar terisolasi
+ * dan bersilangan tepat dengan slope rencana.
  */
 
 import React from 'react';
 
-// Generate kontur natural (meliuk-liuk seperti sungai asli)
-function generateKonturEksisting(b3, hPrime, numPoints = 15) {
-  const points = [];
-  for (let i = 0; i < numPoints; i++) {
-    const x = (i / (numPoints - 1)) * b3;
-    const undulation = Math.sin(i * 1.5) * 0.08 * hPrime + Math.sin(i * 0.7) * 0.05 * hPrime;
-    const y = hPrime + undulation;
-    points.push({ x, y });
-  }
-  return points;
-}
-
-// Generate kontur rencana (trapesium terbalik)
-function generateKonturRencana(b1, b2, b3, h, hPrime, slope) {
-  return [
-    { x: 0, y: hPrime },
-    { x: b3, y: hPrime },
-    { x: b1 + slope * h, y: hPrime - h },
-    { x: -(slope * h), y: hPrime - h }
-  ];
-}
-
-// Path string from points
-function pointsToPath(points, toSvg) {
-  if (!points || points.length < 2) return '';
-  const svgPoints = points.map(p => toSvg(p.x, p.y));
-  let path = `M ${svgPoints[0].x} ${svgPoints[0].y}`;
-  for (let i = 1; i < svgPoints.length - 1; i++) {
-    const midX = (svgPoints[i].x + svgPoints[i + 1].x) / 2;
-    const midY = (svgPoints[i].y + svgPoints[i + 1].y) / 2;
-    path += ` Q ${svgPoints[i].x} ${svgPoints[i].y} ${midX} ${midY}`;
-  }
-  path += ` L ${svgPoints[svgPoints.length - 1].x} ${svgPoints[svgPoints.length - 1].y}`;
-  return path;
-}
-
-// Area galian path (between eksisting and rencana)
-function generateAreaGalianPath(rencana, eksisting, toSvg) {
-  const rencanaCoords = [rencana[0], rencana[1]].map(p => toSvg(p.x, p.y));
-  const eksistingCoords = [...eksisting].reverse().map(p => toSvg(p.x, p.y));
-  const allPoints = [...rencanaCoords, ...eksistingCoords];
-  if (allPoints.length === 0) return '';
-  return allPoints.map((p, i) => i === 0 ? `M ${p.x} ${p.y}` : `L ${p.x} ${p.y}`).join(' ') + ' Z';
-}
-
-// Generate smooth kontur path
-function generateKonturPath(kontur, toSvg) {
-  if (!kontur || kontur.length < 2) return '';
-  const svgPoints = kontur.map(p => toSvg(p.x, p.y));
-  let path = `M ${svgPoints[0].x} ${svgPoints[0].y}`;
-  for (let i = 1; i < svgPoints.length - 1; i++) {
-    const midX = (svgPoints[i].x + svgPoints[i + 1].x) / 2;
-    const midY = (svgPoints[i].y + svgPoints[i + 1].y) / 2;
-    path += ` Q ${svgPoints[i].x} ${svgPoints[i].y} ${midX} ${midY}`;
-  }
-  path += ` L ${svgPoints[svgPoints.length - 1].x} ${svgPoints[svgPoints.length - 1].y}`;
-  return path;
-}
-
-// Generate trapesium rencana path
-function generateRencanaPath(rencana, toSvg) {
-  const coords = rencana.map(p => toSvg(p.x, p.y));
-  return coords.map((p, i) => i === 0 ? `M ${p.x} ${p.y}` : `L ${p.x} ${p.y}`).join(' ') + ' Z';
-}
-
-/**
- * KopInline - Government Header (vertical, positioned at LEFT side)
- * Matches reference: PEMERINTAH KABUPATEN BOJONEGORO / DINAS PU
- */
-const KopInline = ({ data, width = 140, height = 400 }) => {
-  const {
-    program = 'PROGRAM PENGELOLAAN SUMBER DAYA AIR (SDA)',
-    kegiatan = 'PENGELOLAAN SDA DAN BANGUNAN PENGAMAN PANTAI PADA WILAYAH SUNGAI',
-    pekerjaan = '-',
-    lokasi = '-',
-    tahun = new Date().getFullYear(),
-    sta = '0+000',
-    skala = '1:50',
-    kodeGambar = 'NS-01',
-    noLembar = 1,
-    jumlahLembar = 5,
-    jenis = 'PERENCANAAN'
-  } = data;
-
-  const isPelaksanaan = jenis === 'PELAKSANAAN';
-  const fs = 7;
-  const fsSmall = 6;
-
-  return (
-    <foreignObject x={0} y={0} width={width} height={height}>
-      <div xmlns="http://www.w3.org/1999/xhtml" style={{
-        width: `${width}px`,
-        height: `${height}px`,
-        borderRight: '2px solid #1E3A5F',
-        padding: '4px',
-        fontSize: `${fs}px`,
-        fontFamily: 'Arial, sans-serif',
-        display: 'flex',
-        flexDirection: 'column',
-        backgroundColor: 'white',
-        boxSizing: 'border-box',
-        overflow: 'hidden'
-      }}>
-        {/* Header Logo */}
-        <div style={{ textAlign: 'center', borderBottom: '2px solid #1E3A5F', paddingBottom: '3px', marginBottom: '3px', backgroundColor: '#1E3A5F', marginLeft: '-4px', marginRight: '-4px', paddingLeft: '4px', paddingRight: '4px' }}>
-          <div style={{ color: 'white', fontWeight: 'bold', fontSize: `${fsSmall}px` }}>PEMERINTAH KABUPATEN BOJONEGORO</div>
-          <div style={{ color: '#FFD700', fontWeight: 'bold', fontSize: `${fs}px` }}>DINAS PEKERJAAN UMUM DAN PENATAAN RUANG</div>
-          <div style={{ color: 'white', fontWeight: 'bold', fontSize: `${fsSmall}px` }}>SUMBER DAYA AIR</div>
-        </div>
-
-        {/* Info fields */}
-        {[
-          { label: 'PROGRAM', value: program, bg: '#EBF5FB' },
-          { label: 'KEGIATAN', value: kegiatan, bg: '#FFFFFF' },
-          { label: 'PEKERJAAN', value: pekerjaan, bg: '#EBF5FB' },
-          { label: 'LOKASI', value: lokasi, bg: '#FFFFFF' },
-          { label: 'TAHUN ANGGARAN', value: String(tahun), bg: '#EBF5FB' }
-        ].map(({ label, value, bg }, idx) => (
-          <div key={idx} style={{ marginBottom: '2px', borderBottom: '1px solid #ccc', paddingBottom: '1px', backgroundColor: bg }}>
-            <div style={{ fontWeight: 'bold', fontSize: `${fsSmall}px`, color: '#1E3A5F' }}>{label}:</div>
-            <div style={{ fontSize: `${fsSmall - 1}px`, color: '#333', lineHeight: 1.1, maxHeight: '28px', overflow: 'hidden' }}>{value}</div>
-          </div>
-        ))}
-
-        {/* Jenis (warna sesuai) */}
-        <div style={{
-          marginTop: '2px',
-          borderBottom: '1px solid #ccc',
-          paddingBottom: '2px',
-          marginBottom: '2px',
-          backgroundColor: isPelaksanaan ? '#D4EDDA' : '#D6E4F0',
-          textAlign: 'center'
-        }}>
-          <div style={{ fontWeight: 'bold', fontSize: `${fsSmall}px`, color: isPelaksanaan ? '#155724' : '#1E3A5F' }}>JENIS:</div>
-          <div style={{ fontSize: `${fs + 1}px`, fontWeight: 'bold', color: isPelaksanaan ? '#155724' : '#1E3A5F' }}>{jenis}</div>
-        </div>
-
-        {/* Spacer */}
-        <div style={{ flex: 1 }} />
-
-        {/* Skala info */}
-        <div style={{ borderTop: '2px solid #1E3A5F', paddingTop: '3px', textAlign: 'center', marginTop: 'auto' }}>
-          <div style={{ fontWeight: 'bold', fontSize: `${fs + 1}px`, color: '#1E3A5F' }}>STA: {sta}</div>
-          <div style={{ fontSize: `${fsSmall}px`, color: '#555' }}>SKALA: <span style={{ fontWeight: 'bold' }}>{skala}</span></div>
-        </div>
-
-        {/* Judul Gambar */}
-        <div style={{ borderTop: '1px solid #1E3A5F', paddingTop: '3px', marginTop: '2px', textAlign: 'center' }}>
-          <div style={{ fontWeight: 'bold', fontSize: `${fsSmall}px`, color: '#1E3A5F' }}>JUDUL GAMBAR</div>
-          <div style={{ fontSize: `${fs}px`, color: '#333', fontWeight: 'bold' }}>POTONGAN MELINTANG</div>
-          <div style={{ fontSize: `${fs}px`, color: '#333' }}>STA {sta}</div>
-        </div>
-
-        {/* Kode & Lembar */}
-        <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '3px', fontSize: `${fsSmall - 1}px`, color: '#555', borderTop: '1px solid #1E3A5F', paddingTop: '2px' }}>
-          <div>KODE: {kodeGambar}</div>
-          <div>LBR: {noLembar}/{jumlahLembar}</div>
-        </div>
-
-        {/* Stamp Area */}
-        <div style={{ borderTop: '1px solid #1E3A5F', paddingTop: '2px', marginTop: '2px' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-around', fontSize: `${fsSmall - 1}px` }}>
-            <div style={{ textAlign: 'center' }}>
-              <div style={{ borderBottom: '1px solid #333', height: '14px' }} />
-              <div style={{ color: '#555', marginTop: '1px' }}>DIGAMBAR</div>
-            </div>
-            <div style={{ textAlign: 'center' }}>
-              <div style={{ borderBottom: '1px solid #333', height: '14px' }} />
-              <div style={{ color: '#555', marginTop: '1px' }}>DICEK</div>
-            </div>
-            <div style={{ textAlign: 'center' }}>
-              <div style={{ borderBottom: '1px solid #333', height: '14px' }} />
-              <div style={{ color: '#555', marginTop: '1px' }}>DIBUAT</div>
-            </div>
-          </div>
-        </div>
-      </div>
-    </foreignObject>
-  );
-};
-
-/**
- * CrossSectionSVG Component
- * Professional government technical drawing
- */
 const CrossSectionSVG = ({
   staData,
   kopData,
-  width = 700,
-  height = 450,
-  padding = { top: 25, right: 25, bottom: 25, left: 155 },
-  showKop = true
+  width = 800,
+  height = 500
 }) => {
   if (!staData || !staData.dimensi) {
     return (
-      <svg width={width} height={height}>
-        <text x={width / 2} y={height / 2} textAnchor="middle" fill="#64748b" fontSize="14">
-          Data tidak tersedia
+      <svg width="100%" height="auto" viewBox={`0 0 ${width} ${height}`}>
+        <rect width={width} height={height} fill="#f4f4f5" />
+        <text x={width / 2} y={height / 2} textAnchor="middle" fill="#52525b" fontSize="16" fontFamily="monospace">
+          [ WAITING FOR DATA ]
         </text>
       </svg>
     );
   }
 
-  const { dimensi, luasGalian = 0 } = staData;
-  const { b1, b2, b3, h, hPrime, slope = 1 } = dimensi;
+  const { dimensi } = staData;
+  const { b1, b3, h, hPrime } = dimensi;
 
-  // Calculate scale
-  const drawWidth = width - padding.left - padding.right;
-  const drawHeight = height - padding.top - padding.bottom;
+  // Hitung kemiringan slope (m) dari rencana
+  const m = h > 0 ? (b3 - b1) / (2 * h) : 0;
 
-  const scaleX = drawWidth / (b3 + 1.5);
-  const scaleY = drawHeight / (hPrime + 1.5);
-  const scale = Math.min(scaleX, scaleY);
+  // --- KOORDINAT MATEMATIS AKTUAL (Titik 0,0 di tengah dasar saluran) ---
+  const pbLeft  = -b1 / 2;
+  const pbRight = b1 / 2;
+  const ptLeft  = -b3 / 2;
+  const ptRight = b3 / 2;
 
-  const originX = padding.left + 0.3 * scale;
-  const originY = padding.top + drawHeight - ((hPrime + 0.3) * scale);
+  // Titik persilangan slope dengan tanah eksisting (pada y = h')
+  const pgLeft  = pbLeft - (m * hPrime);
+  const pgRight = pbRight + (m * hPrime);
+  const b_eksisting = b1 + 2 * m * hPrime;
 
-  const toSvg = (x, y) => ({
-    x: originX + x * scale,
-    y: originY - (hPrime + 0.3 - y) * scale
+  // Hitung luas matematis aktual galian trapesium
+  const actualLuas = ((b1 + b_eksisting) / 2) * hPrime;
+
+  // --- ARSITEKTUR FRAME CAD ---
+  const margin = 20; // Margin luar kertas
+  const kopWidth = 220; // Lebar KOP di kanan
+  
+  // Area Gambar
+  const drawX = margin;
+  const drawY = margin;
+  const drawW = width - (margin * 2) - kopWidth;
+  const drawH = height - (margin * 2);
+
+  const kopX = drawX + drawW;
+  const kopY = drawY;
+
+  // --- SKALA & TRANSFORMASI ---
+  // Pastikan area mencakup lebar/tinggi maksimum dari semua skenario parameter
+  const pWidth = Math.max(b3, b_eksisting) * 1.5; // +50% ruang ekstra di kiri-kanan
+  const pHeight = Math.max(h, hPrime) * 1.5;      // +50% ruang ekstra ke atas
+
+  // Faktor Skala
+  const s = Math.min((drawW - 60) / Math.max(pWidth, 0.1), (drawH - 120) / Math.max(pHeight, 0.1));
+
+  // Posisi nol piksel: X di tengah area, Y di bagian bawah (di atas margin datum)
+  const originX = drawX + (drawW / 2);
+  const originY = drawY + drawH - 70;
+
+  // Konverter (Fisik m -> SVG px) Y dibalik karena SVG Y arah bawah
+  const toSVG = (px, py) => ({
+    x: originX + px * s,
+    y: originY - py * s
   });
 
-  // Generate data
-  const konturEksisting = generateKonturEksisting(b3, hPrime);
-  const konturRencana = generateKonturRencana(b1, b2, b3, h, hPrime, slope);
+  // --- TRANSLASI TITIK KE SVG ---
+  // 1. Trapesium Rencana (Elevasi 0 sampai h) - Open Bowl (Tidak ditutup di atas)
+  const tBL = toSVG(pbLeft, 0);
+  const tBR = toSVG(pbRight, 0);
+  const tTR = toSVG(ptRight, h);
+  const tTL = toSVG(ptLeft, h);
+  const rencanaPathStr = `M ${tTL.x} ${tTL.y} L ${tBL.x} ${tBL.y} L ${tBR.x} ${tBR.y} L ${tTR.x} ${tTR.y}`;
 
-  const konturPath = generateKonturPath(konturEksisting, toSvg);
-  const rencanaPath = generateRencanaPath(konturRencana, toSvg);
-  const areaGalianPath = generateAreaGalianPath(konturRencana, konturEksisting, toSvg);
+  // 2. Kontur Tanah Eksisting (Kerak/Crust Profile)
+  // Garis eksisting berada di atas rencana, dan bertemu di bibir sungai.
+  const overLeft = ptLeft - (b3 * 0.2); 
+  const overRight = ptRight + (b3 * 0.2); 
+  
+  const ptsFisik = [];
+  
+  // 1. Tanggul kiri (menurun tidak lurus)
+  ptsFisik.push({ x: overLeft, y: h * 0.8 });
+  ptsFisik.push({ x: ptLeft - (b3 * 0.1), y: h * 0.95 });
+  ptsFisik.push({ x: ptLeft, y: h }); // Bertemu di bibir kiri
+  
+  // 2. Kerak tebing kiri (turun dengan gaya freehand/sedimen)
+  const offset = b1 * 0.15; // Ketebalan kerak di dasar
+  const exBL = { x: pbLeft + offset, y: hPrime };
+  const exBR = { x: pbRight - offset, y: hPrime };
+  
+  const slopeSegments = 4;
+  for (let i = 1; i <= slopeSegments; i++) {
+    const t = i / slopeSegments;
+    let px = ptLeft + (exBL.x - ptLeft) * t;
+    let py = h - (h - hPrime) * t;
+    // Tambahkan bump (bulge) sedimen ke arah dalam saluran
+    if (i > 0 && i < slopeSegments) {
+       px += (i % 2 !== 0 ? 0.05 : 0.02) * b3; 
+    }
+    ptsFisik.push({ x: px, y: py });
+  }
+  
+  // 3. Dasar sedimen (zigzag kecil natural)
+  const siltSegments = 10;
+  const siltDx = (exBR.x - exBL.x) / siltSegments;
+  for (let i = 1; i < siltSegments; i++) {
+    const px = exBL.x + i * siltDx;
+    let py = hPrime;
+    if (i % 2 !== 0) py += 0.03 * Math.max(hPrime, 0.5); // slight bump
+    ptsFisik.push({ x: px, y: py });
+  }
+  
+  // 4. Kerak tebing kanan (naik dengan gaya freehand/sedimen)
+  for (let i = 1; i <= slopeSegments; i++) {
+    const t = i / slopeSegments;
+    let px = exBR.x + (ptRight - exBR.x) * t;
+    let py = hPrime + (h - hPrime) * t;
+    // Tambahkan bump (bulge) sedimen ke arah dalam saluran (karena di kanan, bulge berarti -x)
+    if (i > 0 && i < slopeSegments) {
+       px -= (i % 2 !== 0 ? 0.02 : 0.05) * b3; 
+    }
+    ptsFisik.push({ x: px, y: py });
+  }
+  
+  // 5. Tanggul kanan (menurun tidak lurus)
+  ptsFisik.push({ x: ptRight + (b3 * 0.1), y: h * 0.95 });
+  ptsFisik.push({ x: overRight, y: h * 0.8 });
 
-  // Key coordinates for labels
-  const ptRencanaBawah = toSvg((b1 + slope * h) / 2, hPrime - h);
-  const ptRencanaAtas = toSvg(b3 / 2, hPrime);
-  const ptHDimensi = toSvg(b3 + 0.15, hPrime - h / 2);
-  const ptSkala = toSvg(b3 / 2, -0.1);
+  const ptsSVG = ptsFisik.map(p => toSVG(p.x, p.y));
+
+  let konturPathStr = `M ${ptsSVG[0].x} ${ptsSVG[0].y}`;
+  for (let i = 1; i < ptsSVG.length; i++) {
+    konturPathStr += ` L ${ptsSVG[i].x} ${ptsSVG[i].y}`;
+  }
+
+  // 3. Poligon Galian (ClipPath)
+  // Menutupi area antara garis rencana (luar) dan garis kerak (dalam)
+  const cBL = tBL;
+  const cBR = tBR;
+  const cTR = tTR;
+  const cExBR = toSVG(exBR.x, exBR.y);
+  const cExBL = toSVG(exBL.x, exBL.y);
+  const cTL = tTL;
+  
+  const clipPathStr = `M ${cBL.x} ${cBL.y} L ${cBR.x} ${cBR.y} L ${cTR.x} ${cTR.y} L ${cExBR.x} ${cExBR.y} L ${cExBL.x} ${cExBL.y} L ${cTL.x} ${cTL.y} Z`;
 
   return (
-    <svg width={width} height={height} viewBox={`0 0 ${width} ${height}`}>
-      <defs>
-        {/* ARSIRAN VERTIKAL untuk area galian (│ │ │ │) */}
-        <pattern
-          id="arsir-vertical"
-          patternUnits="userSpaceOnUse"
-          width="6"
-          height="8"
-        >
-          <line x1="3" y1="0" x2="3" y2="8" stroke="#8B0000" strokeWidth="0.8" />
-        </pattern>
-
-        {/* Arrow marker */}
-        <marker
-          id="arrow-black"
-          markerWidth="8"
-          markerHeight="8"
-          refX="4"
-          refY="4"
-          orient="auto"
-        >
-          <path d="M 0 0 L 8 4 L 0 8 Z" fill="#1E3A5F" />
-        </marker>
-
-        {/* Checkered pattern for water */}
-        <pattern
-          id="water-pattern"
-          patternUnits="userSpaceOnUse"
-          width="8"
-          height="4"
-        >
-          <line x1="0" y1="0" x2="8" y2="4" stroke="#4169E1" strokeWidth="0.5" opacity="0.4" />
-          <line x1="0" y1="4" x2="8" y2="0" stroke="#4169E1" strokeWidth="0.5" opacity="0.4" />
-        </pattern>
-
-        {/* Grid pattern */}
-        <pattern
-          id="grid-pattern"
-          patternUnits="userSpaceOnUse"
-          width="20"
-          height="20"
-        >
-          <rect width="20" height="20" fill="none" />
-          <line x1="20" y1="0" x2="20" y2="20" stroke="#E8EEF5" strokeWidth="0.5" />
-          <line x1="0" y1="20" x2="20" y2="20" stroke="#E8EEF5" strokeWidth="0.5" />
-        </pattern>
-      </defs>
-
-      {/* Background grid */}
-      <rect
-        x={padding.left}
-        y={padding.top}
-        width={drawWidth}
-        height={drawHeight}
-        fill="url(#grid-pattern)"
-        opacity="0.5"
-      />
-
-      {/* GROUND SURFACE LINE (muka tanah) */}
-      <line
-        x1={toSvg(-0.2, hPrime).x}
-        y1={toSvg(-0.2, hPrime).y}
-        x2={toSvg(b3 + 0.5, hPrime).x}
-        y2={toSvg(b3 + 0.5, hPrime).y}
-        stroke="#228B22"
-        strokeWidth="2"
-        strokeDasharray="8,3"
-      />
-      <text
-        x={toSvg(-0.1, hPrime).x}
-        y={toSvg(-0.1, hPrime).y - 6}
-        fill="#228B22"
-        fontSize="9"
-        fontWeight="bold"
-        fontFamily="Arial"
+    <div className="w-full h-full flex justify-center items-center bg-gray-200 p-4 drop-shadow-xl overflow-hidden">
+      <svg
+        width="100%" 
+        height="100%" 
+        viewBox={`0 0 ${width} ${height}`} 
+        className="bg-white shadow-2xl"
+        style={{ fontFamily: 'Arial, sans-serif' }}
       >
-        MUKA TANAH
-      </text>
+        <defs>
+          <pattern id="arsir-vertical-cad" patternUnits="userSpaceOnUse" width="10" height="20" patternTransform="rotate(45)">
+            <line x1="0" y1="0" x2="0" y2="20" stroke="#1f2937" strokeWidth="0.8" />
+          </pattern>
+          <clipPath id="area-galian-clip-cad">
+            <path d={clipPathStr} />
+          </clipPath>
+          <marker id="arrow" markerWidth="6" markerHeight="6" refX="3" refY="3" orient="auto-start-reverse">
+            <path d="M 0 0 L 6 3 L 0 6 z" fill="#000" />
+          </marker>
+        </defs>
 
-      {/* AREA GALIAN (di-arsir VERTIKAL) */}
-      <path
-        d={areaGalianPath}
-        fill="url(#arsir-vertical)"
-        stroke="#8B0000"
-        strokeWidth="0.5"
-        opacity="0.9"
-      />
+        {/* --- 1. CANVAS BOUNDARIES --- */}
+        <rect x={0} y={0} width={width} height={height} fill="#ffffff" />
+        <rect x={drawX} y={drawY} width={width - margin*2} height={drawH} fill="none" stroke="#000" strokeWidth="2.5" />
+        <line x1={kopX} y1={kopY} x2={kopX} y2={kopY + drawH} stroke="#000" strokeWidth="2.5" />
 
-      {/* GARIS KONTUR EKSISTING (biru, meliuk-liuk natural) */}
-      <path
-        d={konturPath}
-        stroke="#1E40AF"
-        strokeWidth="2"
-        fill="none"
-      />
+        {/* --- 2. KOP GAMBAR (KANAN) --- */}
+        <g transform={`translate(${kopX}, ${kopY})`}>
+          <rect x={0} y={0} width={kopWidth} height={80} fill="none" stroke="#000" strokeWidth="1.5" />
+          <image href="/logo-bojonegoro.png" x={kopWidth/2 - 20} y={5} width="40" height="45" />
+          <text x={kopWidth/2} y={60} textAnchor="middle" fontSize="10" fontWeight="bold">PEMERINTAH KAB. BOJONEGORO</text>
+          <text x={kopWidth/2} y={72} textAnchor="middle" fontSize="9" fontWeight="bold">DINAS PU SUMBER DAYA AIR</text>
 
-      {/* GARIS RENCANA GALIAN (hitam, trapesium) */}
-      <path
-        d={rencanaPath}
-        stroke="#1E3A5F"
-        strokeWidth="2.5"
-        fill="none"
-      />
+          <rect x={0} y={80} width={kopWidth} height={20} fill="none" stroke="#000" strokeWidth="1.5" />
+          <text x={kopWidth/2} y={93} textAnchor="middle" fontSize="9" fontWeight="bold">PROGRAM</text>
+          <rect x={0} y={100} width={kopWidth} height={30} fill="none" stroke="#000" strokeWidth="1.5" />
+          <text x={kopWidth/2} y={118} textAnchor="middle" fontSize="9">{kopData?.program || '-'}</text>
 
-      {/* Slope talud lines */}
-      {/* Left slope */}
-      <line
-        x1={toSvg(0, hPrime).x}
-        y1={toSvg(0, hPrime).y}
-        x2={toSvg(-slope * h, hPrime - h).x}
-        y2={toSvg(-slope * h, hPrime - h).y}
-        stroke="#1E3A5F"
-        strokeWidth="1"
-        strokeDasharray="3,2"
-      />
-      {/* Right slope */}
-      <line
-        x1={toSvg(b3, hPrime).x}
-        y1={toSvg(b3, hPrime).y}
-        x2={toSvg(b3 + slope * h, hPrime - h).x}
-        y2={toSvg(b3 + slope * h, hPrime - h).y}
-        stroke="#1E3A5F"
-        strokeWidth="1"
-        strokeDasharray="3,2"
-      />
+          <rect x={0} y={130} width={kopWidth} height={20} fill="none" stroke="#000" strokeWidth="1.5" />
+          <text x={kopWidth/2} y={143} textAnchor="middle" fontSize="9" fontWeight="bold">KEGIATAN</text>
+          <rect x={0} y={150} width={kopWidth} height={50} fill="none" stroke="#000" strokeWidth="1.5" />
+          <foreignObject x={5} y={155} width={kopWidth-10} height={40}>
+            <div xmlns="http://www.w3.org/1999/xhtml" style={{fontSize:'9px', textAlign:'center', lineHeight:1.2, fontWeight:'bold'}}>
+              {kopData?.kegiatan || '-'}
+            </div>
+          </foreignObject>
 
-      {/* ==================== DIMENSION LABELS ==================== */}
+          <rect x={0} y={200} width={kopWidth} height={20} fill="none" stroke="#000" strokeWidth="1.5" />
+          <text x={kopWidth/2} y={213} textAnchor="middle" fontSize="9" fontWeight="bold">PEKERJAAN</text>
+          <rect x={0} y={220} width={kopWidth} height={40} fill="none" stroke="#000" strokeWidth="1.5" />
+          <foreignObject x={5} y={225} width={kopWidth-10} height={30}>
+            <div xmlns="http://www.w3.org/1999/xhtml" style={{fontSize:'9px', textAlign:'center', lineHeight:1.2}}>
+              {kopData?.pekerjaan || '-'}
+            </div>
+          </foreignObject>
 
-      {/* b1 - lebar dasar (atas garis bawah) */}
-      <line
-        x1={toSvg(0, hPrime - h).x}
-        y1={toSvg(0, hPrime - h).y + 22}
-        x2={toSvg(b1, hPrime - h).x}
-        y2={toSvg(b1, hPrime - h).y + 22}
-        stroke="#1E3A5F"
-        strokeWidth="1"
-        markerStart="url(#arrow-black)"
-        markerEnd="url(#arrow-black)"
-      />
-      <text
-        x={toSvg(b1 / 2, hPrime - h).x}
-        y={toSvg(b1 / 2, hPrime - h).y + 36}
-        textAnchor="middle"
-        fill="#1E3A5F"
-        fontSize="10"
-        fontWeight="bold"
-        fontFamily="Arial"
-      >
-        b₁ = {b1.toFixed(3)} m
-      </text>
+          <rect x={0} y={260} width={kopWidth/2} height={15} fill="none" stroke="#000" strokeWidth="1.5" />
+          <text x={kopWidth/4} y={271} textAnchor="middle" fontSize="8" fontWeight="bold">LOKASI</text>
+          <rect x={kopWidth/2} y={260} width={kopWidth/2} height={15} fill="none" stroke="#000" strokeWidth="1.5" />
+          <text x={(kopWidth*3)/4} y={271} textAnchor="middle" fontSize="8" fontWeight="bold">TAHUN</text>
 
-      {/* b2 - lebar tengah */}
-      <line
-        x1={toSvg(0, hPrime - h * 0.5).x - 20}
-        y1={toSvg(0, hPrime - h * 0.5).y}
-        x2={toSvg(b1 + slope * h, hPrime - h * 0.5).x + 20}
-        y2={toSvg(b1 + slope * h, hPrime - h * 0.5).y}
-        stroke="#1E3A5F"
-        strokeWidth="0.8"
-        strokeDasharray="3,2"
-        markerStart="url(#arrow-black)"
-        markerEnd="url(#arrow-black)"
-      />
-      <text
-        x={toSvg(b2 / 2, hPrime - h * 0.5).x}
-        y={toSvg(b2 / 2, hPrime - h * 0.5).y - 8}
-        textAnchor="middle"
-        fill="#555"
-        fontSize="9"
-        fontFamily="Arial"
-      >
-        b₂ = {b2.toFixed(3)} m
-      </text>
+          <rect x={0} y={275} width={kopWidth/2} height={25} fill="none" stroke="#000" strokeWidth="1.5" />
+          <text x={kopWidth/4} y={291} textAnchor="middle" fontSize="9">{kopData?.lokasi || '-'}</text>
+          <rect x={kopWidth/2} y={275} width={kopWidth/2} height={25} fill="none" stroke="#000" strokeWidth="1.5" />
+          <text x={(kopWidth*3)/4} y={291} textAnchor="middle" fontSize="9" fontWeight="bold">{kopData?.tahun || '-'}</text>
 
-      {/* b3 - lebar muka tanah (atas garis atas) */}
-      <line
-        x1={toSvg(0, hPrime).x}
-        y1={toSvg(0, hPrime).y - 18}
-        x2={toSvg(b3, hPrime).x}
-        y2={toSvg(b3, hPrime).y - 18}
-        stroke="#1E3A5F"
-        strokeWidth="1"
-        markerStart="url(#arrow-black)"
-        markerEnd="url(#arrow-black)"
-      />
-      <text
-        x={toSvg(b3 / 2, hPrime).x}
-        y={toSvg(b3 / 2, hPrime).y - 26}
-        textAnchor="middle"
-        fill="#1E3A5F"
-        fontSize="10"
-        fontWeight="bold"
-        fontFamily="Arial"
-      >
-        b₃ = {b3.toFixed(3)} m
-      </text>
+          <rect x={0} y={300} width={kopWidth} height={15} fill="none" stroke="#000" strokeWidth="1.5" />
+          <text x={kopWidth/2} y={311} textAnchor="middle" fontSize="8" fontWeight="bold">CATATAN</text>
+          <rect x={0} y={315} width={kopWidth} height={80} fill="none" stroke="#000" strokeWidth="1.5" />
 
-      {/* h - kedalaman galian (garis tegak kanan) */}
-      <line
-        x1={toSvg(b3 + 0.2, hPrime).x}
-        y1={toSvg(b3 + 0.2, hPrime).y}
-        x2={toSvg(b3 + 0.2, hPrime - h).x}
-        y2={toSvg(b3 + 0.2, hPrime - h).y}
-        stroke="#8B0000"
-        strokeWidth="1.2"
-        markerStart="url(#arrow-black)"
-        markerEnd="url(#arrow-black)"
-      />
-      <text
-        x={toSvg(b3 + 0.4, hPrime - h / 2).x}
-        y={toSvg(b3 + 0.4, hPrime - h / 2).y}
-        fill="#8B0000"
-        fontSize="10"
-        fontWeight="bold"
-        fontFamily="Arial"
-      >
-        h = {h.toFixed(3)} m
-      </text>
+          {/* Kaki KOP */}
+          <rect x={0} y={400} width={kopWidth/2} height={15} fill="none" stroke="#000" strokeWidth="1.5" />
+          <text x={kopWidth/4} y={410} textAnchor="middle" fontSize="8" fontWeight="bold">JUDUL GAMBAR</text>
+          <rect x={kopWidth/2} y={400} width={kopWidth/2} height={15} fill="none" stroke="#000" strokeWidth="1.5" />
+          <text x={(kopWidth*3)/4} y={410} textAnchor="middle" fontSize="8" fontWeight="bold">SKALA</text>
 
-      {/* h' - tinggi air eksisting */}
-      <text
-        x={toSvg(b3 + 0.4, hPrime * 0.6).x}
-        y={toSvg(b3 + 0.4, hPrime * 0.6).y}
-        fill="#555"
-        fontSize="9"
-        fontFamily="Arial"
-      >
-        h' = {hPrime.toFixed(3)} m
-      </text>
+          <rect x={0} y={415} width={kopWidth/2} height={30} fill="none" stroke="#000" strokeWidth="1.5" />
+          <text x={kopWidth/4} y={428} textAnchor="middle" fontSize="9" fontWeight="bold">CROSS SECTION</text>
+          <text x={kopWidth/4} y={440} textAnchor="middle" fontSize="9">STA {staData?.sta || '0+000'}</text>
+          <rect x={kopWidth/2} y={415} width={kopWidth/2} height={30} fill="none" stroke="#000" strokeWidth="1.5" />
+          <text x={(kopWidth*3)/4} y={433} textAnchor="middle" fontSize="10">{kopData?.skala || '1:100'}</text>
+        </g>
 
-      {/* SLOPE RATIO labels */}
-      {/* Left slope label */}
-      <text
-        x={toSvg(-slope * h * 0.7, hPrime - h * 0.7).x}
-        y={toSvg(-slope * h * 0.7, hPrime - h * 0.7).y}
-        fill="#555"
-        fontSize="8"
-        fontFamily="Arial"
-      >
-        1 : {slope}
-      </text>
-      {/* Right slope label */}
-      <text
-        x={toSvg(b3 + slope * h * 0.3, hPrime - h * 0.3).x}
-        y={toSvg(b3 + slope * h * 0.3, hPrime - h * 0.3).y}
-        fill="#555"
-        fontSize="8"
-        fontFamily="Arial"
-      >
-        1 : {slope}
-      </text>
+        {/* --- 3. CROSS SECTION DRAWING --- */}
+        <g>
+          {/* Garis Dasar/Datum horizontal (Elevation Line) */}
+          <line x1={drawX + 10} y1={originY} x2={kopX - 10} y2={originY} stroke="#000" strokeWidth="1" strokeDasharray="10,5" />
+          <text x={drawX + 10} y={originY - 5} fill="#000" fontSize="9">Elevasi Normalisasi (0.00)</text>
 
-      {/* LUAS GALIAN label */}
-      <text
-        x={ptRencanaBawah.x}
-        y={ptRencanaBawah.y}
-        textAnchor="middle"
-        fill="#8B0000"
-        fontSize="13"
-        fontWeight="bold"
-        fontFamily="Arial"
-        stroke="white"
-        strokeWidth="3"
-        paintOrder="stroke"
-      >
-        Luas = {Number(luasGalian).toFixed(3)} m²
-      </text>
+          {/* Arsiran (Hatching) Area Galian */}
+          <g clipPath="url(#area-galian-clip-cad)">
+            <rect x={0} y={0} width={width} height={height} fill="url(#arsir-vertical-cad)" />
+          </g>
 
-      {/* ==================== SKALA BAR ==================== */}
-      <g transform={`translate(${toSvg(0, -0.25).x}, ${toSvg(0, -0.25).y + 8})`}>
-        <line x1="0" y1="0" x2={`${scale * 1}m`} y2="0" stroke="#1E3A5F" strokeWidth="1" />
-        <line x1="0" y1="-3" x2="0" y2="3" stroke="#1E3A5F" strokeWidth="1" />
-        <line x1={`${scale * 1}m`} y1="-3" x2={`${scale * 1}m`} y2="3" stroke="#1E3A5F" strokeWidth="1" />
-        <text x={0} y="-6" fill="#1E3A5F" fontSize="7" fontFamily="Arial">0</text>
-        <text x={scale * 1} y="-6" fill="#1E3A5F" fontSize="7" fontFamily="Arial">1m</text>
-        <text x={scale * 0.5} y="-6" fill="#1E3A5F" fontSize="7" fontFamily="Arial" textAnchor="middle">1m</text>
-      </g>
+          {/* Trapesium Rencana (Solid Black, Thick) */}
+          <path d={rencanaPathStr} stroke="#000" strokeWidth="1.5" strokeDasharray="4,4" fill="none" />
+          
+          {/* Poligon Galian Line Outline/Stroke */}
+          <path d={clipPathStr} stroke="#1d4ed8" strokeWidth="2.5" fill="none" />
 
-      {/* ==================== LEGENDA ==================== */}
-      <g transform={`translate(${padding.left + 5}, ${height - padding.bottom - 18})`}>
-        {/* Garis Kontur Eksisting */}
-        <line x1="0" y1="0" x2="25" y2="0" stroke="#1E40AF" strokeWidth="2" />
-        <text x="30" y="4" fill="#1E40AF" fontSize="8" fontFamily="Arial" fontWeight="bold">KONTUR EKSISTING</text>
+          {/* Kontur Tanah Eksisting (Solid Black) */}
+          <path d={konturPathStr} stroke="#166534" strokeWidth="2" fill="none" />
 
-        {/* Garis Rencana Galian */}
-        <line x1="130" y1="0" x2="155" y2="0" stroke="#1E3A5F" strokeWidth="2.5" />
-        <text x="160" y="4" fill="#1E3A5F" fontSize="8" fontFamily="Arial" fontWeight="bold">RENCANA GALIAN</text>
+          <circle cx={cTR.x} cy={cTR.y} r="3" fill="#ef4444" />
+          <circle cx={cTL.x} cy={cTL.y} r="3" fill="#ef4444" />
 
-        {/* Area Galian */}
-        <rect x="265" y="-7" width="20" height="14" fill="url(#arsir-vertical)" stroke="#8B0000" strokeWidth="0.5" />
-        <text x="290" y="4" fill="#8B0000" fontSize="8" fontFamily="Arial" fontWeight="bold">AREA GALIAN</text>
-      </g>
+          {/* --- LABEL DIMENSI --- */}
+          {/* Lebar Dasar b1 */}
+          <line x1={tBL.x} y1={tBL.y + 15} x2={tBL.x + b1*s} y2={tBL.y + 15} stroke="#000" strokeWidth="1" markerStart="url(#arrow)" markerEnd="url(#arrow)" />
+          <text x={tBL.x + (b1*s)/2} y={tBL.y + 25} textAnchor="middle" fontSize="10" fontWeight="bold">b1 = {b1.toFixed(2)} m</text>
 
-      {/* Footer note */}
-      <text
-        x={width / 2}
-        y={height - 5}
-        textAnchor="middle"
-        fill="#888"
-        fontSize="7"
-        fontFamily="Arial"
-        fontStyle="italic"
-      >
-        Potongan Melintang STA {staData?.sta || '0+000'} - Scale {kopData?.skala || '1:50'}
-      </text>
+          {/* Kedalaman galian eksisting h' */}
+          <line x1={tBR.x + 10} y1={cTR.y} x2={tBR.x + 10} y2={tBR.y} stroke="#000" strokeWidth="1" markerStart="url(#arrow)" markerEnd="url(#arrow)" />
+          <text x={tBR.x + 15} y={cTR.y + (hPrime*s)/2 + 4} fontSize="10" fontWeight="bold">h' = {hPrime.toFixed(2)} m</text>
 
-      {/* KOP GOVERNMENT (di kiri) */}
-      {showKop && kopData && (
-        <KopInline
-          data={kopData}
-          width={padding.left - 5}
-          height={height}
-        />
-      )}
-    </svg>
+          {/* Kedalaman Rencana h */}
+          <line x1={tTR.x + 25} y1={tTR.y} x2={tBR.x + 25} y2={tBR.y} stroke="#6b7280" strokeWidth="1" markerStart="url(#arrow)" markerEnd="url(#arrow)" />
+          <text x={tTR.x + 30} y={tTR.y + (h*s)/2 + 4} fontSize="10" fill="#4B5563">h = {h.toFixed(2)} m</text>
+
+          {/* Label Kemiringan (Slope Ratio) */}
+          <text x={tTR.x - 20} y={tTR.y + (h*s)/2.5} fontSize="9" fill="#000" fontWeight="bold">
+            1 : {m.toFixed(2)}
+          </text>
+
+          {/* Lebar Eksisting Puncak Galian */}
+          <line x1={cTL.x} y1={cTL.y - 12} x2={cTR.x} y2={cTR.y - 12} stroke="#1d4ed8" strokeWidth="1" markerStart="url(#arrow)" markerEnd="url(#arrow)" />
+          <text x={originX} y={cTL.y - 18} textAnchor="middle" fontSize="10" fill="#1d4ed8" fontWeight="bold">b exs = {b_eksisting.toFixed(2)} m</text>
+
+          {/* Label Luasan Matematika vs Visual */}
+          <rect x={originX - 60} y={cTL.y - 65} width="120" height="28" fill="#fff" stroke="#1d4ed8" strokeWidth="1.5" rx="4" />
+          <text x={originX} y={cTL.y - 48} textAnchor="middle" fontSize="11" fill="#1d4ed8" fontWeight="bold">
+            Galian: {actualLuas.toFixed(2)} m²
+          </text>
+        </g>
+        
+      </svg>
+    </div>
   );
 };
 
