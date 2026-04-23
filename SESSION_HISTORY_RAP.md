@@ -1,10 +1,10 @@
 # Laporan Sesi: Rekonstruksi Modul Perhitungan RAP (Tahap Akhir)
-**Tanggal Sesi:** 22 April 2026
+**Tanggal Sesi:** 22-23 April 2026
 
 ## Ringkasan Eksekutif
-Sesi ini difokuskan pada perbaikan visual CAD dan perombakan total mesin *export* Excel pada modul "Perhitungan RAP" agar sesuai dengan standar ketat gambar teknik dan format dokumen Excel master Dinas PU Bojonegoro.
+Sesi ini difokuskan pada perbaikan visual CAD dan perombakan total mesin *export* Excel pada modul "Perhitungan RAP" agar sesuai dengan standar ketat gambar teknik dan format dokumen Excel master Dinas PU Bojonegoro. Selain itu, telah direncanakan Fase 11 untuk otomatisasi GoalSeek tingkat lanjut.
 
-## Pencapaian Utama
+## Pencapaian Utama (Fase 10)
 
 ### 1. Refinement Geometri CAD (Visual Tanah Eksisting)
 *   **Masalah Sebelumnya:** Garis tanah eksisting digambar lurus kaku sehingga area galian tampak tidak natural.
@@ -21,10 +21,11 @@ Sesi ini difokuskan pada perbaikan visual CAD dan perombakan total mesin *export
 *   **Solusi:** Menambahkan logika *SVG-to-PNG Base64 converter* di `rapExport.js`.
 *   **Hasil:** Saat mengklik *Export Excel*, sistem akan memotret gambar SVG, membuat Sheet baru bernama **"LAMPIRAN CAD"**, dan menempelkan gambar-gambar PNG tersebut dengan tata letak Kertas Landscape (1 gambar per halaman).
 
-## Kesimpulan & Alur Kerja Selanjutnya
-Modul "Perhitungan RAP" kini telah memiliki fungsionalitas kelas *Enterprise* yang siap untuk mencetak laporan resmi. Alur kerja untuk pengguna (Admin/Operator) saat ini adalah:
-1. Mengisi parameter geometri dan memilih *Log Harian*.
-2. Klik **Export Excel**.
-3. Buka file yang terunduh dan cetak (*Print Entire Workbook*) menggunakan Microsoft Excel untuk mendapatkan PDF yang terformat sempurna.
+## Rencana Fase 11 (Otomatisasi Lanjut & Standarisasi Master Template)
+1. **Standarisasi Template Master:** Hanya menggunakan `pc 50.xlsx` sebagai template cetak agar format sel seragam. Spesifikasi alat akan diinjeksi secara dinamis.
+2. **Fitur Stripping Area:** Penambahan input Lebar & Kedalaman Stripping di form Geometri, di mana Total Volume = Volume Saluran + Volume Stripping.
+3. **Form Alat Editable & Validasi AHSP:** Membuat parameter spesifikasi alat dapat diedit dengan panel perbandingan (Sebelum/Sesudah) dan *warning* batasan AHSP.
+4. **Auto-GoalSeek Volume Pelaksanaan:** Algoritma yang akan otomatis mengubah lebar penampang pelaksanaan (`b1`) agar volumenya presisi 100% sama dengan akumulasi Log Realisasi.
+5. **Auto-GoalSeek Sinkronisasi BBM:** Algoritma rekayasa mundur (Reverse Engineering) untuk mengatur parameter efisiensi (Fd, Fe, L/kWh) agar sisa *Running Balance* BBM selalu logis dan tidak pernah menyentuh angka negatif sebelum pasokan turun kembali.
 
-Semua *source code* telah disimpan dengan aman dan disinkronisasi. Sesi dapat ditutup.
+Semua *source code* telah disimpan dengan aman dan disinkronisasi. Sesi dapat di-*pause* dan dilanjutkan nanti.
