@@ -21,7 +21,7 @@ import {
   CheckCircle2, ChevronLeft, ChevronRight, Eye,
   ZoomIn, ZoomOut, Focus, Fuel, Download, Printer,
   FileText, BarChart3, Table2, Image as ImageIcon,
-  HelpCircle, BookOpen, Plus, Check, CloudOff, PenLine
+  HelpCircle, BookOpen, Plus, Check, CloudOff, PenLine, Activity
 } from 'lucide-react';
 
 /* ═══════════════════════════════════════════════════════════
