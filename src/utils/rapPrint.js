@@ -112,12 +112,6 @@ export function printCrossSections(rapState) {
       <style>
         /* Ukuran Kertas F4/Folio Portrait (215.9 x 330.2 mm) */
         @page { size: 215.9mm 330.2mm portrait; margin: 15mm; }
-        
-        /* Definisi Halaman Landscape Khusus Gambar Teknik */
-        @page landscape-page { 
-          size: 330.2mm 215.9mm landscape; 
-          margin: 10mm; 
-        }
 
         body { font-family: 'Times New Roman', Times, serif; margin: 0; padding: 0; background: #fff; color: #000; font-size: 12pt; }
         
@@ -128,13 +122,28 @@ export function printCrossSections(rapState) {
           position: relative;
         }
         
-        .page.landscape { 
-          page: landscape-page;
-          width: 310.2mm; 
-          height: 195.9mm;
+        .page.cad-page { 
+          height: 300mm; /* Sisa tinggi kertas setelah margin */
           display: flex;
-          flex-direction: column;
           justify-content: center;
+          align-items: center;
+          overflow: hidden;
+        }
+
+        .cad-wrapper {
+          transform: rotate(90deg);
+          transform-origin: center center;
+          width: 300mm;   /* Sama dengan tinggi area yang tersedia */
+          height: 185mm;  /* Sama dengan lebar area yang tersedia */
+          display: flex;
+          justify-content: center;
+          align-items: center;
+        }
+
+        .cad-wrapper svg {
+          width: 100%;
+          height: 100%;
+          object-fit: contain;
         }
 
         .page:last-child { page-break-after: avoid; }
@@ -164,16 +173,9 @@ export function printCrossSections(rapState) {
         .ttd-section { width: 100%; display: flex; justify-content: space-between; margin-top: 50px; page-break-inside: avoid; }
         .ttd-box { width: 40%; text-align: center; }
         .ttd-name { margin-top: 70px; font-weight: bold; text-decoration: underline; }
-        
-        .cad-container { width: 100%; height: 100%; display: flex; justify-content: center; align-items: center; }
-        .cad-container svg { width: 100%; height: 100%; object-fit: contain; }
 
         @media print { 
           body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-          .page.landscape { 
-            width: 100%;
-            height: 100%;
-          }
           ::-webkit-scrollbar { display: none; }
         }
       </style>
@@ -352,18 +354,18 @@ export function printCrossSections(rapState) {
       </div>
 
       <!-- BAGIAN 1: GAMBAR PERENCANAAN (LANDSCAPE, 1 PER HALAMAN) -->
-      ${svgsRencana.length > 0 ? `<div class="section-title" style="page-break-before: always;">LAMPIRAN I: GAMBAR PERENCANAAN (REKAYASA)</div>` : ''}
+      ${svgsRencana.length > 0 ? `<div class="page"><div class="section-title" style="margin-top:50px;">LAMPIRAN I: GAMBAR PERENCANAAN (REKAYASA)</div></div>` : ''}
       ${svgsRencana.map((s, idx) => `
-        <div class="page landscape">
-          <div class="cad-container">${s.svg}</div>
+        <div class="page cad-page">
+          <div class="cad-wrapper">${s.svg}</div>
         </div>
       `).join('')}
 
       <!-- BAGIAN 2: GAMBAR PELAKSANAAN (LANDSCAPE, 1 PER HALAMAN) -->
-      ${svgsPelaksanaan.length > 0 ? `<div class="section-title" style="page-break-before: always;">LAMPIRAN II: GAMBAR PELAKSANAAN (REALISASI)</div>` : ''}
+      ${svgsPelaksanaan.length > 0 ? `<div class="page"><div class="section-title" style="margin-top:50px;">LAMPIRAN II: GAMBAR PELAKSANAAN (REALISASI)</div></div>` : ''}
       ${svgsPelaksanaan.map((s, idx) => `
-        <div class="page landscape">
-          <div class="cad-container">${s.svg}</div>
+        <div class="page cad-page">
+          <div class="cad-wrapper">${s.svg}</div>
         </div>
       `).join('')}
 
