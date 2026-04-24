@@ -475,6 +475,24 @@ export default function RapWizard() {
                       </p>
                     </div>
                   </Section>
+
+                  <Section icon={Activity} title="Hasil Kalkulasi GoalSeek (Auto)">
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-3 bg-[#f8f9ff] p-4 rounded-xl border border-[#c2c6d3]/30">
+                      <div><div className="text-[10px] text-[#424751] uppercase tracking-wide font-bold">Waktu Siklus (T.1)</div><div className="font-mono text-sm font-bold text-[#00346f]">{analisa?.t1_detik || 0} det / {analisa?.t1 || 0} mnt</div></div>
+                      <div><div className="text-[10px] text-[#424751] uppercase tracking-wide font-bold">Faktor Kedalaman (Fd)</div><div className="font-mono text-sm font-bold text-[#00346f]">{analisa?.fd || 0}</div></div>
+                      <div><div className="text-[10px] text-[#424751] uppercase tracking-wide font-bold">Faktor Efisiensi (Fe)</div><div className="font-mono text-sm font-bold text-[#00346f]">{analisa?.fe || 0}</div></div>
+                      <div><div className="text-[10px] text-[#424751] uppercase tracking-wide font-bold">Tenaga Output (kW)</div><div className="font-mono text-sm font-bold text-[#00346f]">{analisa?.kW || 0}</div></div>
+                      <div><div className="text-[10px] text-[#424751] uppercase tracking-wide font-bold">Produksi Jam (Q1)</div><div className="font-mono text-sm font-bold text-[#00346f]">{analisa?.q1 || 0} m³/jam</div></div>
+                      <div><div className="text-[10px] text-[#424751] uppercase tracking-wide font-bold">Produksi Hari (Q2)</div><div className="font-mono text-sm font-bold text-[#00346f]">{analisa?.q2 || 0} m³/hari</div></div>
+                      <div><div className="text-[10px] text-[#424751] uppercase tracking-wide font-bold">Konsumsi (H)</div><div className="font-mono text-sm font-bold text-[#00346f]">{analisa?.H || 0} L/jam</div></div>
+                      <div><div className="text-[10px] text-[#424751] uppercase tracking-wide font-bold">Sisa BBM Akhir</div><div className="font-mono text-sm font-bold text-[#00346f]">{analisa?.sisaAkhir || 0} Liter</div></div>
+                    </div>
+                    {analisa?.converged === false && (
+                      <div className="mt-2 p-2 bg-red-50 border border-red-200 rounded-lg text-[10px] text-red-700">
+                        ⚠️ GoalSeek gagal menemukan titik temu optimal. Nilai ditampilkan adalah estimasi terbaik (Best Effort).
+                      </div>
+                    )}
+                  </Section>
                 </div>
               )}
 
