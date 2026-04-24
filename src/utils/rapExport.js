@@ -38,7 +38,7 @@ const svgToPngBase64 = (svgString) => {
 
 export async function downloadExcel(data) {
   try {
-    const { geometri, backupPelaksanaan, analisaRencana, selTotals, dailyData, selectedDailyIndices, kopData, selectedExcavator } = data;
+    const { geometri, backupPelaksanaan, analisaRencana, analisaCalculated, selTotals, dailyData, selectedDailyIndices, kopData, selectedExcavator } = data;
     
     // 1. Tentukan File Template (STANDARISASI FASE 11: Selalu gunakan pc 50.xlsx sebagai Master)
     const templatePath = '/pc 50.xlsx';

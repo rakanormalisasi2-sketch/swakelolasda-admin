@@ -140,6 +140,28 @@ export default function RapWizard() {
     approvedBy: 'Dr. Hendra Wijaya, IAI'
   });
 
+  // ── STATE: Harga Default (Auto-save localStorage) ──
+  const [hargaBBM, setHargaBBM] = useState(22300);
+  const [hargaPenjaga, setHargaPenjaga] = useState(75000);
+
+  // Load harga dari localStorage saat mount
+  useEffect(() => {
+    try {
+      const savedBBM = localStorage.getItem('rap_harga_bbm');
+      const savedPenjaga = localStorage.getItem('rap_harga_penjaga');
+      if (savedBBM) setHargaBBM(Number(savedBBM));
+      if (savedPenjaga) setHargaPenjaga(Number(savedPenjaga));
+    } catch {}
+  }, []);
+
+  // Auto-save harga ke localStorage setiap perubahan
+  useEffect(() => {
+    try {
+      localStorage.setItem('rap_harga_bbm', String(hargaBBM));
+      localStorage.setItem('rap_harga_penjaga', String(hargaPenjaga));
+    } catch {}
+  }, [hargaBBM, hargaPenjaga]);
+
   // ════════════════════════════════════
   // DERIVED CALCULATIONS (Real-time)
   // ════════════════════════════════════
@@ -170,8 +192,8 @@ export default function RapWizard() {
   }), { jam: 0, galian: 0, bbm: 0 }), [selectedData]);
 
   const durasiHOK = selectedData.length;
-  const costBBM = selTotals.bbm * 22300;
-  const costPenjaga = 2 * 75000 * durasiHOK; // 2 penjaga malam
+  const costBBM = selTotals.bbm * hargaBBM;
+  const costPenjaga = 2 * hargaPenjaga * durasiHOK; // 2 penjaga malam
   const grandTotal = (costBBM + costPenjaga) * 1.12; // + PPN 12%
 
   // ── Sync excavator selection ──
@@ -290,7 +312,7 @@ export default function RapWizard() {
     const stasPelaksanaan = generateSTAPerencanaan({ ...geometri, b1: b1Pelaksanaan, b3: geometri.b3, h: geometri.h, hPrime: geometri.hGalian, panjang: geometri.panjang });
 
     const rapStateForPrint = {
-      geometri: { stas: stasRencana.stas, kopData, slope: geometri.slope, ...geometri, hPrime: geometri.hGalian },
+      geometri: { stas: stasRencana.stas, kopData, slope: geometri.slope, ...geometri, hPrime: geometri.hGalian, volumeGalian, volumeStripping, totalVolume },
       backupPelaksanaan: { stas: stasPelaksanaan.stas, b1: b1Pelaksanaan },
       analisaRencana: alatParams,
       personil: { durasiHari: durasiHOK, penjagaMalam: 2 },
@@ -300,7 +322,10 @@ export default function RapWizard() {
       grandTotal,
       costBBM,
       costPenjaga,
-      analisaCalculated: analisa
+      hargaBBM,
+      hargaPenjaga,
+      analisaCalculated: analisa,
+      selectedExcavator
     };
     
     printCrossSections(rapStateForPrint);
@@ -541,6 +566,14 @@ export default function RapWizard() {
                   <Section icon={FileText} title="Identitas Proyek">
                     <EngInput label="Nama Pekerjaan" value={kopData.pekerjaan} onChange={v => setKopData(k => ({...k, pekerjaan: v}))} type="text" />
                     <EngInput label="Lokasi / Koordinat" value={kopData.lokasi} onChange={v => setKopData(k => ({...k, lokasi: v}))} type="text" />
+                  </Section>
+
+                  <Section icon={Fuel} title="Harga Satuan Bahan (Auto-Save Default)">
+                    <EngInput label="Harga BBM Solar per Liter" value={hargaBBM} onChange={v => setHargaBBM(v)} unit="Rp" step="100" />
+                    <EngInput label="Upah Penjaga Malam per Hari" value={hargaPenjaga} onChange={v => setHargaPenjaga(v)} unit="Rp" step="1000" />
+                    <div className="mt-2 p-2 bg-emerald-50 border border-emerald-200 rounded-lg">
+                      <p className="text-[10px] text-emerald-700">✅ Nilai ini otomatis tersimpan sebagai default dan akan digunakan kembali di sesi berikutnya.</p>
+                    </div>
                   </Section>
 
                   <Section icon={PenLine} title="Signatories">
