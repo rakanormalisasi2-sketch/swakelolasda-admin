@@ -276,65 +276,31 @@ export function calculateAnalisaRencana(volumeTarget, params) {
  */
 export function calculateAnalisaWithGoalSeek(volumeTarget, params) {
   const { totalBBM, ...rest } = params;
-
-  // If no totalBBM provided, fall back to standard calculation
-  if (!totalBBM || totalBBM <= 0) {
-    return calculateAnalisaRencana(volumeTarget, rest);
-  }
-
+  if (!totalBBM || totalBBM <= 0) return calculateAnalisaRencana(volumeTarget, rest);
   try {
-    const goalseek = goalSeekBisectionPerencanaan({
-      volume: volumeTarget,
-      totalBBM,
-      hp: rest.hp,
-      bucket: rest.bucket,
-      fb: rest.fb,
-      fa: rest.fa,
-      fv: rest.fv,
-      fk: rest.fk,
-      loadFactor: rest.loadFactor,
-      waktuGali: rest.waktuGali,
-      tk: rest.tk || 8,
-      targetSisaMin: 40,
-      targetSisaMax: 100,
-      targetSisaIdeal: 70
+    const gs = goalSeekBisectionPerencanaan({
+      volume: volumeTarget, totalBBM,
+      hp: rest.hp, bucket: rest.bucket, fb: rest.fb, fa: rest.fa,
+      fv: rest.fv, fk: rest.fk, loadFactor: rest.loadFactor,
+      waktuGali: rest.waktuGali, feMenit: rest.feMenit || 48,
+      tk: rest.tk || 7, targetSisaMin: 40, targetSisaMax: 150
     });
-
     return {
-      tk: rest.tk || 8,
-      fk: rest.fk || 0.8,
-      hp: rest.hp || 148,
-      bucket: rest.bucket || 0.9,
-      fb: rest.fb || 1.0,
-      fa: rest.fa || 0.7,
-      fv: rest.fv || 0.8,
-      loadFactor: rest.loadFactor || 0.28,
-      feMenit: rest.feMenit || 45,
-      waktuGali: rest.waktuGali || 38,
-      t1: goalseek.t1,
-      fd: goalseek.t1_detik / 60,
-      kW: (rest.hp || 148) * 0.7457,
-      fe: (rest.feMenit || 45) / 60,
-      q1: goalseek.q1,
-      q2: goalseek.q2,
-      H: goalseek.h,
-      h2: goalseek.h2,
-      koefBBM: goalseek.koefBBM,
-      estimasiHari: goalseek.estimasiHari,
-      totalSolar: goalseek.totalSolarUsed,
-      volumeTarget,
-      // GoalSeek metadata
-      sisaAkhir: goalseek.sisaAkhir,
-      converged: goalseek.converged,
-      dalamRangeSNI: goalseek.dalamRangeSNI,
-      goalseekStatus: goalseek.status,
-      t1_detik: goalseek.t1_detik,
-      targetSisaIdeal: goalseek.targetSisaIdeal
+      tk: rest.tk||7, fk: rest.fk||0.8, hp: rest.hp||148,
+      bucket: rest.bucket||0.9, fb: rest.fb||1.0, fa: rest.fa||0.7,
+      fv: rest.fv||0.8, loadFactor: rest.loadFactor||0.28,
+      feMenit: rest.feMenit||48, waktuGali: rest.waktuGali||38,
+      t1: gs.t1, fd: gs.fd, kW: gs.kW, fe: gs.fe,
+      q1: gs.q1, q2: gs.q2, H: gs.h, h2: gs.h2,
+      koefBBM: gs.koefBBM, estimasiHari: gs.estimasiHari,
+      totalSolar: gs.totalSolarUsed, volumeTarget,
+      volRealisasi: gs.volRealisasi, volSurplus: gs.volSurplus,
+      sisaAkhir: gs.sisaAkhir, converged: gs.converged,
+      dalamRangeSNI: gs.dalamRangeSNI, goalseekStatus: gs.status,
+      t1_detik: gs.t1_detik, targetSisaIdeal: gs.targetSisaIdeal,
+      inRange: gs.inRange
     };
-  } catch (err) {
-    // Graceful fallback if GoalSeek fails
-    return calculateAnalisaRencana(volumeTarget, rest);
-  }
+  } catch (err) { return calculateAnalisaRencana(volumeTarget, rest); }
 }
 
 // =====================
@@ -883,127 +849,51 @@ export function generateKebutuhanRealisasiSheet(rapState) {
  */
 export function goalSeekBisectionPerencanaan(params) {
   const {
-    volume,           // Total volume galian (m³)
-    totalBBM,        // Total BBM yang diterima (liter)
-    targetSisaMin = 40,
-    targetSisaMax = 100,
-    targetSisaIdeal = 70,
-    // Excavator specs
-    hp = 148,
-    bucket = 0.9,
-    fb = 1.0,
-    fa = 0.7,
-    fv = 0.8,
-    fk = 0.8,
-    loadFactor = 0.28,
-    waktuGali = 38,  // detik
-    tk = 8,          // jam per hari
-    maxIter = 50,
-    tolerance = 0.5  // liter
+    volume, totalBBM, targetSisaMin=40, targetSisaMax=150, targetSisaIdeal=90,
+    hp=148, bucket=0.9, fb=1.0, fa=0.7, fv=0.8, fk=0.8,
+    loadFactor=0.28, waktuGali=38, feMenit=48, tk=7,
+    volSurplusMin=1.00, volSurplusMax=5.00
   } = params;
-
   const kW = hp * 0.7457;
-  const SPECIFIC_FUEL = 0.10; // L/kWh
-  const H_liter_jam = kW * loadFactor * SPECIFIC_FUEL;
-
-  const Q1 = (t1_menit) => {
-    if (t1_menit <= 0) return Infinity;
-    return (bucket * fb * fa * 60) / (t1_menit * fv * fk);
-  };
-
-  const totalSolar = (t1_menit) => {
-    const q1 = Q1(t1_menit);
-    if (q1 <= 0) return Infinity;
-    return (volume / q1) * H_liter_jam;
-  };
-
-  const targetSolar = totalBBM - targetSisaIdeal;
-  const f = (t1_menit) => totalSolar(t1_menit) - targetSolar;
-
-  // SNI range in MENIT
-  const T_low  = 14.4 / 60;  // 0.240 menit
-  const T_high = 31.8 / 60;  // 0.530 menit
-
-  const fLow  = f(T_low);
-  const fHigh = f(T_high);
-
-  let converged = false;
-  let bestT1 = (T_low + T_high) / 2;
-  let bestSisa = totalBBM - totalSolar(bestT1);
-
-  if (fLow * fHigh > 0) {
-    // No exact root — find T.1 closest to ideal sisa
-    let a = T_low, b = T_high;
-    let bestDist = Infinity;
-    for (let i = 0; i < maxIter; i++) {
-      const mid = (a + b) / 2;
-      const midSolar = totalSolar(mid);
-      const midSisa = totalBBM - midSolar;
-      const dist = Math.abs(midSisa - targetSisaIdeal);
-      if (dist < bestDist) {
-        bestDist = dist;
-        bestT1 = mid;
-        bestSisa = midSisa;
-      }
-      // Narrow interval toward ideal
-      const solarA = totalSolar(a);
-      if (Math.abs(totalBBM - solarA - targetSisaIdeal) < Math.abs(totalBBM - midSolar - targetSisaIdeal)) {
-        b = mid;
-      } else {
-        a = mid;
-      }
-    }
-  } else {
-    // === BISECTION ===
-    let a = T_low, b = T_high;
-    let fa = fLow, fb = fHigh;
-    for (let i = 0; i < maxIter; i++) {
-      const mid = (a + b) / 2;
-      const fmid = f(mid);
-      if (Math.abs(fmid) < tolerance) {
-        bestT1 = mid;
-        converged = true;
-        bestSisa = totalBBM - totalSolar(mid);
-        break;
-      }
-      if (fa * fmid < 0) { b = mid; fb = fmid; }
-      else                { a = mid; fa = fmid; }
-      bestT1 = mid;
-      bestSisa = totalBBM - totalSolar(mid);
+  const Fe = (feMenit||48) / 60;
+  const calcQ1 = t1 => t1<=0 ? Infinity : (bucket*fb*fa*60)/(t1*fv*fk);
+  const calcFd = t1 => { const s=t1*60; return s<=0?1:(waktuGali/s)+((s-waktuGali)/s)*0.7; };
+  const calcH = t1 => calcFd(t1)*Fe*kW*loadFactor;
+  const T_low=0.10, T_high=0.80, step=(T_high-T_low)/2000;
+  let bestT1=0.31, bestScore=Infinity, converged=false;
+  for(let t1=T_low;t1<=T_high;t1+=step){
+    const q1=calcQ1(t1), q2=q1*tk, estH=Math.ceil(volume/q2);
+    const vr=q1*estH*tk, surplus=vr-volume;
+    const h=calcH(t1), solar=h*estH*tk, sisa=totalBBM-solar;
+    const sOK=surplus>=volSurplusMin&&surplus<=volSurplusMax;
+    const bOK=sisa>=targetSisaMin&&sisa<=targetSisaMax;
+    if(sOK&&bOK){
+      const sc=Math.abs(surplus-(volSurplusMin+volSurplusMax)/2);
+      if(sc<bestScore){bestScore=sc;bestT1=t1;converged=true;}
+    } else if(!converged){
+      const sp=surplus<volSurplusMin?(volSurplusMin-surplus)*10:surplus>volSurplusMax?(surplus-volSurplusMax)*10:0;
+      const bp=sisa<targetSisaMin?(targetSisaMin-sisa)*5:sisa>targetSisaMax?(sisa-targetSisaMax)*2:0;
+      const sc=Math.abs(surplus-(volSurplusMin+volSurplusMax)/2)+sp+bp;
+      if(sc<bestScore){bestScore=sc;bestT1=t1;}
     }
   }
-
-  const sisaAkhir = Math.max(targetSisaMin, Math.min(targetSisaMax, bestSisa));
-  const inRange = sisaAkhir >= targetSisaMin && sisaAkhir <= targetSisaMax;
-
-  const Q1_res = Q1(bestT1);
-  const Q2_res = Q2(Q1_res, tk);
-  const estimasiHari = Math.ceil(volume / Q2_res);
-  const H_res = H_liter_jam;
-  const h2_res = H_res * tk;
-  const koefBBM = H_res / Q1_res;
-  const totalSolarUsed = volume * koefBBM;
-  const Fd_res = waktuGali / (bestT1 * 60);
-
+  const Q1r=calcQ1(bestT1),Q2r=Q1r*tk,estHari=Math.ceil(volume/Q2r);
+  const Fdr=calcFd(bestT1),Hr=calcH(bestT1),h2r=Hr*tk;
+  const koefBBM=Hr/Q1r,totalSolarUsed=Hr*estHari*tk;
+  const sisaAkhir=totalBBM-totalSolarUsed,volReal=Q1r*estHari*tk;
   return {
-    t1: Number(bestT1.toFixed(4)),
-    t1_detik: Number((bestT1 * 60).toFixed(2)),
-    q1: Number(Q1_res.toFixed(2)),
-    q2: Number(Q2_res.toFixed(2)),
-    estimasiHari,
-    h: Number(H_res.toFixed(4)),
-    h2: Number(h2_res.toFixed(2)),
-    totalSolarUsed: Number(totalSolarUsed.toFixed(2)),
-    sisaAkhir: Number(sisaAkhir.toFixed(2)),
-    koefBBM: Number(koefBBM.toFixed(6)),
-    converged,
-    inRange,
-    status: inRange ? 'OPTIMAL' : 'ADJUSTED',
-    targetSisaIdeal,
-    targetSisaMin,
-    targetSisaMax,
-    dalamRangeSNI: bestT1 >= (14.4/60) && bestT1 <= (31.8/60),
-    sniRange: { min: 14.4, max: 31.8 }
+    t1:+bestT1.toFixed(4), t1_detik:+(bestT1*60).toFixed(2),
+    q1:+Q1r.toFixed(2), q2:+Q2r.toFixed(2), estimasiHari,
+    h:+Hr.toFixed(4), h2:+h2r.toFixed(2),
+    totalSolarUsed:+totalSolarUsed.toFixed(2),
+    sisaAkhir:+sisaAkhir.toFixed(2), koefBBM:+koefBBM.toFixed(6),
+    fd:+Fdr.toFixed(4), fe:+(Fe).toFixed(4), kW:+kW.toFixed(2),
+    volRealisasi:+volReal.toFixed(2), volSurplus:+(volReal-volume).toFixed(2),
+    converged, inRange:sisaAkhir>=targetSisaMin&&sisaAkhir<=targetSisaMax,
+    status:converged?'OPTIMAL':'BEST_EFFORT',
+    targetSisaIdeal, targetSisaMin, targetSisaMax,
+    dalamRangeSNI:bestT1>=(14.4/60)&&bestT1<=(31.8/60),
+    sniRange:{min:14.4,max:31.8}
   };
 }
 
