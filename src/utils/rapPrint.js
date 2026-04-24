@@ -32,10 +32,10 @@ export function generateAllSVGs(rapState) {
    ══════════════════════════════════════════ */
 export async function printCrossSections(rapState) {
   try {
-  const jsPDFModule = await import('jspdf');
-  const jsPDF = jsPDFModule.jsPDF || jsPDFModule.default;
-  const autoTableModule = await import('jspdf-autotable');
-  if (autoTableModule.default) autoTableModule.default(jsPDF);
+  const { default: jsPDF } = await import('jspdf');
+  const { default: autoTable } = await import('jspdf-autotable');
+
+  const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: [330.2, 215.9] });
 
   const { analisaRencana, selTotals, dailyData, kopData, grandTotal, costBBM, costPenjaga, analisaCalculated, geometri, backupPelaksanaan, hargaBBM, hargaPenjaga, selectedExcavator } = rapState;
   const fN = (n, f=2) => Number(n||0).toFixed(f);
@@ -48,7 +48,7 @@ export async function printCrossSections(rapState) {
   const hBBM = hargaBBM || 22300;
   const hPjg = hargaPenjaga || 75000;
 
-  const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: [330.2, 215.9] });
+
   let firstPage = true;
   const addPage = (orient = 'landscape') => {
     if (!firstPage) doc.addPage([330.2, 215.9], orient);
@@ -74,7 +74,7 @@ export async function printCrossSections(rapState) {
     const lStrip = (geometri.lebarStripping||2)*(geometri.kedalamanStripping||0.1);
     return [i+1, s.sta, fN(s.b1), fN(s.b3), fN(s.hPrime||s.h), fN(s.luas), fN(lStrip), fN((s.luas||0)+lStrip), fN(s.volume||0)];
   });
-  doc.autoTable({ startY: 50, head:[['No','STA','b1(m)','b3(m)','h\'(m)','Luas(m²)','Strip(m²)','Total(m²)','Vol(m³)']], body: bvRows, styles:{fontSize:8,halign:'center'}, headStyles:{fillColor:[220,220,220],textColor:0} });
+  autoTable(doc, { startY: 50, head:[['No','STA','b1(m)','b3(m)','h\'(m)','Luas(m²)','Strip(m²)','Total(m²)','Vol(m³)']], body: bvRows, styles:{fontSize:8,halign:'center'}, headStyles:{fillColor:[220,220,220],textColor:0} });
 
   // ═══ HAL 2: ANALISA HARGA SATUAN PERENCANAAN (Portrait) ═══
   addPage('portrait');
@@ -104,7 +104,7 @@ export async function printCrossSections(rapState) {
     ['','Estimasi Waktu','',String(estimasiHariRencana),'Hari'],
     ['','Total Kebutuhan Solar','',fN(analisaCalculated?.totalSolar||0),'Liter'],
   ];
-  doc.autoTable({ startY: 50, head:[['No','Keterangan','Simbol','Nilai','Satuan']], body: anaRows, styles:{fontSize:8}, headStyles:{fillColor:[220,220,220],textColor:0}, columnStyles:{0:{halign:'center',cellWidth:12},3:{halign:'center'},4:{halign:'center'}} });
+  autoTable(doc, { startY: 50, head:[['No','Keterangan','Simbol','Nilai','Satuan']], body: anaRows, styles:{fontSize:8}, headStyles:{fillColor:[220,220,220],textColor:0}, columnStyles:{0:{halign:'center',cellWidth:12},3:{halign:'center'},4:{halign:'center'}} });
 
   // ═══ HAL 3: ANALISA HARGA SATUAN PEKERJAAN (Landscape) ═══
   addPage('landscape');
@@ -119,7 +119,7 @@ export async function printCrossSections(rapState) {
     ['1',`Excavator ${selectedExcavator||'PC200'}`,'Jam','1','-','-','Swakelola'],
     ['','','','','TOTAL',fR(2*hPjg + koefBBM*hBBM),'per m³'],
   ];
-  doc.autoTable({ startY: 50, head:[['No','Uraian','Satuan','Koefisien','Harga Satuan','Jumlah','Ket']], body: hspRows, styles:{fontSize:8}, headStyles:{fillColor:[220,220,220],textColor:0} });
+  autoTable(doc, { startY: 50, head:[['No','Uraian','Satuan','Koefisien','Harga Satuan','Jumlah','Ket']], body: hspRows, styles:{fontSize:8}, headStyles:{fillColor:[220,220,220],textColor:0} });
 
   // ═══ HAL 4: PERHITUNGAN RENCANA TENAGA & BAHAN (Landscape) ═══
   addPage('landscape');
@@ -132,7 +132,7 @@ export async function printCrossSections(rapState) {
     ['1','BBM Solar','Liter',fN(totalSolar,0),fR(totalSolar*hBBM)],
     ['','','','TOTAL',fR(estimasiHariRencana*2*hPjg + totalSolar*hBBM)],
   ];
-  doc.autoTable({ startY: 50, head:[['No','Uraian','Satuan','Volume','Jumlah Harga']], body: tbRows, styles:{fontSize:8}, headStyles:{fillColor:[220,220,220],textColor:0} });
+  autoTable(doc, { startY: 50, head:[['No','Uraian','Satuan','Volume','Jumlah Harga']], body: tbRows, styles:{fontSize:8}, headStyles:{fillColor:[220,220,220],textColor:0} });
 
   // ═══ HAL 5: RENCANA ANGGARAN BIAYA PER BAHAN (Landscape) ═══
   addPage('landscape');
@@ -147,9 +147,9 @@ export async function printCrossSections(rapState) {
     ['','','','','PPN 12%',fR(ppnRencana)],
     ['','','','','TOTAL',fR(subTotalRencana+ppnRencana)],
   ];
-  doc.autoTable({ startY: 50, head:[['No','Uraian Pekerjaan','Volume','Satuan','Harga Satuan','Jumlah Harga']], body: rabRows, styles:{fontSize:8}, headStyles:{fillColor:[220,220,220],textColor:0} });
+  autoTable(doc, { startY: 50, head:[['No','Uraian Pekerjaan','Volume','Satuan','Harga Satuan','Jumlah Harga']], body: rabRows, styles:{fontSize:8}, headStyles:{fillColor:[220,220,220],textColor:0} });
   doc.setFontSize(8);
-  doc.text(`Estimasi Waktu Rencana: ${estimasiHariRencana} hari kerja (Vol ${fN(volRencana)} m³ ÷ Q1 ${fN(q1)} m³/jam × 7 jam/hari)`, 14, doc.lastAutoTable.finalY+10);
+  doc.text(`Estimasi Waktu Rencana: ${estimasiHariRencana} hari kerja (Vol ${fN(volRencana)} m³ ÷ Q1 ${fN(q1)} m³/jam × 7 jam/hari)`, 14, (doc.lastAutoTable?.finalY || 180)+10);
 
   // ═══ HAL 6: RAB RENCANA (Landscape) ═══
   addPage('landscape');
@@ -165,7 +165,7 @@ export async function printCrossSections(rapState) {
     ['','','','','PPN 12%',fR(volRencana*hspPerM3*0.12)],
     ['','','','','GRAND TOTAL',fR(volRencana*hspPerM3*1.12)],
   ];
-  doc.autoTable({ startY: 65, head:[['No','Uraian','Volume','Sat','Harga Satuan','Jumlah']], body: rab2Rows, styles:{fontSize:8}, headStyles:{fillColor:[220,220,220],textColor:0} });
+  autoTable(doc, { startY: 65, head:[['No','Uraian','Volume','Sat','Harga Satuan','Jumlah']], body: rab2Rows, styles:{fontSize:8}, headStyles:{fillColor:[220,220,220],textColor:0} });
 
   // ═══ HAL 7: RINCIAN KEBUTUHAN & HASIL PELAKSANAAN (Portrait) ═══
   addPage('portrait');
@@ -177,12 +177,12 @@ export async function printCrossSections(rapState) {
     cumVol += gal;
     return [i+1, d.tanggal, fN(d.jam,1), fN(q1), fN(gal), fN(bbmH), fN(bbm), fN(cumVol), d.keterangan||'-'];
   });
-  doc.autoTable({ startY: 50, head:[['No','Tanggal','Jam','Q1','Vol(m³)','H','BBM(L)','Kum Vol','Ket']], body: rkRows, styles:{fontSize:7}, headStyles:{fillColor:[220,220,220],textColor:0} });
+  autoTable(doc, { startY: 50, head:[['No','Tanggal','Jam','Q1','Vol(m³)','H','BBM(L)','Kum Vol','Ket']], body: rkRows, styles:{fontSize:7}, headStyles:{fillColor:[220,220,220],textColor:0} });
 
   // ═══ HAL 8: ANALISA PELAKSANAAN (Portrait) ═══
   addPage('portrait');
   hdr('ANALISA HARGA SATUAN GALIAN TANAH\nDENGAN EXCAVATOR (PELAKSANAAN)', 'portrait');
-  doc.autoTable({ startY: 50, head:[['No','Keterangan','Simbol','Nilai','Satuan']], body: anaRows, styles:{fontSize:8}, headStyles:{fillColor:[220,220,220],textColor:0}, columnStyles:{0:{halign:'center',cellWidth:12},3:{halign:'center'},4:{halign:'center'}} });
+  autoTable(doc, { startY: 50, head:[['No','Keterangan','Simbol','Nilai','Satuan']], body: anaRows, styles:{fontSize:8}, headStyles:{fillColor:[220,220,220],textColor:0}, columnStyles:{0:{halign:'center',cellWidth:12},3:{halign:'center'},4:{halign:'center'}} });
 
   // ═══ HAL 9: BACKUP VOLUME PELAKSANAAN (Landscape) ═══
   addPage('landscape');
@@ -191,12 +191,12 @@ export async function printCrossSections(rapState) {
     const lStrip = (geometri.lebarStripping||2)*(geometri.kedalamanStripping||0.1);
     return [i+1, s.sta, fN(s.b1), fN(s.b3), fN(s.hPrime||s.h), fN(s.luas), fN(lStrip), fN((s.luas||0)+lStrip), fN(s.volume||0)];
   });
-  doc.autoTable({ startY: 50, head:[['No','STA','b1(m)','b3(m)','h\'(m)','Luas(m²)','Strip(m²)','Total(m²)','Vol(m³)']], body: bvpRows, styles:{fontSize:8,halign:'center'}, headStyles:{fillColor:[220,220,220],textColor:0} });
+  autoTable(doc, { startY: 50, head:[['No','STA','b1(m)','b3(m)','h\'(m)','Luas(m²)','Strip(m²)','Total(m²)','Vol(m³)']], body: bvpRows, styles:{fontSize:8,halign:'center'}, headStyles:{fillColor:[220,220,220],textColor:0} });
 
   // ═══ HAL 10: ANALISA HSP PELAKSANAAN (Landscape) ═══
   addPage('landscape');
   hdr('ANALISA HARGA SATUAN PEKERJAAN (PELAKSANAAN)', 'landscape');
-  doc.autoTable({ startY: 50, head:[['No','Uraian','Satuan','Koefisien','Harga Satuan','Jumlah','Ket']], body: hspRows, styles:{fontSize:8}, headStyles:{fillColor:[220,220,220],textColor:0} });
+  autoTable(doc, { startY: 50, head:[['No','Uraian','Satuan','Koefisien','Harga Satuan','Jumlah','Ket']], body: hspRows, styles:{fontSize:8}, headStyles:{fillColor:[220,220,220],textColor:0} });
 
   // ═══ HAL 11: TENAGA & BAHAN PELAKSANAAN (Landscape) ═══
   const durasiPelaksanaan = (dailyData||[]).length || 1;
@@ -210,7 +210,7 @@ export async function printCrossSections(rapState) {
     ['1','BBM Solar','Liter',fN(totalSolarPlks,0),fR(totalSolarPlks*hBBM)],
     ['','','','TOTAL',fR(durasiPelaksanaan*2*hPjg + totalSolarPlks*hBBM)],
   ];
-  doc.autoTable({ startY: 50, head:[['No','Uraian','Satuan','Volume','Jumlah Harga']], body: tbpRows, styles:{fontSize:8}, headStyles:{fillColor:[220,220,220],textColor:0} });
+  autoTable(doc, { startY: 50, head:[['No','Uraian','Satuan','Volume','Jumlah Harga']], body: tbpRows, styles:{fontSize:8}, headStyles:{fillColor:[220,220,220],textColor:0} });
 
   // ═══ HAL 12: REALISASI ANGGARAN PER BAHAN (Landscape) ═══
   addPage('landscape');
@@ -224,7 +224,7 @@ export async function printCrossSections(rapState) {
     ['','','','','PPN 12%',fR(subTotalPlks*0.12)],
     ['','','','','TOTAL',fR(subTotalPlks*1.12)],
   ];
-  doc.autoTable({ startY: 50, head:[['No','Uraian','Volume','Sat','Harga Satuan','Jumlah']], body: rapbRows, styles:{fontSize:8}, headStyles:{fillColor:[220,220,220],textColor:0} });
+  autoTable(doc, { startY: 50, head:[['No','Uraian','Volume','Sat','Harga Satuan','Jumlah']], body: rapbRows, styles:{fontSize:8}, headStyles:{fillColor:[220,220,220],textColor:0} });
   doc.setFontSize(8);
   doc.text(`Estimasi Waktu Pelaksanaan: ${durasiPelaksanaan} hari (dari ${dailyData?.[0]?.tanggal||'-'} s/d ${dailyData?.[dailyData.length-1]?.tanggal||'-'})`, 14, doc.lastAutoTable.finalY+10);
 
@@ -238,7 +238,7 @@ export async function printCrossSections(rapState) {
     ['','','','','PPN 12%',fR(volPlks*hspPerM3*0.12)],
     ['','','','','GRAND TOTAL',fR(volPlks*hspPerM3*1.12)],
   ];
-  doc.autoTable({ startY: 50, head:[['No','Uraian','Volume','Sat','Harga Satuan','Jumlah']], body: rap2Rows, styles:{fontSize:8}, headStyles:{fillColor:[220,220,220],textColor:0} });
+  autoTable(doc, { startY: 50, head:[['No','Uraian','Volume','Sat','Harga Satuan','Jumlah']], body: rap2Rows, styles:{fontSize:8}, headStyles:{fillColor:[220,220,220],textColor:0} });
 
   // ═══ HAL 14+: GAMBAR TEKNIK CAD (Letter Landscape, 1 per halaman) ═══
   try {

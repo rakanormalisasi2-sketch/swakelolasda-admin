@@ -53,11 +53,20 @@ export async function downloadExcel(data) {
 
     // Fix: Strip shared formulas to prevent "Shared Formula master" error during writeBuffer
     wb.eachSheet(sheet => {
-      sheet.eachRow(row => {
-        row.eachCell(cell => {
-          if (cell._value && cell._value.constructor && cell._value.constructor.name === 'SharedFormulaValue') {
-            try { cell.value = cell.result || null; } catch(e) {}
-          }
+      sheet.eachRow({ includeEmpty: false }, row => {
+        row.eachCell({ includeEmpty: false }, cell => {
+          try {
+            // Check multiple ways to detect shared formulas
+            const v = cell._value;
+            if (v && (v.sharedFormula !== undefined || v._sharedFormula !== undefined || 
+                (v.model && v.model.sharedFormula !== undefined))) {
+              cell.value = cell.result !== undefined ? cell.result : (cell.value || null);
+            }
+            // Also convert regular formulas to their results to avoid any formula issues
+            if (cell.formula) {
+              cell.value = cell.result !== undefined ? cell.result : 0;
+            }
+          } catch(e) { /* skip */ }
         });
       });
     });
