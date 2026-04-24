@@ -93,10 +93,18 @@ export async function downloadExcel(data) {
       let currentSisa = 400; 
       let kumulatif = 0;
 
-      // Clear existing manual log inputs (Row 10 to 50)
+      // Clear existing manual log inputs (Row 10 to 50) - safely handle shared formulas
       for(let r = 10; r <= 50; r++) {
          const row = realisasiSheet.getRow(r);
-         [1,2,3,4,5,6,7,8,9,10,11,12,13,14].forEach(c => row.getCell(c).value = null);
+         [1,2,3,4,5,6,7,8,9,10,11,12,13,14].forEach(c => {
+           try {
+             const cell = row.getCell(c);
+             // Only clear if not a shared formula
+             if (cell.type !== 8) { // 8 = SharedFormula in ExcelJS
+               cell.value = null;
+             }
+           } catch(e) { /* skip problematic cells */ }
+         });
       }
 
       // Recalculate basic constraints (Gunakan nilai dari GoalSeek jika tersedia)
@@ -104,6 +112,7 @@ export async function downloadExcel(data) {
       const bbmPerJam = analisaCalculated?.H || ((analisaRencana.waktuGali / analisaRencana.waktuGali) * 0.75 * (analisaRencana.hp * 0.7457) * analisaRencana.loadFactor);
 
       selectedData.forEach((d, index) => {
+         try {
          const rowIndex = 10 + index;
          const row = realisasiSheet.getRow(rowIndex);
          
@@ -128,7 +137,7 @@ export async function downloadExcel(data) {
          row.getCell(9).value = bbmHariTsb;
          
          if(index === 0) {
-            row.getCell(10).value = 400; // Drop
+            row.getCell(10).value = 400;
             currentSisa = 400 - bbmHariTsb;
          }
          
@@ -140,6 +149,7 @@ export async function downloadExcel(data) {
          row.getCell(14).value = kumulatif;
          
          row.commit();
+         } catch(e) { console.warn('Row write error:', e.message); }
       });
     }
 

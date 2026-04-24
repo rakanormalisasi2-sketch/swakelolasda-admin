@@ -298,7 +298,7 @@ export default function RapWizard() {
   };
 
   // ── Handlers ──
-  const handlePrint = () => {
+  const handlePrint = async () => {
     const stasRencana = generateSTAPerencanaan({ ...geometri, b1: geometri.b1, b3: geometri.b3, h: geometri.h, hPrime: geometri.hGalian, panjang: geometri.panjang });
     
     // Auto-GoalSeek Pelaksanaan: mencari b1 agar volume galian cocok dgn Log Realisasi
