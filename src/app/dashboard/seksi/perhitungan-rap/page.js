@@ -193,17 +193,41 @@ export default function RapWizard() {
   useEffect(() => {
     async function fetchLogs() {
       try {
-        const { data } = await supabase.from('operator_logs').select('*').order('tanggal');
+        const { data } = await supabase
+          .from('operator_logs')
+          .select(`
+            *,
+            assignment:assignments(id, job_sub_type, location_district, location_village)
+          `)
+          .order('tanggal');
+          
         if (data && data.length > 0) {
-          setDailyData(data.map(d => ({
-            id: d.id,
-            tanggal: d.tanggal,
-            jam: d.jam_kerja || 7,
-            galian: (d.jam_kerja || 7) * (analisa?.q1 || 50),
-            bbm: (d.jam_kerja || 7) * (analisa?.H || 6),
-            unit: d.unit_alat || selectedExcavator,
-            keterangan: d.keterangan || 'Galian saluran'
-          })));
+          const SUB_TYPE_MAP = {
+            normalisasi_sungai: 'NORMALISASI SUNGAI',
+            normalisasi_saluran_irigasi: 'NORMALISASI SALURAN / IRIGASI',
+            rehabilitasi_embung: 'REHABILITASI EMBUNG',
+            pembangunan_embung: 'PEMBANGUNAN EMBUNG',
+            saluran_afvoer: 'SALURAN AIR / AFVOER',
+            normalisasi_embung: 'NORMALISASI EMBUNG',
+          };
+
+          setDailyData(data.map(d => {
+            const desa = (d.override_desa || d.assignment?.location_village || '').toUpperCase();
+            const kec = (d.override_kecamatan || d.assignment?.location_district || '').toUpperCase();
+            const jobType = SUB_TYPE_MAP[d.assignment?.job_sub_type] || 'NORMALISASI SUNGAI';
+            const judulPekerjaan = d.custom_pekerjaan || `${jobType} DESA ${desa} KECAMATAN ${kec}`;
+
+            return {
+              id: d.id,
+              tanggal: d.tanggal,
+              jam: d.jam_kerja || 7,
+              galian: (d.jam_kerja || 7) * (analisa?.q1 || 50),
+              bbm: (d.jam_kerja || 7) * (analisa?.H || 6),
+              unit: d.override_alat || d.unit_alat || selectedExcavator,
+              keterangan: judulPekerjaan,
+              catatan: d.keterangan || 'Galian saluran'
+            };
+          }));
         } else {
           // Demo data if DB empty
           setDailyData([
@@ -482,9 +506,12 @@ export default function RapWizard() {
                                     {checked && <span className="material-symbols-outlined text-[12px]">check</span>}
                                   </div>
                                   <div className="flex-1 min-w-0 flex items-center justify-between">
-                                    <div className="flex items-center gap-3">
-                                      <span className="font-bold text-sm text-[#0b1c30] w-24">{d.tanggal}</span>
-                                      <span className="px-2 py-0.5 rounded bg-[#eff4ff] text-[10px] font-mono font-bold text-[#00346f]">{d.unit}</span>
+                                    <div className="flex flex-col">
+                                      <div className="flex items-center gap-3">
+                                        <span className="font-bold text-sm text-[#0b1c30] w-24">{d.tanggal}</span>
+                                        <span className="px-2 py-0.5 rounded bg-[#eff4ff] text-[10px] font-mono font-bold text-[#00346f]">{d.unit}</span>
+                                      </div>
+                                      <span className="text-[10px] text-[#424751] mt-1">{d.catatan}</span>
                                     </div>
                                     <span className="font-mono text-xs font-bold text-[#424751]">{d.jam} Jam</span>
                                   </div>
