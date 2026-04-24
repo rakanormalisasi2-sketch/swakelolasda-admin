@@ -50,6 +50,17 @@ export async function downloadExcel(data) {
     
     const wb = new ExcelJS.Workbook();
     await wb.xlsx.load(arrayBuffer);
+
+    // Fix: Strip shared formulas to prevent "Shared Formula master" error during writeBuffer
+    wb.eachSheet(sheet => {
+      sheet.eachRow(row => {
+        row.eachCell(cell => {
+          if (cell._value && cell._value.constructor && cell._value.constructor.name === 'SharedFormulaValue') {
+            try { cell.value = cell.result || null; } catch(e) {}
+          }
+        });
+      });
+    });
     
     // 2. Hydrate "ANALISA perencanaan" & "Analisa Pelaksanaan " (Tidak menyentuh rumus!)
     const analisaSheets = ['ANALISA perencanaan', 'Analisa Pelaksanaan '];

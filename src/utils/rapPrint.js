@@ -31,8 +31,11 @@ export function generateAllSVGs(rapState) {
    PRINT PDF — jsPDF with mixed orientations
    ══════════════════════════════════════════ */
 export async function printCrossSections(rapState) {
-  const { jsPDF } = await import('jspdf');
-  await import('jspdf-autotable');
+  try {
+  const jsPDFModule = await import('jspdf');
+  const jsPDF = jsPDFModule.jsPDF || jsPDFModule.default;
+  const autoTableModule = await import('jspdf-autotable');
+  if (autoTableModule.default) autoTableModule.default(jsPDF);
 
   const { analisaRencana, selTotals, dailyData, kopData, grandTotal, costBBM, costPenjaga, analisaCalculated, geometri, backupPelaksanaan, hargaBBM, hargaPenjaga, selectedExcavator } = rapState;
   const fN = (n, f=2) => Number(n||0).toFixed(f);
@@ -269,4 +272,9 @@ export async function printCrossSections(rapState) {
 
   // Save
   doc.save(`RAP_${kopData?.pekerjaan||'Proyek'}.pdf`);
+
+  } catch(err) {
+    console.error('PDF Generation Error:', err);
+    alert('Error generating PDF: ' + err.message);
+  }
 }
