@@ -9,6 +9,7 @@ import {
   calculateAnalisaWithGoalSeek,
   goalSeekBisectionPerencanaan,
   generateSTAPerencanaan,
+  generateSTAPelaksanaan,
   MASTER_EXCAVATOR_SPECS,
   SNI_WAKTU_SIKLUS,
   SNI_BUCKET_FACTOR,
@@ -301,19 +302,14 @@ export default function RapWizard() {
   const handlePrint = async () => {
     const stasRencana = generateSTAPerencanaan({ ...geometri, b1: geometri.b1, b3: geometri.b3, h: geometri.h, hPrime: geometri.hGalian, panjang: geometri.panjang });
     
-    // Auto-GoalSeek Pelaksanaan: mencari b1 agar volume galian cocok dgn Log Realisasi
-    const targetVolumeSaluran = selTotals.galian - volumeStripping;
-    let b1Pelaksanaan = geometri.b1;
-    if (targetVolumeSaluran > 0 && geometri.hGalian > 0 && geometri.panjang > 0) {
-       const targetLuas = targetVolumeSaluran / geometri.panjang;
-       b1Pelaksanaan = (2 * targetLuas / geometri.hGalian) - geometri.b3;
-       if (b1Pelaksanaan < 0.1) b1Pelaksanaan = 0.1; // batas minimal
-    }
-    const stasPelaksanaan = generateSTAPerencanaan({ ...geometri, b1: b1Pelaksanaan, b3: geometri.b3, h: geometri.h, hPrime: geometri.hGalian, panjang: geometri.panjang });
+    // Backup Volume Pelaksanaan: variasi dimensi ±3-5%, total = volume realisasi
+    // Volume realisasi = dari GoalSeek (volRealisasi) atau dari daily log (selTotals.galian)
+    const volRealisasi = analisa?.volRealisasi || selTotals.galian || totalVolume;
+    const stasPelaksanaan = generateSTAPelaksanaan(stasRencana.stas, volRealisasi);
 
     const rapStateForPrint = {
       geometri: { stas: stasRencana.stas, kopData, slope: geometri.slope, ...geometri, hPrime: geometri.hGalian, volumeGalian, volumeStripping, totalVolume },
-      backupPelaksanaan: { stas: stasPelaksanaan.stas, b1: b1Pelaksanaan },
+      backupPelaksanaan: { stas: stasPelaksanaan.stas, totalVolume: volRealisasi },
       analisaRencana: alatParams,
       personil: { durasiHari: durasiHOK, penjagaMalam: 2 },
       selTotals,
@@ -334,19 +330,13 @@ export default function RapWizard() {
   const handleExportExcel = () => {
     const stasRencana = generateSTAPerencanaan({ ...geometri, b1: geometri.b1, b3: geometri.b3, h: geometri.h, hPrime: geometri.hGalian, panjang: geometri.panjang });
     
-    // Auto-GoalSeek Pelaksanaan
-    const targetVolumeSaluran = selTotals.galian - volumeStripping;
-    let b1Pelaksanaan = geometri.b1;
-    if (targetVolumeSaluran > 0 && geometri.hGalian > 0 && geometri.panjang > 0) {
-       const targetLuas = targetVolumeSaluran / geometri.panjang;
-       b1Pelaksanaan = (2 * targetLuas / geometri.hGalian) - geometri.b3;
-       if (b1Pelaksanaan < 0.1) b1Pelaksanaan = 0.1;
-    }
-    const stasPelaksanaan = generateSTAPerencanaan({ ...geometri, b1: b1Pelaksanaan, b3: geometri.b3, h: geometri.h, hPrime: geometri.hGalian, panjang: geometri.panjang });
+    // Backup Volume Pelaksanaan: variasi dimensi, total = volume realisasi
+    const volRealisasiXL = analisa?.volRealisasi || selTotals.galian || totalVolume;
+    const stasPelaksanaanXL = generateSTAPelaksanaan(stasRencana.stas, volRealisasiXL);
 
     const rapStateForPrint = {
       geometri: { stas: stasRencana.stas, kopData, slope: geometri.slope, ...geometri, hPrime: geometri.hGalian, volumeGalian, volumeStripping, totalVolume },
-      backupPelaksanaan: { stas: stasPelaksanaan.stas, b1: b1Pelaksanaan },
+      backupPelaksanaan: { stas: stasPelaksanaanXL.stas, totalVolume: volRealisasiXL },
       analisaRencana: alatParams,
       personil: { durasiHari: durasiHOK, penjagaMalam: 2 },
       selTotals,
