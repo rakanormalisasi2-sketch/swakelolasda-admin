@@ -45,23 +45,34 @@ const EXCAVATOR_OPTIONS = [
 ];
 
 // ─── Reusable: Engineering Input ───
-function EngInput({ label, value, onChange, unit, type = 'number', step }) {
+function EngInput({ label, value, onChange, unit, type = 'number', step, helperText }) {
+  const [isFocused, setIsFocused] = useState(false);
   return (
     <div className="relative group mb-4">
       <label className="block text-xs font-semibold text-[#424751] mb-1 ml-1 transition-colors group-focus-within:text-[#00346f]">
         {label}
+        {helperText && <span className="ml-1 text-[10px] text-amber-500 font-normal border border-amber-200 bg-amber-50 px-1 rounded">SNI</span>}
       </label>
       <div className="relative flex items-center">
         <input
           type={type}
           step={step}
           value={value}
+          onFocus={() => setIsFocused(true)}
+          onBlur={() => setIsFocused(false)}
           onChange={e => onChange(type === 'number' ? parseFloat(e.target.value) || 0 : e.target.value)}
           className="w-full bg-[#f8f9ff] border-0 border-b-2 border-transparent focus:border-[#00346f] px-4 py-3 text-[#0b1c30] text-sm focus:ring-0 transition-all rounded-t-sm outline-none"
           style={{ fontFamily: "'Roboto Mono', monospace" }}
         />
         {unit && <span className="absolute right-4 text-xs font-mono text-[#424751]">{unit}</span>}
       </div>
+      {helperText && (
+        <div className={`absolute z-10 left-0 top-[calc(100%+4px)] w-[120%] bg-[#0b1c30] text-white text-[10px] leading-relaxed p-2.5 rounded-lg shadow-xl transition-all duration-200 pointer-events-none origin-top ${isFocused ? 'opacity-100 scale-100' : 'opacity-0 scale-95'}`}>
+          <div className="font-bold text-amber-400 mb-1 border-b border-white/20 pb-1">Standar AHSP / SNI:</div>
+          {helperText}
+          <div className="absolute -top-1 left-4 w-2 h-2 bg-[#0b1c30] rotate-45"></div>
+        </div>
+      )}
     </div>
   );
 }
@@ -394,10 +405,24 @@ export default function RapWizard() {
                     <div className="grid grid-cols-2 gap-4">
                       <EngInput label="Kapasitas Bucket (V)" value={alatParams.bucket} onChange={v => setAlatParams(p => ({...p, bucket: v}))} unit="m³" step="0.01" />
                       <EngInput label="Tenaga Alat (HP)" value={alatParams.hp} onChange={v => setAlatParams(p => ({...p, hp: v}))} unit="HP" step="1" />
-                      <EngInput label="Faktor Bucket (Fb)" value={alatParams.fb} onChange={v => setAlatParams(p => ({...p, fb: v}))} step="0.01" />
-                      <EngInput label="Efisiensi Alat (Fa)" value={alatParams.fa} onChange={v => setAlatParams(p => ({...p, fa: v}))} step="0.01" />
-                      <EngInput label="Konversi Galian (Fv)" value={alatParams.fv} onChange={v => setAlatParams(p => ({...p, fv: v}))} step="0.01" />
-                      <EngInput label="Efisiensi Wkt (Fe menit)" value={alatParams.feMenit || 48} onChange={v => setAlatParams(p => ({...p, feMenit: v}))} unit="min" step="1" />
+                      
+                      <EngInput 
+                        label="Faktor Bucket (Fb)" value={alatParams.fb} onChange={v => setAlatParams(p => ({...p, fb: v}))} step="0.01" 
+                        helperText={<div>• Pasir/Kerikil: 0.8 - 1.0<br/>• Tanah Biasa: 0.6 - 0.8<br/>• Lempung Keras: 0.5 - 0.6<br/>• Batuan Pecah: 0.4 - 0.5</div>} 
+                      />
+                      <EngInput 
+                        label="Efisiensi Alat (Fa)" value={alatParams.fa} onChange={v => setAlatParams(p => ({...p, fa: v}))} step="0.01" 
+                        helperText={<div>• Kondisi Baik Sekali: 0.83<br/>• Kondisi Baik: 0.75<br/>• Kondisi Sedang: 0.69<br/>• Kondisi Buruk: 0.52</div>}
+                      />
+                      <EngInput 
+                        label="Konversi Galian (Fv)" value={alatParams.fv} onChange={v => setAlatParams(p => ({...p, fv: v}))} step="0.01" 
+                        helperText={<div>• Tanah Biasa: 0.8<br/>• Tanah Keras: 0.6<br/>• Batu: 0.5</div>}
+                      />
+                      <EngInput 
+                        label="Efisiensi Wkt (Fe menit)" value={alatParams.feMenit || 48} onChange={v => setAlatParams(p => ({...p, feMenit: v}))} unit="min" step="1" 
+                        helperText={<div>• Standar AHSP: 45 menit (0.75)<br/>• Optimal: 48 - 50 menit<br/>(Disesuaikan untuk GoalSeek BBM)</div>}
+                      />
+                      
                       <EngInput label="Waktu Gali (Fd)" value={alatParams.waktuGali} onChange={v => setAlatParams(p => ({...p, waktuGali: v}))} unit="sec" step="0.1" />
                       <EngInput label="Jam Efektif Harian (Tk)" value={alatParams.tk} onChange={v => setAlatParams(p => ({...p, tk: v}))} unit="jam" step="1" />
                     </div>
