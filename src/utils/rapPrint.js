@@ -100,6 +100,10 @@ export function printCrossSections(rapState) {
   const formatRp = (num) => 'Rp ' + Math.round(num || 0).toLocaleString('id-ID');
   const formatNum = (num, fix=2) => Number(num || 0).toFixed(fix);
 
+  // Pisahkan SVGs berdasarkan jenis
+  const svgsRencana = svgs.filter(s => s.jenis === 'PERENCANAAN');
+  const svgsPelaksanaan = svgs.filter(s => s.jenis === 'PELAKSANAAN');
+
   const html = `
     <!DOCTYPE html>
     <html>
@@ -108,13 +112,31 @@ export function printCrossSections(rapState) {
       <style>
         /* Ukuran Kertas F4/Folio Portrait (215.9 x 330.2 mm) */
         @page { size: 215.9mm 330.2mm portrait; margin: 15mm; }
+        
+        /* Definisi Halaman Landscape Khusus Gambar Teknik */
+        @page landscape-page { 
+          size: 330.2mm 215.9mm landscape; 
+          margin: 10mm; 
+        }
+
         body { font-family: 'Times New Roman', Times, serif; margin: 0; padding: 0; background: #fff; color: #000; font-size: 12pt; }
+        
         .page { 
           page-break-after: always; 
           width: 100%; 
           box-sizing: border-box;
           position: relative;
         }
+        
+        .page.landscape { 
+          page: landscape-page;
+          width: 310.2mm; 
+          height: 195.9mm;
+          display: flex;
+          flex-direction: column;
+          justify-content: center;
+        }
+
         .page:last-child { page-break-after: avoid; }
         
         .header-kop { text-align: center; border-bottom: 3px solid #000; margin-bottom: 20px; padding-bottom: 10px; position: relative; }
@@ -134,23 +156,24 @@ export function printCrossSections(rapState) {
         .no-border { border: none !important; }
         .border-bottom-only { border: none; border-bottom: 1px solid #000; }
         
-        /* Untuk Info Proyek */
         .info-table { width: 100%; border: none; margin-bottom: 30px; font-size: 12pt; }
         .info-table td { border: none; padding: 4px; }
         .info-table td:nth-child(1) { width: 150px; font-weight: bold; }
         .info-table td:nth-child(2) { width: 10px; }
         
-        /* TTD Section */
         .ttd-section { width: 100%; display: flex; justify-content: space-between; margin-top: 50px; page-break-inside: avoid; }
         .ttd-box { width: 40%; text-align: center; }
         .ttd-name { margin-top: 70px; font-weight: bold; text-decoration: underline; }
         
-        /* Layout Lampiran CAD (3 per halaman vertikal) */
-        .cad-container { width: 100%; height: 280px; display: flex; justify-content: center; align-items: center; margin-bottom: 15px; }
-        .cad-container svg { width: 100%; max-height: 100%; object-fit: contain; }
+        .cad-container { width: 100%; height: 100%; display: flex; justify-content: center; align-items: center; }
+        .cad-container svg { width: 100%; height: 100%; object-fit: contain; }
 
         @media print { 
           body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+          .page.landscape { 
+            width: 100%;
+            height: 100%;
+          }
           ::-webkit-scrollbar { display: none; }
         }
       </style>
@@ -160,7 +183,6 @@ export function printCrossSections(rapState) {
       <!-- HALAMAN 1: RAB -->
       <div class="page">
         <div class="header-kop">
-          <!-- Asumsi pengguna telah menyimpan logo-bojonegoro.png di folder public -->
           <img src="/logo-bojonegoro.png" alt="Logo" onerror="this.style.display='none'" />
           <h1>PEMERINTAH KABUPATEN BOJONEGORO</h1>
           <h2>DINAS PEKERJAAN UMUM SUMBER DAYA AIR</h2>
@@ -329,16 +351,19 @@ export function printCrossSections(rapState) {
         </table>
       </div>
 
-      <!-- LAMPIRAN GAMBAR CAD -->
-      ${Array.from({ length: Math.ceil(svgs.length / 3) }).map((_, pageIdx) => `
-        <div class="page">
-          <div class="section-title" style="margin-bottom:5px;">LAMPIRAN: CROSS SECTION GAMBAR KERJA</div>
-          <p style="text-align:center; font-size:10pt; margin-top:0;">Lembar ${pageIdx + 1} dari ${Math.ceil(svgs.length / 3)}</p>
-          <div style="height: 20px;"></div>
-          
-          <div class="cad-container">${svgs[pageIdx * 3]?.svg || ''}</div>
-          <div class="cad-container">${svgs[pageIdx * 3 + 1]?.svg || ''}</div>
-          <div class="cad-container">${svgs[pageIdx * 3 + 2]?.svg || ''}</div>
+      <!-- BAGIAN 1: GAMBAR PERENCANAAN (LANDSCAPE, 1 PER HALAMAN) -->
+      ${svgsRencana.length > 0 ? `<div class="section-title" style="page-break-before: always;">LAMPIRAN I: GAMBAR PERENCANAAN (REKAYASA)</div>` : ''}
+      ${svgsRencana.map((s, idx) => `
+        <div class="page landscape">
+          <div class="cad-container">${s.svg}</div>
+        </div>
+      `).join('')}
+
+      <!-- BAGIAN 2: GAMBAR PELAKSANAAN (LANDSCAPE, 1 PER HALAMAN) -->
+      ${svgsPelaksanaan.length > 0 ? `<div class="section-title" style="page-break-before: always;">LAMPIRAN II: GAMBAR PELAKSANAAN (REALISASI)</div>` : ''}
+      ${svgsPelaksanaan.map((s, idx) => `
+        <div class="page landscape">
+          <div class="cad-container">${s.svg}</div>
         </div>
       `).join('')}
 

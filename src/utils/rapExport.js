@@ -90,7 +90,7 @@ export async function downloadExcel(data) {
     const realisasiSheet = wb.getWorksheet('Kebutuhan  realisasi');
     if (realisasiSheet && selectedDailyIndices && selectedDailyIndices.length > 0) {
       const selectedData = dailyData.filter((_, i) => selectedDailyIndices.includes(i));
-      let currentSisa = 400; // Drop stock awal default (Excel formulas might override this logically, but we input raw values if requested)
+      let currentSisa = 400; 
       let kumulatif = 0;
 
       // Clear existing manual log inputs (Row 10 to 50)
@@ -100,8 +100,8 @@ export async function downloadExcel(data) {
       }
 
       // Recalculate basic constraints (Gunakan nilai dari GoalSeek jika tersedia)
-      const q1 = data.analisaCalculated?.q1 || ((analisaRencana.bucket * analisaRencana.fb * analisaRencana.fa * analisaRencana.fv * 60) / (analisaRencana.waktuGali / 60));
-      const bbmPerJam = data.analisaCalculated?.H || ((analisaRencana.waktuGali / analisaRencana.waktuGali) * 0.75 * (analisaRencana.hp * 0.7457) * analisaRencana.loadFactor);
+      const q1 = analisaCalculated?.q1 || ((analisaRencana.bucket * analisaRencana.fb * analisaRencana.fa * analisaRencana.fv * 60) / (analisaRencana.waktuGali / 60));
+      const bbmPerJam = analisaCalculated?.H || ((analisaRencana.waktuGali / analisaRencana.waktuGali) * 0.75 * (analisaRencana.hp * 0.7457) * analisaRencana.loadFactor);
 
       selectedData.forEach((d, index) => {
          const rowIndex = 10 + index;
@@ -117,8 +117,6 @@ export async function downloadExcel(data) {
          
          currentSisa = currentSisa - bbmHariTsb;
 
-         // Insert raw log data. Formatted formulas in the Excel sheet will compute totals if we leave them,
-         // but since we are clearing the row, we push computed values to ensure it matches the web preview exactly.
          row.getCell(1).value = index + 1;
          row.getCell(2).value = day;
          row.getCell(3).value = month;
@@ -164,10 +162,11 @@ export async function downloadExcel(data) {
         const startRow = idx * 45;
         cadSheet.addImage(imageId, {
           tl: { col: 1, row: startRow + 2 },
-          ext: { width: 1000, height: 600 }
+          ext: { width: 1100, height: 600 }
         });
         
-        cadSheet.getCell(startRow + 1, 2).value = svgs[idx].title;
+        const title = `${svgs[idx].jenis} - STA ${svgs[idx].sta}`;
+        cadSheet.getCell(startRow + 1, 2).value = title;
         cadSheet.getCell(startRow + 1, 2).font = { bold: true, size: 14 };
         
         if (idx < pngBase64List.length - 1) {
