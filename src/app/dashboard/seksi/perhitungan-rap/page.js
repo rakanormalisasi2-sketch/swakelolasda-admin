@@ -209,10 +209,33 @@ export default function RapWizard() {
     fetchLogs();
   }, []);
 
+  const groupedLogs = useMemo(() => {
+    return dailyData.reduce((acc, curr) => {
+      const groupName = curr.keterangan || 'Pekerjaan Umum';
+      if (!acc[groupName]) acc[groupName] = [];
+      acc[groupName].push(curr);
+      return acc;
+    }, {});
+  }, [dailyData]);
+
   const toggleCheck = (id) => {
     setCheckedIds(prev => {
       const next = new Set(prev);
       next.has(id) ? next.delete(id) : next.add(id);
+      return next;
+    });
+  };
+
+  const toggleGroup = (groupName) => {
+    const logsInGroup = groupedLogs[groupName] || [];
+    const allChecked = logsInGroup.every(log => checkedIds.has(log.id));
+    setCheckedIds(prev => {
+      const next = new Set(prev);
+      if (allChecked) {
+        logsInGroup.forEach(log => next.delete(log.id));
+      } else {
+        logsInGroup.forEach(log => next.add(log.id));
+      }
       return next;
     });
   };
@@ -397,28 +420,54 @@ export default function RapWizard() {
                   <h2 className="text-2xl font-bold tracking-tight text-[#0b1c30] mb-2">Daily Logs</h2>
                   <p className="text-sm text-[#424751] mb-6">Pilih entri untuk disertakan dalam laporan realisasi.</p>
 
-                  <div className="space-y-3">
-                    {dailyData.map(d => {
-                      const checked = checkedIds.has(d.id);
+                  <div className="space-y-6">
+                    {Object.entries(groupedLogs).map(([groupName, logs]) => {
+                      const allChecked = logs.every(log => checkedIds.has(log.id));
+                      const someChecked = logs.some(log => checkedIds.has(log.id));
+                      
                       return (
-                        <button key={d.id} onClick={() => toggleCheck(d.id)}
-                          className={`w-full text-left p-4 rounded-xl border-2 flex items-start gap-4 transition-all outline-none ${
-                            checked ? 'border-[#00346f] bg-[#d7e2ff]/20 shadow-sm' : 'border-[#c2c6d3]/20 bg-white hover:border-[#c2c6d3]/50'
-                          }`}>
-                          <div className={`w-5 h-5 rounded flex items-center justify-center flex-shrink-0 mt-0.5 transition-colors ${
-                            checked ? 'bg-[#00346f] text-white' : 'border-2 border-[#c2c6d3]'
-                          }`}>
-                            {checked && <span className="material-symbols-outlined text-[14px]">check</span>}
-                          </div>
-                          <div className="flex-1 min-w-0">
-                            <div className="flex items-center justify-between mb-1">
-                              <span className="font-bold text-sm text-[#0b1c30]">{d.tanggal}</span>
-                              <span className="px-2 py-0.5 rounded bg-[#eff4ff] text-[10px] font-mono font-bold text-[#00346f]">{d.unit}</span>
+                        <div key={groupName} className="bg-white rounded-xl border border-[#c2c6d3]/20 overflow-hidden shadow-sm">
+                          <div 
+                            className="flex items-center justify-between p-4 bg-[#eff4ff]/50 border-b border-[#c2c6d3]/20 cursor-pointer hover:bg-[#eff4ff] transition-colors"
+                            onClick={() => toggleGroup(groupName)}
+                          >
+                            <div className="flex items-center gap-3">
+                              <div className={`w-5 h-5 rounded flex items-center justify-center flex-shrink-0 transition-colors ${
+                                allChecked ? 'bg-[#00346f] text-white' : someChecked ? 'bg-[#00346f]/60 text-white' : 'border-2 border-[#c2c6d3]'
+                              }`}>
+                                {(allChecked || someChecked) && <span className="material-symbols-outlined text-[14px]">{allChecked ? 'check' : 'remove'}</span>}
+                              </div>
+                              <h3 className="font-bold text-sm text-[#0b1c30] uppercase tracking-wide">{groupName}</h3>
                             </div>
-                            <p className="text-xs text-[#424751]">{d.keterangan}</p>
-                            <span className="font-mono text-xs font-bold text-[#00346f] mt-1 inline-block">{d.jam}h</span>
+                            <span className="text-xs font-semibold text-[#424751] bg-white px-2 py-1 rounded-md border border-[#c2c6d3]/20">
+                              {logs.length} Log Harian
+                            </span>
                           </div>
-                        </button>
+                          <div className="p-2 space-y-1 bg-[#f8f9ff]">
+                            {logs.map(d => {
+                              const checked = checkedIds.has(d.id);
+                              return (
+                                <button key={d.id} onClick={() => toggleCheck(d.id)}
+                                  className={`w-full text-left p-3 rounded-lg border flex items-center gap-4 transition-all outline-none ${
+                                    checked ? 'border-[#00346f] bg-white shadow-sm' : 'border-transparent hover:bg-white hover:border-[#c2c6d3]/30'
+                                  }`}>
+                                  <div className={`w-4 h-4 rounded flex items-center justify-center flex-shrink-0 transition-colors ${
+                                    checked ? 'bg-[#00346f] text-white' : 'border-2 border-[#c2c6d3]'
+                                  }`}>
+                                    {checked && <span className="material-symbols-outlined text-[12px]">check</span>}
+                                  </div>
+                                  <div className="flex-1 min-w-0 flex items-center justify-between">
+                                    <div className="flex items-center gap-3">
+                                      <span className="font-bold text-sm text-[#0b1c30] w-24">{d.tanggal}</span>
+                                      <span className="px-2 py-0.5 rounded bg-[#eff4ff] text-[10px] font-mono font-bold text-[#00346f]">{d.unit}</span>
+                                    </div>
+                                    <span className="font-mono text-xs font-bold text-[#424751]">{d.jam} Jam</span>
+                                  </div>
+                                </button>
+                              );
+                            })}
+                          </div>
+                        </div>
                       );
                     })}
                     {dailyData.length === 0 && (
