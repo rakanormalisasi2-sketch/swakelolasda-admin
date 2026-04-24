@@ -858,7 +858,7 @@ export function goalSeekBisectionPerencanaan(params) {
   const FeRaw = (feMenit||48) / 60;
   const Fe = Math.min(1.0, Math.max(0.3, +FeRaw.toFixed(3)));
   const calcQ1 = t1 => t1<=0 ? Infinity : (bucket*fb*fa*60)/(t1*fv*fk);
-  const calcFd = t1 => { const s=t1*60; return s<=0?1:(waktuGali/s)+((s-waktuGali)/s)*0.7; };
+  const calcFd = t1 => { const s=t1*60; const raw=s<=0?1:(waktuGali/s)+((s-waktuGali)/s)*0.7; return Math.min(1.0, Math.max(0.3, +raw.toFixed(3))); };
   const calcH = t1 => calcFd(t1)*Fe*kW*loadFactor;
   const T_low=0.10, T_high=0.80, step=(T_high-T_low)/2000;
   let bestT1=0.31, bestScore=Infinity, converged=false;
@@ -888,7 +888,7 @@ export function goalSeekBisectionPerencanaan(params) {
     h:+Hr.toFixed(4), h2:+h2r.toFixed(2),
     totalSolarUsed:+totalSolarUsed.toFixed(2),
     sisaAkhir:+sisaAkhir.toFixed(2), koefBBM:+koefBBM.toFixed(6),
-    fd:+Fdr.toFixed(4), fe:+(Fe).toFixed(3), kW:+kW.toFixed(2),
+    fd:+Fdr.toFixed(3), fe:+(Fe).toFixed(3), kW:+kW.toFixed(2),
     volRealisasi:+volReal.toFixed(2), volSurplus:+(volReal-volume).toFixed(2),
     converged, inRange:sisaAkhir>=targetSisaMin&&sisaAkhir<=targetSisaMax,
     status:converged?'OPTIMAL':'BEST_EFFORT',
