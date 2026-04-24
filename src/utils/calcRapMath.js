@@ -164,11 +164,12 @@ export function calculateKW(hp) {
  * - Fd = Faktor Daya = waktu_gali / (T.1 × 60)
  * - Fe = Faktor Efisiensi = 45 / 60 = 0.75 (45 menit efektif dari 60)
  */
-export function calculateBBMConsumption(hp, loadFactor, waktuGali, t1) {
+export function calculateBBMConsumption(hp, loadFactor, waktuGali, t1, feMenit = 45, lKwh = 0.28) {
   const kW = calculateKW(hp);
-  const Fe = 45 / 60; // 0.75
-  const Fd = waktuGali / (t1 * 60);
-  const H = Fd * Fe * loadFactor * kW;
+  const Fe = feMenit / 60;
+  const Fd = t1 > 0 ? (waktuGali / (t1 * 60)) : 0.9;
+  // Rumus BBM = Fd * Fe * kW * L/kWh (Berdasarkan gambar)
+  const H = Fd * Fe * kW * lKwh;
   return H;
 }
 

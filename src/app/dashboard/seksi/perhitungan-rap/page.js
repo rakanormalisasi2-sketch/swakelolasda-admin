@@ -105,7 +105,8 @@ export default function RapWizard() {
 
   // ── STATE: Step 1 — Geometri ──
   const [geometri, setGeometri] = useState({
-    b1: 4.0, b3: 6.857, h: 1.0, hGalian: 1.0, slope: 1, panjang: 540
+    b1: 4.0, b3: 6.857, h: 1.0, hGalian: 1.0, slope: 1, panjang: 540,
+    lebarStripping: 2.0, kedalamanStripping: 0.10
   });
 
   // ── STATE: Step 2 — Alat ──
@@ -132,7 +133,9 @@ export default function RapWizard() {
   // ════════════════════════════════════
   const b2 = useMemo(() => Math.max(geometri.b3 - 2 * geometri.slope * geometri.h, 0.1), [geometri]);
   const luasGalian = useMemo(() => ((geometri.b1 + geometri.b3) / 2) * geometri.hGalian, [geometri]);
-  const totalVolume = useMemo(() => luasGalian * geometri.panjang, [luasGalian, geometri.panjang]);
+  const volumeGalian = useMemo(() => luasGalian * geometri.panjang, [luasGalian, geometri.panjang]);
+  const volumeStripping = useMemo(() => geometri.lebarStripping * geometri.kedalamanStripping * geometri.panjang, [geometri.lebarStripping, geometri.kedalamanStripping, geometri.panjang]);
+  const totalVolume = useMemo(() => volumeGalian + volumeStripping, [volumeGalian, volumeStripping]);
 
   // GoalSeek-powered analysis
   const analisa = useMemo(() => {
@@ -161,9 +164,16 @@ export default function RapWizard() {
 
   // ── Sync excavator selection ──
   useEffect(() => {
-    const spec = EXCAVATOR_OPTIONS.find(e => e.key === selectedExcavator);
+    const spec = MASTER_EXCAVATOR_SPECS[selectedExcavator];
     if (spec) {
-      setAlatParams(p => ({ ...p, hp: spec.hp, bucket: spec.bucket }));
+      setAlatParams(p => ({ 
+        ...p, 
+        hp: spec.hp, 
+        bucket: spec.bucket,
+        fb: spec.fb,
+        fa: spec.fa,
+        loadFactor: spec.loadFactor
+      }));
     }
   }, [selectedExcavator]);
 
@@ -208,19 +218,21 @@ export default function RapWizard() {
 
   // ── Handlers ──
   const handlePrint = () => {
-    const stas = generateSTAPerencanaan({ ...geometri, b1: geometri.b1, b3: geometri.b3, h: geometri.h, hPrime: geometri.hGalian, panjang: geometri.panjang });
+    const stasRencana = generateSTAPerencanaan({ ...geometri, b1: geometri.b1, b3: geometri.b3, h: geometri.h, hPrime: geometri.hGalian, panjang: geometri.panjang });
     
+    // Auto-GoalSeek Pelaksanaan: mencari b1 agar volume galian cocok dgn Log Realisasi
+    const targetVolumeSaluran = selTotals.galian - volumeStripping;
+    let b1Pelaksanaan = geometri.b1;
+    if (targetVolumeSaluran > 0 && geometri.hGalian > 0 && geometri.panjang > 0) {
+       const targetLuas = targetVolumeSaluran / geometri.panjang;
+       b1Pelaksanaan = (2 * targetLuas / geometri.hGalian) - geometri.b3;
+       if (b1Pelaksanaan < 0.1) b1Pelaksanaan = 0.1; // batas minimal
+    }
+    const stasPelaksanaan = generateSTAPerencanaan({ ...geometri, b1: b1Pelaksanaan, b3: geometri.b3, h: geometri.h, hPrime: geometri.hGalian, panjang: geometri.panjang });
+
     const rapStateForPrint = {
-      geometri: {
-        stas: stas.stas,
-        kopData: kopData,
-        slope: geometri.slope,
-        ...geometri,
-        hPrime: geometri.hGalian
-      },
-      backupPelaksanaan: {
-        stas: stas.stas // Menggunakan STA yang sama untuk pelaksanaan sbg placeholder visual
-      },
+      geometri: { stas: stasRencana.stas, kopData, slope: geometri.slope, ...geometri, hPrime: geometri.hGalian },
+      backupPelaksanaan: { stas: stasPelaksanaan.stas, b1: b1Pelaksanaan },
       analisaRencana: alatParams,
       personil: { durasiHari: durasiHOK, penjagaMalam: 2 },
       selTotals,
@@ -236,11 +248,21 @@ export default function RapWizard() {
   };
 
   const handleExportExcel = () => {
-    const stas = generateSTAPerencanaan({ ...geometri, b1: geometri.b1, b3: geometri.b3, h: geometri.h, hPrime: geometri.hGalian, panjang: geometri.panjang });
+    const stasRencana = generateSTAPerencanaan({ ...geometri, b1: geometri.b1, b3: geometri.b3, h: geometri.h, hPrime: geometri.hGalian, panjang: geometri.panjang });
     
+    // Auto-GoalSeek Pelaksanaan
+    const targetVolumeSaluran = selTotals.galian - volumeStripping;
+    let b1Pelaksanaan = geometri.b1;
+    if (targetVolumeSaluran > 0 && geometri.hGalian > 0 && geometri.panjang > 0) {
+       const targetLuas = targetVolumeSaluran / geometri.panjang;
+       b1Pelaksanaan = (2 * targetLuas / geometri.hGalian) - geometri.b3;
+       if (b1Pelaksanaan < 0.1) b1Pelaksanaan = 0.1;
+    }
+    const stasPelaksanaan = generateSTAPerencanaan({ ...geometri, b1: b1Pelaksanaan, b3: geometri.b3, h: geometri.h, hPrime: geometri.hGalian, panjang: geometri.panjang });
+
     const rapStateForPrint = {
-      geometri: { stas: stas.stas, kopData, slope: geometri.slope, ...geometri, hPrime: geometri.hGalian },
-      backupPelaksanaan: { stas: stas.stas },
+      geometri: { stas: stasRencana.stas, kopData, slope: geometri.slope, ...geometri, hPrime: geometri.hGalian, volumeGalian, volumeStripping, totalVolume },
+      backupPelaksanaan: { stas: stasPelaksanaan.stas, b1: b1Pelaksanaan },
       analisaRencana: alatParams,
       personil: { durasiHari: durasiHOK, penjagaMalam: 2 },
       selTotals,
@@ -314,6 +336,11 @@ export default function RapWizard() {
                   <Section icon={Route} title="Parameter Memanjang">
                     <EngInput label="Panjang Total Saluran — L (m)" value={geometri.panjang} onChange={v => setGeometri(g => ({...g, panjang: v}))} unit="m" />
                   </Section>
+
+                  <Section icon={Ruler} title="Stripping Area (Jalur Alat)">
+                    <EngInput label="Lebar Stripping (m)" value={geometri.lebarStripping} onChange={v => setGeometri(g => ({...g, lebarStripping: v}))} unit="m" step="0.1" />
+                    <EngInput label="Kedalaman Stripping (m)" value={geometri.kedalamanStripping} onChange={v => setGeometri(g => ({...g, kedalamanStripping: v}))} unit="m" step="0.01" />
+                  </Section>
                 </div>
               )}
 
@@ -339,13 +366,26 @@ export default function RapWizard() {
                     </div>
                   </Section>
 
-                  <Section icon={Settings2} title="Faktor SNI">
-                    <EngInput label="Kapasitas Bucket (V)" value={alatParams.bucket} onChange={v => setAlatParams(p => ({...p, bucket: v}))} unit="m³" step="0.01" />
-                    <EngInput label="Faktor Bucket (Fb)" value={alatParams.fb} onChange={v => setAlatParams(p => ({...p, fb: v}))} step="0.01" />
-                    <EngInput label="Efisiensi Alat (Fa)" value={alatParams.fa} onChange={v => setAlatParams(p => ({...p, fa: v}))} step="0.01" />
-                    <EngInput label="Konversi Galian (Fv)" value={alatParams.fv} onChange={v => setAlatParams(p => ({...p, fv: v}))} step="0.01" />
-                    <EngInput label="Waktu Siklus — Cm" value={(analisa?.t1 || 0.45).toFixed(4)} onChange={() => {}} unit="min" />
-                    <EngInput label="Total Budget BBM" value={alatParams.totalBBM} onChange={v => setAlatParams(p => ({...p, totalBBM: v}))} unit="L" />
+                  <Section icon={Settings2} title="Faktor Efisiensi (SNI / AHSP)">
+                    <div className="grid grid-cols-2 gap-4">
+                      <EngInput label="Kapasitas Bucket (V)" value={alatParams.bucket} onChange={v => setAlatParams(p => ({...p, bucket: v}))} unit="m³" step="0.01" />
+                      <EngInput label="Tenaga Alat (HP)" value={alatParams.hp} onChange={v => setAlatParams(p => ({...p, hp: v}))} unit="HP" step="1" />
+                      <EngInput label="Faktor Bucket (Fb)" value={alatParams.fb} onChange={v => setAlatParams(p => ({...p, fb: v}))} step="0.01" />
+                      <EngInput label="Efisiensi Alat (Fa)" value={alatParams.fa} onChange={v => setAlatParams(p => ({...p, fa: v}))} step="0.01" />
+                      <EngInput label="Konversi Galian (Fv)" value={alatParams.fv} onChange={v => setAlatParams(p => ({...p, fv: v}))} step="0.01" />
+                      <EngInput label="Efisiensi Wkt (Fe menit)" value={alatParams.feMenit || 48} onChange={v => setAlatParams(p => ({...p, feMenit: v}))} unit="min" step="1" />
+                      <EngInput label="Waktu Gali (Fd)" value={alatParams.waktuGali} onChange={v => setAlatParams(p => ({...p, waktuGali: v}))} unit="sec" step="0.1" />
+                      <EngInput label="Jam Efektif Harian (Tk)" value={alatParams.tk} onChange={v => setAlatParams(p => ({...p, tk: v}))} unit="jam" step="1" />
+                    </div>
+                    <div className="mt-4 pt-4 border-t border-[#c2c6d3]/20">
+                      <EngInput label="Total Budget BBM" value={alatParams.totalBBM} onChange={v => setAlatParams(p => ({...p, totalBBM: v}))} unit="L" />
+                    </div>
+                    <div className="mt-4 p-3 bg-amber-50 border border-amber-200 rounded-lg flex items-start gap-3">
+                      <HelpCircle size={16} className="text-amber-600 mt-0.5" />
+                      <p className="text-[10px] text-amber-800 leading-relaxed">
+                        <strong>Panduan AHSP:</strong> Perubahan manual pada nilai Efisiensi dan Kapasitas sangat memengaruhi kalkulasi <i>GoalSeek</i> BBM dan Waktu Siklus. Pastikan Anda mengacu pada batas toleransi SNI agar realisasi pelaporan tidak ditolak.
+                      </p>
+                    </div>
                   </Section>
                 </div>
               )}
@@ -519,7 +559,7 @@ export default function RapWizard() {
                         <span className="flex items-center gap-1"><span className="w-1.5 h-1.5 rounded-full bg-emerald-400" /> Scale: 1:50</span>
                         <span>Unit: Meters (m)</span>
                       </div>
-                      <span>Vol: {totalVolume.toFixed(2)} m³</span>
+                      <span>Total Vol: {totalVolume.toFixed(2)} m³ (Galian: {volumeGalian.toFixed(2)} | Stripping: {volumeStripping.toFixed(2)})</span>
                     </div>
                   </div>
                 </div>

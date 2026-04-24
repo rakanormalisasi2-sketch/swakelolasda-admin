@@ -3,11 +3,7 @@ import { saveAs } from 'file-saver';
 import { generateAllSVGs } from './rapPrint';
 
 const templateMap = {
-  'pc50': '/pc 50.xlsx',
-  'pc75': '/PC75.xlsx',
-  'pc100': '/PC 100 .xlsx',
-  'pc200': '/pc 200.xlsx',
-  'pc200-long': '/PC 200 LONG ARM.xlsx'
+  // Always fallback to pc 50.xlsx as master format
 };
 
 const svgToPngBase64 = (svgString) => {
@@ -42,11 +38,11 @@ const svgToPngBase64 = (svgString) => {
 
 export async function downloadExcel(data) {
   try {
-    const { geometri, analisaRencana, selTotals, dailyData, selectedDailyIndices, kopData, selectedExcavator } = data;
+    const { geometri, backupPelaksanaan, analisaRencana, selTotals, dailyData, selectedDailyIndices, kopData, selectedExcavator } = data;
     
-    // 1. Tentukan File Template Berdasarkan Alat
-    const templatePath = templateMap[selectedExcavator] || '/pc 50.xlsx';
-    console.log(`Menggunakan template: ${templatePath}`);
+    // 1. Tentukan File Template (STANDARISASI FASE 11: Selalu gunakan pc 50.xlsx sebagai Master)
+    const templatePath = '/pc 50.xlsx';
+    console.log(`Menggunakan template master: ${templatePath}`);
     
     const response = await fetch(templatePath);
     if (!response.ok) throw new Error(`Template ${templatePath} tidak ditemukan di folder public/`);
@@ -72,6 +68,24 @@ export async function downloadExcel(data) {
       }
     });
 
+    // 2.5 Hydrate "Backup Galian" (Stripping Area & b1 Pelaksanaan)
+    const backupSheets = ['backup volume rencana', 'backup volume pelaksanaan'];
+    backupSheets.forEach(name => {
+      const sheet = wb.getWorksheet(name);
+      if(sheet) {
+         // Sesuai konfirmasi gambar: Lebar Stripping di F19, Kedalaman di I19
+         sheet.getCell('F19').value = geometri?.lebarStripping || 2.0;
+         sheet.getCell('I19').value = geometri?.kedalamanStripping || 0.10;
+         
+         // Injeksi b1 agar GoalSeek Pelaksanaan sinkron dengan log realisasi
+         if (name === 'backup volume pelaksanaan' && backupPelaksanaan?.b1) {
+            sheet.getCell('F15').value = backupPelaksanaan.b1;
+         } else if (name === 'backup volume rencana' && geometri?.b1) {
+            sheet.getCell('F15').value = geometri.b1;
+         }
+      }
+    });
+
     // 3. Hydrate "Kebutuhan  realisasi"
     const realisasiSheet = wb.getWorksheet('Kebutuhan  realisasi');
     if (realisasiSheet && selectedDailyIndices && selectedDailyIndices.length > 0) {
@@ -85,10 +99,9 @@ export async function downloadExcel(data) {
          [1,2,3,4,5,6,7,8,9,10,11,12,13,14].forEach(c => row.getCell(c).value = null);
       }
 
-      // Recalculate basic constraints
-      const q1 = (analisaRencana.bucket * analisaRencana.fb * analisaRencana.fa * analisaRencana.fv * 60) / (analisaRencana.waktuGali / 60);
-      const kw = analisaRencana.hp * 0.7457;
-      const bbmPerJam = (analisaRencana.waktuGali / analisaRencana.waktuGali) * 0.75 * kw * analisaRencana.loadFactor;
+      // Recalculate basic constraints (Gunakan nilai dari GoalSeek jika tersedia)
+      const q1 = data.analisaCalculated?.q1 || ((analisaRencana.bucket * analisaRencana.fb * analisaRencana.fa * analisaRencana.fv * 60) / (analisaRencana.waktuGali / 60));
+      const bbmPerJam = data.analisaCalculated?.H || ((analisaRencana.waktuGali / analisaRencana.waktuGali) * 0.75 * (analisaRencana.hp * 0.7457) * analisaRencana.loadFactor);
 
       selectedData.forEach((d, index) => {
          const rowIndex = 10 + index;
