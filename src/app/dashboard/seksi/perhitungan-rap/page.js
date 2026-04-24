@@ -37,10 +37,11 @@ const NAV_ITEMS = [
 ];
 
 const EXCAVATOR_OPTIONS = [
-  { key: 'PC50',  label: 'PC50',  bucket: 0.22, hp: 42 },
-  { key: 'PC75',  label: 'PC75',  bucket: 0.35, hp: 65 },
-  { key: 'PC100', label: 'PC100', bucket: 0.45, hp: 97 },
-  { key: 'PC200', label: 'PC200', bucket: 0.93, hp: 143 },
+  { key: 'PC50',  label: 'PC 50',  bucket: 0.22, hp: 42 },
+  { key: 'PC75',  label: 'PC 75',  bucket: 0.35, hp: 65 },
+  { key: 'PC100', label: 'PC 100', bucket: 0.45, hp: 97 },
+  { key: 'PC200', label: 'PC 200', bucket: 0.93, hp: 143 },
+  { key: 'PC200LA', label: 'PC 200 Long Arm', bucket: 0.46, hp: 148 },
 ];
 
 // ─── Reusable: Engineering Input ───
