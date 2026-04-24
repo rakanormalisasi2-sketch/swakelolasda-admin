@@ -161,16 +161,32 @@ export async function printCrossSections(rapState) {
     autoTable(doc,{startY:44,head:[['No','Uraian','Volume','Sat','Harga Satuan (Rp)','Jumlah (Rp)']],body:a6,styles:tS,headStyles:hS,theme:'grid'});
 
     // === HAL 7: RINCIAN KEBUTUHAN & HASIL PELAKSANAAN ===
-    np('portrait'); kop('RINCIAN KEBUTUHAN DAN HASIL PELAKSANAAN','portrait');
-    let cumV=0, sisa=0;
+    np('landscape'); kop('RINCIAN KEBUTUHAN DAN HASIL PELAKSANAAN','landscape');
+    let cumV=0, sisa=0, cumBBM=0;
     const a7 = (dailyData||[]).map((d,i) => {
       const g2=d.jam*q1, bb=d.jam*H;
-      if(i===0) sisa=400;
-      sisa -= bb;
+      // Parse Drop BBM dari keterangan (cari angka setelah kata "BBM" atau "solar" atau "drop")
+      let drop = 0;
+      if (d.keterangan) {
+        const match = d.keterangan.match(/(?:bbm|solar|drop|kirim|terima|pengiriman)\s*[:=]?\s*(\d+)/i);
+        if (match) drop = parseInt(match[1]);
+      }
+      // Jika hari pertama dan tidak ada drop di keterangan, default 400
+      if (i===0 && drop===0) drop = 400;
+      sisa = sisa + drop - bb;
+      if (sisa < 0) sisa = 0; // safety: tidak boleh minus
       cumV += g2;
+      cumBBM += bb;
       const dt = new Date(d.tanggal);
-      return [i+1,dt.getDate(),dt.toLocaleString('id-ID',{month:'short'}),dt.getFullYear(),f(d.jam,1),f(q1),f(g2),f(H),f(bb),i===0?'400':'',f(sisa),d.tanggal,'',f(cumV)];
+      return [i+1,dt.getDate(),dt.toLocaleString('id-ID',{month:'short'}),dt.getFullYear(),
+        f(d.jam,1),f(q1),f(g2),f(H),f(bb),
+        drop>0?String(drop):'',f(sisa),
+        d.hmAwal||'',d.hmAkhir||'',f(cumV)];
     });
+    // Add totals row
+    a7.push([{content:'TOTAL',colSpan:4,styles:{fontStyle:'bold'}},'',
+      '',f((dailyData||[]).reduce((a,d)=>a+d.jam*q1,0)),
+      '',f(cumBBM),'','',f(sisa),'','',f(cumV)]);
     autoTable(doc,{startY:44,head:[['No','Tgl','Bln','Thn','Jam','Q1','Vol(m³)','H(L/j)','BBM(L)','Drop','Sisa','HM Awal','HM Akhir','Kum Vol']],body:a7,styles:{...tS,fontSize:5.5},headStyles:{...hS,fontSize:5.5},theme:'grid'});
 
     // === HAL 8: ANALISA PELAKSANAAN ===
