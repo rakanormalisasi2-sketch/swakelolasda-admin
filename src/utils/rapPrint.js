@@ -170,25 +170,26 @@ export async function printCrossSections(rapState) {
     // === HAL 7: RINCIAN KEBUTUHAN & HASIL PELAKSANAAN ===
     const dP = (dailyData||[]).length||1;
     const volPel = bp?.totalVolume || selTotals?.galian || vol;
-    np('landscape'); const y7s=kop('RINCIAN KEBUTUHAN DAN HASIL PELAKSANAAN','landscape',{volume:volPel,durasi:dP});
+    np('landscape'); const y7s_header=kop('RINCIAN KEBUTUHAN DAN HASIL PELAKSANAAN','landscape',{volume:volPel,durasi:dP});
     
     // Gunakan fungsi distribusi BBM agar sisa akhir 40-150 & tidak pernah minus
-    const drops = distributeBBMDrops(dailyData || [], H);
-    
-    let cumV=0, sisa=0, cumBBM=0;
-    const a7 = (dailyData||[]).map((d,i) => {
-      const g2=d.jam*q1, bb=d.jam*H;
-      let drop = drops[i] || 0;
-      sisa = sisa + drop - bb;
-      if(sisa<0) sisa=0; // safety
-      cumV += g2; cumBBM += bb;
+    const tSolPrint = vol * koef;
+    const drops = distributeBBMDrops(dailyData || [], H, tSolPrint);
+    let sisa = 0, cumV=0, cumBBM=0;
+    const a7 = (dailyData || []).map((d, i) => {
+      const g2=d.jam*q1;
+      const iterH = (d.jam || 0) * H;
+      sisa = sisa + (drops[i]||0) - iterH;
+      cumV += g2; cumBBM += iterH;
       const dt = new Date(d.tanggal);
-      return [i+1,dt.getDate(),dt.toLocaleString('id-ID',{month:'short'}),dt.getFullYear(),
-        f(d.jam,1),f(q1),f(g2),f(H),f(bb),drop>0?String(drop):'',f(sisa),
-        d.hmAwal||'',d.hmAkhir||'',f(cumV)];
+      return [
+        i+1, dt.getDate(), dt.toLocaleString('id-ID',{month:'short'}), dt.getFullYear(),
+        f(d.jam,1), f(q1), f(g2), f(H), f(iterH), (drops[i]||0)>0?f(drops[i],0):'', f(sisa),
+        d.hmAwal||'', d.hmAkhir||'', f(cumV)
+      ];
     });
     a7.push([{content:'TOTAL',colSpan:4,styles:{fontStyle:'bold'}},'','',f(cumV),'',f(cumBBM),'','','','','',f(cumV)]);
-    autoTable(doc,{startY:y7s,head:[['No','Tgl','Bln','Thn','Jam','Q1','Vol(m³)','H(L/j)','BBM(L)','Drop','Sisa','HM Awal','HM Akhir','Kum Vol']],body:a7,styles:{...tS,fontSize:5.5},headStyles:{...hS,fontSize:5.5},theme:'grid'});
+    autoTable(doc,{startY:y7s_header,head:[['No','Tgl','Bln','Thn','Jam','Q1','Vol(m³)','H(L/j)','BBM(L)','Drop','Sisa','HM Awal','HM Akhir','Kum Vol']],body:a7,styles:{...tS,fontSize:5.5},headStyles:{...hS,fontSize:5.5},theme:'grid'});
 
     // === HAL 8: ANALISA PELAKSANAAN (sama dengan perencanaan) ===
     np('portrait'); const y8s=kop('ANALISA HARGA SATUAN\nGALIAN TANAH DENGAN '+alatLabel.toUpperCase()+' (PELAKSANAAN)','portrait',{volume:volPel,durasi:dP});
@@ -200,12 +201,29 @@ export async function printCrossSections(rapState) {
     bvp.push(['','','','','','','TOTAL','',f((bp?.stas||[]).reduce((a,s)=>a+(s.volume||0),0))]);
     autoTable(doc,{startY:y9s,head:[['No','STA','b1(m)','b3(m)','h(m)',"h'(m)",'Luas(m²)','Jarak(m)','Volume(m³)']],body:bvp,styles:tS,headStyles:hS,theme:'grid'});
 
-    // === HAL 10: AHSP PELAKSANAAN (sama dengan perencanaan) ===
+    // === HAL 10: AHSP PELAKSANAAN ===
+    const fePel = Math.max(0.3, (ac?.fe || 0.8) - 0.04);
+    const HPel = (ac?.fd || 0.99) * fePel * kW * (ar?.loadFactor || 0.28);
+    const koefPel = HPel / q1;
+    const hspPel = (dP / volPel) * hP + koefPel * hB;
+
+    const a3Pelaksanaan = [
+      [{content:'A.',styles:{fontStyle:'bold'}},{content:'TENAGA',colSpan:5,styles:{fontStyle:'bold'}}],
+      ['1','Penjaga Malam','OH',f(dP/volPel,6),fR(hP),fR((dP/volPel)*hP)],
+      [{content:'',styles:{fontStyle:'bold'}},{content:'JUMLAH TENAGA',colSpan:4,styles:{fontStyle:'bold'}},fR((dP/volPel)*hP)],
+      [{content:'B.',styles:{fontStyle:'bold'}},{content:'BAHAN',colSpan:5,styles:{fontStyle:'bold'}}],
+      ['1','Solar','Ltr',f(koefPel,6),fR(hB),fR(koefPel*hB)],
+      [{content:'',styles:{fontStyle:'bold'}},{content:'JUMLAH BAHAN',colSpan:4,styles:{fontStyle:'bold'}},fR(koefPel*hB)],
+      [{content:'C.',styles:{fontStyle:'bold'}},{content:'PERALATAN (Swakelola)',colSpan:5,styles:{fontStyle:'bold'}}],
+      ['1',alatLabel,'Jam',f(1/q1,6),'-','-'],
+      [{content:'',styles:{fontStyle:'bold'}},{content:'TOTAL HARGA SATUAN PER m³',colSpan:4,styles:{fontStyle:'bold'}},{content:fR(hspPel),styles:{fontStyle:'bold'}}],
+    ];
+
     np('landscape'); const y10s=kop('ANALISA HARGA SATUAN PEKERJAAN (PELAKSANAAN)','landscape');
-    autoTable(doc,{startY:y10s,head:[['No','Uraian','Satuan','Koefisien','Harga Satuan','Jumlah Harga']],body:a3,styles:tS,headStyles:hS,theme:'grid'});
+    autoTable(doc,{startY:y10s,head:[['No','Uraian','Satuan','Koefisien','Harga Satuan','Jumlah Harga']],body:a3Pelaksanaan,styles:tS,headStyles:hS,theme:'grid'});
 
     // === HAL 11: TENAGA BAHAN PELAKSANAAN ===
-    const tSolP = selTotals?.bbm||0;
+    const tSolP = volPel * koefPel;
     np('landscape'); const y11s=kop('PERHITUNGAN TENAGA DAN BAHAN (PELAKSANAAN)','landscape');
     const a11 = [
       [{content:'A.',styles:{fontStyle:'bold'}},{content:'TENAGA',colSpan:4,styles:{fontStyle:'bold'}}],
@@ -231,12 +249,11 @@ export async function printCrossSections(rapState) {
 
     // === HAL 13: REALISASI ANGGARAN ===
     np('landscape'); const y13s=kop('REALISASI ANGGARAN PELAKSANAAN','landscape');
-    const vP = selTotals?.galian||0;
     const a13 = [
-      ['I','Pekerjaan Galian Tanah (Realisasi)',f(vP),'m³',fR(hsp),fR(vP*hsp)],
-      ['','','','',{content:'SUB TOTAL',styles:{fontStyle:'bold'}},{content:fR(vP*hsp),styles:{fontStyle:'bold'}}],
-      ['','','','','PPN 12%',fR(vP*hsp*0.12)],
-      ['','','','',{content:'GRAND TOTAL',styles:{fontStyle:'bold'}},{content:fR(vP*hsp*1.12),styles:{fontStyle:'bold'}}],
+      ['I','Pekerjaan Galian Tanah (Realisasi)',f(volPel),'m³',fR(hspPel),fR(volPel*hspPel)],
+      ['','','','',{content:'SUB TOTAL',styles:{fontStyle:'bold'}},{content:fR(volPel*hspPel),styles:{fontStyle:'bold'}}],
+      ['','','','','PPN 12%',fR(volPel*hspPel*0.12)],
+      ['','','','',{content:'GRAND TOTAL',styles:{fontStyle:'bold'}},{content:fR(volPel*hspPel*1.12),styles:{fontStyle:'bold'}}],
     ];
     autoTable(doc,{startY:y13s,head:[['No','Uraian','Volume','Sat','Harga Satuan (Rp)','Jumlah (Rp)']],body:a13,styles:tS,headStyles:hS,theme:'grid'});
 

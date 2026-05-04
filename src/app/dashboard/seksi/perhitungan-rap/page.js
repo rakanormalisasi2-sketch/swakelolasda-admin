@@ -43,6 +43,8 @@ const EXCAVATOR_OPTIONS = [
   { key: 'PC100', label: 'PC 100', bucket: 0.45, hp: 97 },
   { key: 'PC200', label: 'PC 200', bucket: 0.93, hp: 143 },
   { key: 'PC200LA', label: 'PC 200 Long Arm', bucket: 0.46, hp: 148 },
+  { key: 'BULLDOZER', label: 'Bulldozer', bucket: 0.9, hp: 155 },
+  { key: 'LAINNYA', label: 'Lainnya (Ketik Manual)', bucket: 0.93, hp: 143 },
 ];
 
 // ─── Reusable: Engineering Input ───
@@ -125,6 +127,7 @@ export default function RapWizard() {
 
   // ── STATE: Step 2 — Alat ──
   const [selectedExcavator, setSelectedExcavator] = useState('PC200');
+  const [customAlat, setCustomAlat] = useState('');
   const [alatParams, setAlatParams] = useState({
     hp: 143, bucket: 0.93, fb: 0.9, fa: 0.83, fv: 0.8, fk: 0.8,
     loadFactor: 0.28, waktuGali: 38, tk: 7, totalBBM: 600
@@ -173,39 +176,6 @@ export default function RapWizard() {
   const b2 = useMemo(() => Math.max(geometri.b3 - 2 * geometri.slope * geometri.h, 0.1), [geometri]);
   const luasGalian = useMemo(() => ((geometri.b1 + geometri.b3) / 2) * geometri.hGalian, [geometri]);
   const volumeGalian = useMemo(() => luasGalian * geometri.panjang, [luasGalian, geometri.panjang]);
-  const volumeStripping = useMemo(() => geometri.lebarStripping * geometri.kedalamanStripping * geometri.panjang, [geometri.lebarStripping, geometri.kedalamanStripping, geometri.panjang]);
-  const totalVolume = useMemo(() => volumeGalian + volumeStripping, [volumeGalian, volumeStripping]);
-
-  // GoalSeek-powered analysis
-  const analisa = useMemo(() => {
-    try {
-      let base = calculateAnalisaWithGoalSeek(totalVolume, {
-        ...alatParams,
-        totalBBM: alatParams.totalBBM
-      });
-      
-      // Override Q1 if we have actual logs to ensure perfect matching for final Sisa (20-150L)
-      if (selTotals?.jam > 0 && step >= 3) {
-        const dRand = Math.sin(selTotals.jam * 1000) * 0.5 + 0.5;
-        const targetSisa = 20 + dRand * 130; 
-        
-        // Target: Vol * H / Q1 = actualJam * H + targetSisa
-        const newQ1 = totalVolume / (selTotals.jam + targetSisa / base.h);
-        const newT1 = (alatParams.bucket * alatParams.fb * alatParams.fa * 60) / (newQ1 * alatParams.fv * alatParams.fk);
-        
-        base = { ...base };
-        base.q1 = +newQ1.toFixed(2);
-        base.t1 = +newT1.toFixed(4);
-        base.t1_detik = +(newT1 * 60).toFixed(2);
-        base.q2 = +(newQ1 * (alatParams.tk || 7)).toFixed(2);
-        base.totalSolarUsed = +(totalVolume * (base.h / base.q1)).toFixed(2);
-      }
-      return base;
-    } catch {
-      return calculateAnalisaRencana(totalVolume, alatParams);
-    }
-  }, [totalVolume, alatParams, selTotals?.jam, step]);
-
   // Checkbox aggregation
   const selectedData = useMemo(() => dailyData.filter(d => checkedIds.has(d.id)), [dailyData, checkedIds]);
   const selTotals = useMemo(() => selectedData.reduce((acc, d) => ({
@@ -214,6 +184,30 @@ export default function RapWizard() {
     bbm: acc.bbm + (d.bbm || 0),
   }), { jam: 0, galian: 0, bbm: 0 }), [selectedData]);
 
+  const totalDiterimaLogs = useMemo(() => {
+    return selectedData.reduce((acc, d) => {
+      let dVal = d.bbmDiterima || 0;
+      if (!dVal && d.catatan) {
+        const m = d.catatan.match(/(?:bbm|solar|drop|kirim|terima)\s*[:=]?\s*(\d+)/i);
+        if (m) dVal = parseInt(m[1]);
+      }
+      return acc + dVal;
+    }, 0);
+  }, [selectedData]);
+
+  // GoalSeek-powered analysis
+  const analisa = useMemo(() => {
+    try {
+      const actualTotalBBM = (totalDiterimaLogs > 0 && step >= 3) ? totalDiterimaLogs : alatParams.totalBBM;
+      return calculateAnalisaWithGoalSeek(totalVolume, {
+        ...alatParams,
+        totalBBM: actualTotalBBM
+      });
+    } catch {
+      return calculateAnalisaRencana(totalVolume, alatParams);
+    }
+  }, [totalVolume, alatParams, totalDiterimaLogs, step]);
+
   const durasiHOK = selectedData.length;
   const costBBM = selTotals.bbm * hargaBBM;
   const costPenjaga = 2 * hargaPenjaga * durasiHOK; // 2 penjaga malam
@@ -221,15 +215,15 @@ export default function RapWizard() {
 
   // ── Sync excavator selection ──
   useEffect(() => {
-    const spec = MASTER_EXCAVATOR_SPECS[selectedExcavator];
+    const spec = EXCAVATOR_OPTIONS.find(e => e.key === selectedExcavator) || MASTER_EXCAVATOR_SPECS[selectedExcavator];
     if (spec) {
       setAlatParams(p => ({ 
         ...p, 
         hp: spec.hp, 
         bucket: spec.bucket,
-        fb: spec.fb,
-        fa: spec.fa,
-        loadFactor: spec.loadFactor
+        fb: spec.fb || p.fb,
+        fa: spec.fa || p.fa,
+        loadFactor: spec.loadFactor || p.loadFactor
       }));
     }
   }, [selectedExcavator]);
@@ -368,7 +362,7 @@ export default function RapWizard() {
       hargaBBM,
       hargaPenjaga,
       analisaCalculated: analisa,
-      selectedExcavator
+      selectedExcavator: selectedExcavator === 'LAINNYA' ? customAlat || 'Alat Berat' : selectedExcavator
     };
     
     printCrossSections(rapStateForPrint);
@@ -472,7 +466,7 @@ export default function RapWizard() {
                   <p className="text-sm text-[#424751] mb-8">Konfigurasi parameter alat berat sesuai spesifikasi teknis.</p>
 
                   <Section icon={Wrench} title="Kelas Excavator">
-                    <div className="grid grid-cols-2 gap-3">
+                    <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
                       {EXCAVATOR_OPTIONS.map(exc => (
                         <button key={exc.key} onClick={() => setSelectedExcavator(exc.key)}
                           className={`text-left p-4 rounded-xl border-2 transition-all outline-none ${

@@ -161,8 +161,9 @@ const CrossSectionSVG = ({
   return (
     <div className="w-full h-full flex justify-center items-center bg-gray-200 p-4 drop-shadow-xl overflow-hidden">
       <svg
-        width="100%" 
-        height="100%" 
+        xmlns="http://www.w3.org/2000/svg"
+        width={width} 
+        height={height} 
         viewBox={`0 0 ${width} ${height}`} 
         className="bg-white shadow-2xl"
         style={{ fontFamily: 'Arial, sans-serif' }}
