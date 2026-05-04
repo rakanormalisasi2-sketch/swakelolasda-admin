@@ -140,9 +140,13 @@ export default function RapWizard() {
   // ── STATE: Step 4 — Finalisasi ──
   const [kopData, setKopData] = useState({
     pekerjaan: 'Normalisasi Sungai',
-    lokasi: '-7.2912, 112.7314',
-    preparedBy: 'Ir. Budi Santoso, MT',
-    approvedBy: 'Dr. Hendra Wijaya, IAI'
+    lokasi: 'Desa Pacul, Kec. Bojonegoro',
+    jabatanMenyetujui: 'KUASA PENGGUNA ANGGARAN',
+    namaMenyetujui: '',
+    nipMenyetujui: '',
+    jabatanMengetahui: 'PEJABAT PELAKSANA TEKNIS KEGIATAN',
+    namaMengetahui: '',
+    nipMengetahui: '',
   });
 
   // ── STATE: Kredensial Dokumen (dari section_settings) ──
@@ -152,13 +156,20 @@ export default function RapWizard() {
   const [hargaBBM, setHargaBBM] = useState(22300);
   const [hargaPenjaga, setHargaPenjaga] = useState(75000);
 
-  // Load harga dari localStorage saat mount
+  // Load harga + signature from localStorage
   useEffect(() => {
     try {
       const savedBBM = localStorage.getItem('rap_harga_bbm');
       const savedPenjaga = localStorage.getItem('rap_harga_penjaga');
       if (savedBBM) setHargaBBM(Number(savedBBM));
       if (savedPenjaga) setHargaPenjaga(Number(savedPenjaga));
+      
+      // Load saved signature data
+      const savedSig = localStorage.getItem('rap_signature_data');
+      if (savedSig) {
+        const sig = JSON.parse(savedSig);
+        setKopData(prev => ({ ...prev, ...sig }));
+      }
     } catch {}
   }, []);
 
@@ -169,6 +180,21 @@ export default function RapWizard() {
       localStorage.setItem('rap_harga_penjaga', String(hargaPenjaga));
     } catch {}
   }, [hargaBBM, hargaPenjaga]);
+
+  // Auto-save signature data to localStorage
+  useEffect(() => {
+    try {
+      const sigData = {
+        jabatanMenyetujui: kopData.jabatanMenyetujui,
+        namaMenyetujui: kopData.namaMenyetujui,
+        nipMenyetujui: kopData.nipMenyetujui,
+        jabatanMengetahui: kopData.jabatanMengetahui,
+        namaMengetahui: kopData.namaMengetahui,
+        nipMengetahui: kopData.nipMengetahui,
+      };
+      localStorage.setItem('rap_signature_data', JSON.stringify(sigData));
+    } catch {}
+  }, [kopData.jabatanMenyetujui, kopData.namaMenyetujui, kopData.nipMenyetujui, kopData.jabatanMengetahui, kopData.namaMengetahui, kopData.nipMengetahui]);
 
   // ════════════════════════════════════
   // DERIVED CALCULATIONS (Real-time)
@@ -702,9 +728,24 @@ export default function RapWizard() {
                     </div>
                   </Section>
 
-                  <Section icon={PenLine} title="Signatories">
-                    <EngInput label="Prepared By" value={kopData.preparedBy} onChange={v => setKopData(k => ({...k, preparedBy: v}))} type="text" />
-                    <EngInput label="Approved By" value={kopData.approvedBy} onChange={v => setKopData(k => ({...k, approvedBy: v}))} type="text" />
+                  <Section icon={PenLine} title="Tanda Tangan Pejabat">
+                    <div className="grid grid-cols-2 gap-8">
+                      <div className="p-4 border border-[#c2c6d3]/30 rounded-xl bg-[#f8f9ff]">
+                        <p className="text-xs font-bold text-[#00346f] mb-3 uppercase tracking-wide">Menyetujui</p>
+                        <EngInput label="Jabatan" value={kopData.jabatanMenyetujui || ''} onChange={v => setKopData(k => ({...k, jabatanMenyetujui: v}))} type="text" />
+                        <EngInput label="Nama Pejabat" value={kopData.namaMenyetujui || ''} onChange={v => setKopData(k => ({...k, namaMenyetujui: v}))} type="text" />
+                        <EngInput label="NIP" value={kopData.nipMenyetujui || ''} onChange={v => setKopData(k => ({...k, nipMenyetujui: v}))} type="text" />
+                      </div>
+                      <div className="p-4 border border-[#c2c6d3]/30 rounded-xl bg-[#f8f9ff]">
+                        <p className="text-xs font-bold text-[#00346f] mb-3 uppercase tracking-wide">Mengetahui</p>
+                        <EngInput label="Jabatan" value={kopData.jabatanMengetahui || ''} onChange={v => setKopData(k => ({...k, jabatanMengetahui: v}))} type="text" />
+                        <EngInput label="Nama Pejabat" value={kopData.namaMengetahui || ''} onChange={v => setKopData(k => ({...k, namaMengetahui: v}))} type="text" />
+                        <EngInput label="NIP" value={kopData.nipMengetahui || ''} onChange={v => setKopData(k => ({...k, nipMengetahui: v}))} type="text" />
+                      </div>
+                    </div>
+                    <div className="mt-3 p-2 bg-emerald-50 border border-emerald-200 rounded-lg">
+                      <p className="text-[10px] text-emerald-700">✅ Data tanda tangan otomatis tersimpan sebagai default untuk laporan berikutnya.</p>
+                    </div>
                   </Section>
                 </div>
               )}

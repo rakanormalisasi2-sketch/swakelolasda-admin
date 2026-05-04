@@ -35,16 +35,47 @@ export async function printCrossSections(rapState) {
     const preparedBy = kopData?.preparedBy || 'Ir. Budi Santoso, MT';
     const approvedBy = kopData?.approvedBy || 'Dr. Hendra Wijaya, IAI';
     const addSignature = (doc, y, w) => {
-      const col1 = 30, col2 = w - 80;
-      doc.setFontSize(7); doc.setFont('helvetica','normal');
-      doc.text('Mengetahui,', col1, y);
-      doc.text('Yang Membuat,', col2, y);
+      const col1 = 30, col2 = w - 100;
+      const subKegShort = subKeg || 'NORMALISASI/RESTORASI SUNGAI';
+      
+      const jabMenyetujui = kopData?.jabatanMenyetujui || 'KUASA PENGGUNA ANGGARAN';
+      const namMenyetujui = kopData?.namaMenyetujui || '-';
+      const nipMenyetujui = kopData?.nipMenyetujui || '-';
+      
+      const jabMengetahui = kopData?.jabatanMengetahui || 'PEJABAT PELAKSANA TEKNIS KEGIATAN';
+      const namMengetahui = kopData?.namaMengetahui || '-';
+      const nipMengetahui = kopData?.nipMengetahui || '-';
+      
+      doc.setFontSize(8); doc.setFont('helvetica','normal');
+      doc.text('Menyetujui :', col1, y);
+      doc.text('Mengetahui :', col2, y);
+      
+      // Jabatan
       doc.setFontSize(7); doc.setFont('helvetica','bold');
-      doc.text(approvedBy, col1, y + 20);
-      doc.text(preparedBy, col2, y + 20);
+      doc.text(jabMenyetujui, col1, y + 8);
+      doc.text(jabMengetahui, col2, y + 8);
+      
+      // Sub Kegiatan line
       doc.setFont('helvetica','normal');
-      doc.line(col1, y + 21, col1 + 45, y + 21);
-      doc.line(col2, y + 21, col2 + 45, y + 21);
+      doc.text('SUB KEGIATAN ' + subKegShort, col1, y + 12);
+      doc.text('SUB KEGIATAN ' + subKegShort, col2, y + 12);
+      
+      // Nama (bold, underlined)
+      doc.setFontSize(8); doc.setFont('helvetica','bold');
+      doc.text(namMenyetujui, col1, y + 30);
+      doc.text(namMengetahui, col2, y + 30);
+      
+      // Underline below name
+      const nameW1 = doc.getTextWidth(namMenyetujui);
+      const nameW2 = doc.getTextWidth(namMengetahui);
+      doc.setLineWidth(0.3);
+      doc.line(col1, y + 31, col1 + nameW1, y + 31);
+      doc.line(col2, y + 31, col2 + nameW2, y + 31);
+      
+      // NIP
+      doc.setFontSize(7); doc.setFont('helvetica','normal');
+      doc.text('NIP.' + nipMenyetujui, col1, y + 35);
+      doc.text('NIP. ' + nipMengetahui, col2, y + 35);
     };
     const f = (n,d=2) => Number(n||0).toFixed(d);
     const fR = n => 'Rp ' + Math.round(n||0).toLocaleString('id-ID');
