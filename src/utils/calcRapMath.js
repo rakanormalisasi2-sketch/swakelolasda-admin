@@ -976,9 +976,18 @@ export function distributeBBMDrops(dailyData, H) {
   const bbmHariArray = dailyData.map(d => d.jam * H);
 
   // 1. Check if user provided explicit drops
-  const hasExplicitDrops = dailyData.some(d => d.bbmDiterima > 0);
+  const dropsParsed = dailyData.map(d => {
+    let dVal = d.bbmDiterima || 0;
+    if (!dVal && d.catatan) {
+      const m = d.catatan.match(/(?:bbm|solar|drop|kirim|terima)\s*[:=]?\s*(\d+)/i);
+      if (m) dVal = parseInt(m[1]);
+    }
+    return dVal;
+  });
+
+  const hasExplicitDrops = dropsParsed.some(val => val > 0);
   if (hasExplicitDrops) {
-    return dailyData.map(d => d.bbmDiterima || 0);
+    return dropsParsed;
   }
 
   // 2. Identify drop indices (Fallback algorithmic logic)
