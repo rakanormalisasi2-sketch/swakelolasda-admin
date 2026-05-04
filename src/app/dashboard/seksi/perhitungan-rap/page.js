@@ -255,12 +255,44 @@ export default function RapWizard() {
     }
   }, [analisa?.t1, analisa?.q1, analisa?.H]);
 
-  // ── Fetch section_settings for subKegiatan ──
+  // ── Sync kopData.pekerjaan, lokasi, tahun from selectedData ──
+  useEffect(() => {
+    if (selectedData.length > 0) {
+      const firstEntry = selectedData[0];
+      const pekerjaan = firstEntry.keterangan || kopData.pekerjaan;
+      
+      // Extract tahun from the first selected log's date
+      const firstDate = firstEntry.tanggal ? new Date(firstEntry.tanggal) : new Date();
+      const tahun = firstDate.getFullYear().toString();
+      
+      // Build lokasi from the pekerjaan string (e.g. "NORMALISASI SUNGAI DESA PACUL KECAMATAN BOJONEGORO")
+      const lokasiMatch = pekerjaan.match(/DESA\s+(\S+)\s+KECAMATAN\s+(\S+)/i);
+      const lokasi = lokasiMatch ? `Desa ${lokasiMatch[1]}, Kec. ${lokasiMatch[2]}` : kopData.lokasi;
+
+      setKopData(prev => ({
+        ...prev,
+        pekerjaan: pekerjaan,
+        lokasi: lokasi,
+        tahun: tahun
+      }));
+    }
+  }, [selectedData]);
+
+  // ── Fetch section_settings for subKegiatan and kopData ──
   useEffect(() => {
     async function fetchSettings() {
       try {
         const { data } = await supabase.from('section_settings').select('*').limit(1).single();
-        if (data?.pdf_sub_kegiatan) setSubKegiatan(data.pdf_sub_kegiatan);
+        if (data) {
+          if (data.pdf_sub_kegiatan) setSubKegiatan(data.pdf_sub_kegiatan);
+          
+          // Populate kopData from section_settings for cross-section title block
+          setKopData(prev => ({
+            ...prev,
+            program: data.pdf_program || 'PENGELOLAAN SUMBER DAYA AIR',
+            kegiatan: data.pdf_kegiatan || 'PENGELOLAAN SDA DAN BANGUNAN PENGAMAN PANTAI PADA WILAYAH SUNGAI (WS) DALAM 1 (SATU) DAERAH KABUPATEN/KOTA',
+          }));
+        }
       } catch {}
     }
     fetchSettings();
