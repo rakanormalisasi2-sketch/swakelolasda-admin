@@ -95,6 +95,22 @@ export async function printCrossSections(rapState) {
     const pekerjaan = kopData?.pekerjaan || '-';
     const tahunAnggaran = kopData?.tahun || new Date().getFullYear();
     const alatLabel = (selectedExcavator||'').toLowerCase().includes('bull') ? (selectedExcavator||'Bulldozer') : 'Excavator';
+
+    let logoBase64 = null;
+    try {
+      const logoResp = await fetch('/logo_bojonegoro.png');
+      const logoBlob = await logoResp.blob();
+      logoBase64 = await new Promise(resolve => {
+        const reader = new FileReader();
+        reader.onloadend = () => resolve(reader.result);
+        reader.readAsDataURL(logoBlob);
+      });
+      kopData.logoBase64 = logoBase64;
+      if (g) {
+        if (!g.kopData) g.kopData = {};
+        g.kopData.logoBase64 = logoBase64;
+      }
+    } catch(e) { console.warn('Logo not loaded:', e); }
     
     const kop = (t,o,extra) => {
       const w = o==='portrait'?215.9:330.2;

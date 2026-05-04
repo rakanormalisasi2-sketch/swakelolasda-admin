@@ -54,20 +54,20 @@ export async function downloadExcel(data) {
     const wb = new ExcelJS.Workbook();
     await wb.xlsx.load(arrayBuffer);
 
-    // Fix: Strip shared formulas to prevent "Shared Formula master" error during writeBuffer
+    // Fix corrupted file / named range issues and preserve regular formulas
+    if (wb.definedNames) {
+      wb.definedNames.model = []; // Removes corrupted defined names/print areas that exceljs writes incorrectly
+    }
+
     wb.eachSheet(sheet => {
       sheet.eachRow({ includeEmpty: false }, row => {
         row.eachCell({ includeEmpty: false }, cell => {
           try {
-            // Check multiple ways to detect shared formulas
             const v = cell._value;
+            // Only wipe shared formulas because they cause "Shared Formula master" errors in exceljs
             if (v && (v.sharedFormula !== undefined || v._sharedFormula !== undefined || 
                 (v.model && v.model.sharedFormula !== undefined))) {
               cell.value = cell.result !== undefined ? cell.result : (cell.value || null);
-            }
-            // Also convert regular formulas to their results to avoid any formula issues
-            if (cell.formula) {
-              cell.value = cell.result !== undefined ? cell.result : 0;
             }
           } catch(e) { /* skip */ }
         });
@@ -112,7 +112,7 @@ export async function downloadExcel(data) {
       try { sheet.getCell('K38').value = ac.fe || 0.8; } catch{}   // Fe
       try { sheet.getCell('K39').value = ac.fd || 0.99; } catch{}  // Fd
       // V. ESTIMASI
-      try { sheet.getCell('K42').value = vol; } catch{}           // Volume
+      // We will inject formula references instead of hardcoded values for Volume so they link correctly to the new backup volume tables
       try { sheet.getCell('K43').value = estHari; } catch{}       // T.pek
       try { sheet.getCell('K44').value = totalSolar; } catch{}    // Ks
     });
@@ -125,14 +125,92 @@ export async function downloadExcel(data) {
     backupConfigs.forEach(({ name, stas, b1 }) => {
       const sheet = wb.getWorksheet(name);
       if(!sheet) return;
-      // Header dimensions
-      try { sheet.getCell('F10').value = geometri?.b3 || 6.857; } catch{}  // b3
-      try { sheet.getCell('F15').value = b1 || 4; } catch{}                // b1
-      try { sheet.getCell('H14').value = geometri?.hGalian || 1; } catch{} // h'
-      try { sheet.getCell('H17').value = geometri?.h || 1; } catch{}       // h
-      try { sheet.getCell('N15').value = geometri?.panjang || 540; } catch{} // panjang
-      try { sheet.getCell('F19').value = geometri?.lebarStripping || 2; } catch{}
-      try { sheet.getCell('I19').value = geometri?.kedalamanStripping || 0.1; } catch{}
+
+      // Clear the old diagram blocks from row 10 to 50
+      for(let r = 10; r <= 50; r++) {
+         const row = sheet.getRow(r);
+         [1,2,3,4,5,6,7,8,9,10,11,12,13,14,15].forEach(c => {
+           try { const cell = row.getCell(c); if (cell.type !== 8) cell.value = null; } catch{}
+         });
+      }
+
+      // Draw the table headers
+      sheet.getCell('E10').value = 'No';
+      sheet.getCell('F10').value = 'STA';
+      sheet.getCell('G10').value = 'b1 (m)';
+      sheet.getCell('H10').value = 'b3 (m)';
+      sheet.getCell('I10').value = 'h (m)';
+      sheet.getCell('J10').value = 'h\' (m)';
+      sheet.getCell('K10').value = 'Luas (m2)';
+      sheet.getCell('L10').value = 'Jarak (m)';
+      sheet.getCell('M10').value = 'Volume (m3)';
+
+      // Style headers
+      for(let c=5; c<=13; c++) {
+        const cell = sheet.getCell(10, c);
+        cell.font = { bold: true };
+        cell.border = { top: {style:'thin'}, left: {style:'thin'}, bottom: {style:'thin'}, right: {style:'thin'} };
+        cell.alignment = { horizontal: 'center' };
+      }
+
+      let y = 11;
+      let totalVolRaw = 0;
+      (stas || []).forEach((sta, i) => {
+        sheet.getCell(y, 5).value = i + 1;
+        sheet.getCell(y, 6).value = sta.sta;
+        sheet.getCell(y, 7).value = b1 || 4;
+        sheet.getCell(y, 8).value = sta.b3;
+        sheet.getCell(y, 9).value = sta.h;
+        sheet.getCell(y, 10).value = sta.hPrime || geometri?.hGalian || 1;
+        sheet.getCell(y, 11).value = sta.luas;
+        sheet.getCell(y, 12).value = i === 0 ? '-' : (sta.jarak || 0);
+        sheet.getCell(y, 13).value = i === 0 ? '-' : (sta.volume || 0);
+        
+        for(let c=5; c<=13; c++) {
+          sheet.getCell(y, c).border = { top: {style:'thin'}, left: {style:'thin'}, bottom: {style:'thin'}, right: {style:'thin'} };
+          sheet.getCell(y, c).alignment = { horizontal: 'center' };
+        }
+        totalVolRaw += (sta.volume || 0);
+        y++;
+      });
+
+      if (name === 'backup volume rencana') {
+        const vs = geometri?.volumeStripping || 0;
+        sheet.mergeCells(y, 5, y, 11);
+        sheet.getCell(y, 5).value = `Volume Stripping (${geometri?.lebarStripping||2}m x ${geometri?.kedalamanStripping||0.1}m)`;
+        sheet.getCell(y, 12).value = '';
+        sheet.getCell(y, 13).value = vs;
+        for(let c=5; c<=13; c++) {
+          sheet.getCell(y, c).border = { top: {style:'thin'}, left: {style:'thin'}, bottom: {style:'thin'}, right: {style:'thin'} };
+          sheet.getCell(y, c).alignment = { horizontal: 'center' };
+        }
+        totalVolRaw += vs;
+        y++;
+      }
+
+      // Total Row
+      sheet.mergeCells(y, 5, y, 12);
+      sheet.getCell(y, 5).value = 'TOTAL VOLUME GALIAN';
+      sheet.getCell(y, 5).font = { bold: true };
+      sheet.getCell(y, 13).value = totalVolRaw;
+      sheet.getCell(y, 13).font = { bold: true };
+      for(let c=5; c<=13; c++) {
+        sheet.getCell(y, c).border = { top: {style:'thin'}, left: {style:'thin'}, bottom: {style:'thin'}, right: {style:'thin'} };
+        sheet.getCell(y, c).alignment = { horizontal: 'center' };
+      }
+
+      // Link total to Analisa sheet
+      if (name === 'backup volume rencana') {
+         const analisaRen = wb.getWorksheet('ANALISA perencanaan');
+         if (analisaRen) {
+             analisaRen.getCell('K42').formula = `='backup volume rencana'!M${y}`;
+         }
+      } else {
+         const analisaPel = wb.getWorksheet('Analisa Pelaksanaan ');
+         if (analisaPel) {
+             analisaPel.getCell('K42').formula = `='backup volume Pelaksanaan'!M${y}`;
+         }
+      }
     });
 
     // 3. Hydrate "Kebutuhan  realisasi"

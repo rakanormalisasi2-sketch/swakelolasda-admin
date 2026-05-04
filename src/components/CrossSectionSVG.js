@@ -188,7 +188,7 @@ const CrossSectionSVG = ({
         {/* --- 2. KOP GAMBAR (KANAN) --- */}
         <g transform={`translate(${kopX}, ${kopY})`}>
           <rect x={0} y={0} width={kopWidth} height={80} fill="none" stroke="#000" strokeWidth="1.5" />
-          <image href="/logo-bojonegoro.png" x={kopWidth/2 - 20} y={5} width="40" height="45" />
+          <image href={kopData?.logoBase64 || "/logo_bojonegoro.png"} x={kopWidth/2 - 20} y={5} width="40" height="45" />
           <text x={kopWidth/2} y={60} textAnchor="middle" fontSize="10" fontWeight="bold">PEMERINTAH KAB. BOJONEGORO</text>
           <text x={kopWidth/2} y={72} textAnchor="middle" fontSize="9" fontWeight="bold">DINAS PU SUMBER DAYA AIR</text>
 
