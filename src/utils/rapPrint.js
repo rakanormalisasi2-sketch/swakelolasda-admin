@@ -32,6 +32,20 @@ export async function printCrossSections(rapState) {
     const { default: jsPDF } = await import('jspdf');
     const { default: autoTable } = await import('jspdf-autotable');
     const { analisaRencana: ar, selTotals, dailyData, kopData, analisaCalculated: ac, geometri: g, backupPelaksanaan: bp, hargaBBM, hargaPenjaga, selectedExcavator } = rapState;
+    const preparedBy = kopData?.preparedBy || 'Ir. Budi Santoso, MT';
+    const approvedBy = kopData?.approvedBy || 'Dr. Hendra Wijaya, IAI';
+    const addSignature = (doc, y, w) => {
+      const col1 = 30, col2 = w - 80;
+      doc.setFontSize(7); doc.setFont('helvetica','normal');
+      doc.text('Mengetahui,', col1, y);
+      doc.text('Yang Membuat,', col2, y);
+      doc.setFontSize(7); doc.setFont('helvetica','bold');
+      doc.text(approvedBy, col1, y + 20);
+      doc.text(preparedBy, col2, y + 20);
+      doc.setFont('helvetica','normal');
+      doc.line(col1, y + 21, col1 + 45, y + 21);
+      doc.line(col2, y + 21, col2 + 45, y + 21);
+    };
     const f = (n,d=2) => Number(n||0).toFixed(d);
     const fR = n => 'Rp ' + Math.round(n||0).toLocaleString('id-ID');
     const q1=ac?.q1||50, H=ac?.H||6, q2=ac?.q2||(q1*7), kW=ac?.kW||31;
@@ -73,12 +87,13 @@ export async function printCrossSections(rapState) {
     np('landscape'); const y1s=kop('BACKUP VOLUME RENCANA PEKERJAAN','landscape',{volume:vol,durasi:estHari});
     doc.setFontSize(7);
     doc.text(`b3=${f(b3)}m | b1=${f(b1)}m | h=${f(hSal)}m | h'=${f(hGal)}m | L=${f(pjg,0)}m | Strip: ${f(g?.lebarStripping||2)}×${f(g?.kedalamanStripping||0.1)}m`,12,y1s);
-    const bv = (g?.stas||[]).map((s,i) => [i+1,s.sta,f(s.b1),f(s.b3),f(s.h),f(s.hPrime||hGal),f(s.luas),i===0?'0':f(s.jarak||0,0),i===0?'-':f(s.volume||0)]);
-    bv.push(['','','','','','','TOTAL','',f((g?.stas||[]).reduce((a,s)=>a+(s.volume||0),0))]);
+    const staVolTotal = (g?.stas||[]).reduce((a,s)=>a+(s.volume||0),0);
+    const bv = (g?.stas||[]).map((s,i) => [i+1,s.sta,f(s.b1),f(s.b3),f(s.h),f(s.hPrime||hGal),f(s.luas),f(s.jarak||0,0),i===0?'-':f(s.volume||0)]);
+    bv.push(['','','','','','','TOTAL','',f(staVolTotal)]);
     autoTable(doc,{startY:y1s+3,head:[['No','STA','b1(m)','b3(m)','h(m)',"h'(m)",'Luas(m²)','Jarak(m)','Volume(m³)']],body:bv,styles:tS,headStyles:hS,theme:'grid'});
     let y1 = doc.lastAutoTable?.finalY||130;
     doc.setFontSize(7);
-    doc.text(`Vol Galian = ${f(g?.volumeGalian||0)} m³ + Stripping = ${f(g?.volumeStripping||0)} m³ = TOTAL ${f(vol)} m³`,12,y1+5);
+    doc.text(`Vol Galian STA = ${f(staVolTotal)} m³ + Stripping = ${f(g?.volumeStripping||0)} m³ = TOTAL ${f(vol)} m³`,12,y1+5);
 
     // === HAL 2: ANALISA HARGA SATUAN PERENCANAAN ===
     np('portrait'); const y2s=kop('ANALISA HARGA SATUAN\nGALIAN TANAH DENGAN '+alatLabel.toUpperCase(),'portrait',{volume:vol,durasi:estHari});
@@ -166,38 +181,43 @@ export async function printCrossSections(rapState) {
       ['','','','',{content:'GRAND TOTAL',styles:{fontStyle:'bold'}},{content:fR(vol*hsp*1.12),styles:{fontStyle:'bold'}}],
     ];
     autoTable(doc,{startY:y6s,head:[['No','Uraian','Volume','Sat','Harga Satuan (Rp)','Jumlah (Rp)']],body:a6,styles:tS,headStyles:hS,theme:'grid'});
+    addSignature(doc, (doc.lastAutoTable?.finalY||160)+10, 330.2);
 
     // === HAL 7: RINCIAN KEBUTUHAN & HASIL PELAKSANAAN ===
     const dP = (dailyData||[]).length||1;
     const volPel = bp?.totalVolume || selTotals?.galian || vol;
     np('landscape'); const y7s_header=kop('RINCIAN KEBUTUHAN DAN HASIL PELAKSANAAN','landscape',{volume:volPel,durasi:dP});
     
-    // Gunakan fungsi distribusi BBM agar sisa akhir 40-150 & tidak pernah minus
-    const tSolPrint = vol * koef;
-    const drops = distributeBBMDrops(dailyData || [], H, tSolPrint);
+    // Read BBM drops from daily logs keterangan field
+    const drops = distributeBBMDrops(dailyData || [], H);
+    // Scale volume per day so cumulative matches volPel exactly
+    const rawCumV = (dailyData||[]).reduce((a,d)=>a+(d.jam||0)*q1, 0);
+    const volScale = rawCumV > 0 ? volPel / rawCumV : 1;
     let sisa = 0, cumV=0, cumBBM=0;
     const a7 = (dailyData || []).map((d, i) => {
-      const g2=d.jam*q1;
+      const g2 = (d.jam||0) * q1 * volScale;
       const iterH = (d.jam || 0) * H;
       sisa = sisa + (drops[i]||0) - iterH;
       cumV += g2; cumBBM += iterH;
       const dt = new Date(d.tanggal);
+      // Column order: No, Tgl, Bln, Thn, HM Awal, HM Akhir, Jam, Q1, Vol, Kum Vol, H, BBM, Drop, Sisa
       return [
         i+1, dt.getDate(), dt.toLocaleString('id-ID',{month:'short'}), dt.getFullYear(),
-        f(d.jam,1), f(q1), f(g2), f(H), f(iterH), (drops[i]||0)>0?f(drops[i],0):'', f(sisa),
-        d.hmAwal||'', d.hmAkhir||'', f(cumV)
+        d.hmAwal||'', d.hmAkhir||'',
+        f(d.jam,1), f(q1), f(g2), f(cumV),
+        f(H), f(iterH), (drops[i]||0)>0?f(drops[i],0):'', f(Math.max(0,sisa))
       ];
     });
-    a7.push([{content:'TOTAL',colSpan:4,styles:{fontStyle:'bold'}},'','',f(cumV),'',f(cumBBM),'','','','','',f(cumV)]);
-    autoTable(doc,{startY:y7s_header,head:[['No','Tgl','Bln','Thn','Jam','Q1','Vol(m³)','H(L/j)','BBM(L)','Drop','Sisa','HM Awal','HM Akhir','Kum Vol']],body:a7,styles:{...tS,fontSize:5.5},headStyles:{...hS,fontSize:5.5},theme:'grid'});
+    a7.push([{content:'TOTAL',colSpan:6,styles:{fontStyle:'bold'}},'','',f(volPel),f(volPel),'',f(cumBBM),'','']);
+    autoTable(doc,{startY:y7s_header,head:[['No','Tgl','Bln','Thn','HM Awal','HM Akhir','Jam','Q1','Vol(m³)','Kum Vol','H(L/j)','BBM(L)','Drop','Sisa']],body:a7,styles:{...tS,fontSize:5.5},headStyles:{...hS,fontSize:5.5},theme:'grid'});
 
-    // === HAL 8: ANALISA PELAKSANAAN (sama dengan perencanaan) ===
+    // === HAL 8: ANALISA PELAKSANAAN ===
     np('portrait'); const y8s=kop('ANALISA HARGA SATUAN\nGALIAN TANAH DENGAN '+alatLabel.toUpperCase()+' (PELAKSANAAN)','portrait',{volume:volPel,durasi:dP});
     autoTable(doc,{startY:y8s,head:[['No','URAIAN','Kode','Koef.','Satuan']],body:a2,styles:{...tS,fontSize:7},headStyles:hS,theme:'grid',columnStyles:{0:{cellWidth:10,halign:'center'},2:{cellWidth:18,halign:'center'},3:{cellWidth:22,halign:'right'},4:{cellWidth:18}}});
 
     // === HAL 9: BACKUP VOLUME PELAKSANAAN ===
     np('landscape'); const y9s=kop('BACKUP VOLUME PELAKSANAAN','landscape',{volume:volPel,durasi:dP});
-    const bvp = (bp?.stas||[]).map((s,i) => [i+1,s.sta,f(s.b1),f(s.b3),f(s.h),f(s.hPrime||hGal),f(s.luas),i===0?'0':f(s.jarak||0,0),i===0?'-':f(s.volume||0)]);
+    const bvp = (bp?.stas||[]).map((s,i) => [i+1,s.sta,f(s.b1),f(s.b3),f(s.h),f(s.hPrime||hGal),f(s.luas),f(s.jarak||0,0),i===0?'-':f(s.volume||0)]);
     bvp.push(['','','','','','','TOTAL','',f((bp?.stas||[]).reduce((a,s)=>a+(s.volume||0),0))]);
     autoTable(doc,{startY:y9s,head:[['No','STA','b1(m)','b3(m)','h(m)',"h'(m)",'Luas(m²)','Jarak(m)','Volume(m³)']],body:bvp,styles:tS,headStyles:hS,theme:'grid'});
 
@@ -256,6 +276,7 @@ export async function printCrossSections(rapState) {
       ['','','','',{content:'GRAND TOTAL',styles:{fontStyle:'bold'}},{content:fR(volPel*hspPel*1.12),styles:{fontStyle:'bold'}}],
     ];
     autoTable(doc,{startY:y13s,head:[['No','Uraian','Volume','Sat','Harga Satuan (Rp)','Jumlah (Rp)']],body:a13,styles:tS,headStyles:hS,theme:'grid'});
+    addSignature(doc, (doc.lastAutoTable?.finalY||160)+10, 330.2);
 
     // === LAMPIRAN GAMBAR TEKNIK ===
     try {

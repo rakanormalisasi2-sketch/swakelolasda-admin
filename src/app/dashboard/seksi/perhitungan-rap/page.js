@@ -290,6 +290,7 @@ export default function RapWizard() {
               catatan: d.keterangan_tambahan || 'Galian saluran',
               hmAwal: d.hm_awal || '',
               hmAkhir: d.hm_akhir || '',
+              bbmDiterima: d.bbm_diterima || 0,
             };
           }));
         } else {

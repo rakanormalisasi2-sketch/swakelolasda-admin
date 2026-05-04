@@ -502,16 +502,17 @@ export function generateSTAPerencanaan(params) {
   }
 
   // Hitung volume antar STA (average end area method)
+  // STA pertama: jarak=0, volume=0 (titik awal)
+  // STA ke-2 dst: jarak=interval, volume dihitung dari rata-rata luas × jarak
   let totalVolume = 0;
-  for (let i = 0; i < nSTA - 1; i++) {
-    const vol = ((stas[i].luas + stas[i + 1].luas) / 2) * interval;
-    stas[i].volume = vol;
+  stas[0].jarak = 0;
+  stas[0].volume = 0;
+  for (let i = 1; i < nSTA; i++) {
     stas[i].jarak = interval;
+    const vol = ((stas[i-1].luas + stas[i].luas) / 2) * interval;
+    stas[i].volume = vol;
     totalVolume += vol;
   }
-  // STA terakhir
-  stas[nSTA - 1].volume = 0;
-  stas[nSTA - 1].jarak = 0;
 
   // Hitung stripping
   const totalStripping = (lebarStripping * kedalamanStripping * panjang);
@@ -523,9 +524,12 @@ export function generateSTAPerencanaan(params) {
  * Generate STA untuk Pelaksanaan
  * Constraint: STA 0 = STA 0 TAB 1, Total = targetVolume
  */
-export function generateSTAPelaksanaan(geometriStas, totalVolume) {
+export function generateSTAPelaksanaan(geometriStas, rencanaTotalVolume) {
   const stasInput = typeof geometriStas === 'number' ? arguments[2] : geometriStas;
-  const targetVolume = typeof geometriStas === 'number' ? geometriStas : (totalVolume || 0);
+  // Pelaksanaan volume = perencanaan + 2~5 m³ (deterministic)
+  const baseVol = typeof geometriStas === 'number' ? geometriStas : (rencanaTotalVolume || 0);
+  const addVol = 2 + (Math.sin(baseVol * 7) * 0.5 + 0.5) * 3; // 2-5 m³
+  const targetVolume = +(baseVol + addVol).toFixed(2);
 
   if (!stasInput || stasInput.length === 0) {
     return { stas: [], totalVolume: 0 };
@@ -535,9 +539,8 @@ export function generateSTAPelaksanaan(geometriStas, totalVolume) {
 
   // Build pelaksanaan STAs with ±2% variation from perencanaan dimensions
   let stas = stasInput.map((ref, i) => {
-    // Small realistic variation per STA (field measurement differences)
-    const seed = Math.sin(i * 31 + 7) * 0.5 + 0.5; // 0-1 deterministic
-    const dimVar = 0.98 + seed * 0.04; // 0.98 to 1.02
+    const seed = Math.sin(i * 31 + 7) * 0.5 + 0.5;
+    const dimVar = 0.98 + seed * 0.04;
 
     const b1 = +(ref.b1 * dimVar).toFixed(3);
     const h = +(ref.h * dimVar).toFixed(3);
@@ -545,22 +548,22 @@ export function generateSTAPelaksanaan(geometriStas, totalVolume) {
     const b3 = +(b1 + 2 * slope * h).toFixed(3);
     const hPrime = ref.hPrime || ref.h;
     const luas = +( ((b1 + b3) / 2) * h ).toFixed(4);
-    const jarak = i === 0 ? 0 : (ref.jarak || 0);
 
     return {
       sta: ref.sta,
-      b1, b3, h, hPrime, luas, jarak,
-      volume: 0, // will be calculated below
+      b1, b3, h, hPrime, luas,
+      jarak: i === 0 ? 0 : (ref.jarak || 0),
+      volume: 0,
       isSTA0: i === 0,
       index: i
     };
   });
 
-  // Calculate raw volumes using average-end-area method
+  // Calculate raw volumes
+  stas[0].volume = 0;
   for (let i = 1; i < stas.length; i++) {
     stas[i].volume = +( ((stas[i-1].luas + stas[i].luas) / 2) * stas[i].jarak ).toFixed(2);
   }
-  stas[0].volume = 0; // STA 0 has no volume (it's the starting point)
 
   // Normalize so total = targetVolume
   const rawTotal = stas.reduce((sum, s) => sum + s.volume, 0);
