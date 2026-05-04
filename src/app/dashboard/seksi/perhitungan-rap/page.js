@@ -343,10 +343,9 @@ export default function RapWizard() {
   const handlePrint = async () => {
     const stasRencana = generateSTAPerencanaan({ ...geometri, b1: geometri.b1, b3: geometri.b3, h: geometri.h, hPrime: geometri.hGalian, panjang: geometri.panjang });
     
-    // Backup Volume Pelaksanaan: variasi dimensi ±3-5%, total = volume realisasi
-    // Volume realisasi = dari GoalSeek (volRealisasi) atau dari daily log (selTotals.galian)
-    const volRealisasi = analisa?.volRealisasi || selTotals.galian || totalVolume;
-    const stasPelaksanaan = generateSTAPelaksanaan(stasRencana.stas, volRealisasi);
+    // Backup Volume Pelaksanaan: variasi dimensi ±3-5%, total = volume realisasi (Perencanaan + 2~5 m³)
+    const stasPelaksanaan = generateSTAPelaksanaan(stasRencana.stas, totalVolume);
+    const volRealisasi = stasPelaksanaan.totalVolume;
 
     const selectedLogs = dailyData.filter(d => checkedIds.has(d.id));
     // Derive pekerjaan from first selected daily log group title
@@ -375,9 +374,8 @@ export default function RapWizard() {
   const handleExportExcel = () => {
     const stasRencana = generateSTAPerencanaan({ ...geometri, b1: geometri.b1, b3: geometri.b3, h: geometri.h, hPrime: geometri.hGalian, panjang: geometri.panjang });
     
-    // Backup Volume Pelaksanaan: variasi dimensi, total = volume realisasi
-    const volRealisasiXL = analisa?.volRealisasi || selTotals.galian || totalVolume;
-    const stasPelaksanaanXL = generateSTAPelaksanaan(stasRencana.stas, volRealisasiXL);
+    const stasPelaksanaanXL = generateSTAPelaksanaan(stasRencana.stas, totalVolume);
+    const volRealisasiXL = stasPelaksanaanXL.totalVolume;
 
     const rapStateForPrint = {
       geometri: { stas: stasRencana.stas, kopData, slope: geometri.slope, ...geometri, hPrime: geometri.hGalian, volumeGalian, volumeStripping, totalVolume },

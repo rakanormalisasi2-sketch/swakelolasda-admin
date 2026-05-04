@@ -237,7 +237,7 @@ const CrossSectionSVG = ({
 
           <rect x={0} y={415} width={kopWidth/2} height={30} fill="none" stroke="#000" strokeWidth="1.5" />
           <text x={kopWidth/4} y={428} textAnchor="middle" fontSize="9" fontWeight="bold">CROSS SECTION</text>
-          <text x={kopWidth/4} y={440} textAnchor="middle" fontSize="9">STA {staData?.sta || '0+000'}</text>
+          <text x={kopWidth/4} y={440} textAnchor="middle" fontSize="9">STA {kopData?.sta || '0+000'}</text>
           <rect x={kopWidth/2} y={415} width={kopWidth/2} height={30} fill="none" stroke="#000" strokeWidth="1.5" />
           <text x={(kopWidth*3)/4} y={433} textAnchor="middle" fontSize="10">{kopData?.skala || '1:100'}</text>
         </g>

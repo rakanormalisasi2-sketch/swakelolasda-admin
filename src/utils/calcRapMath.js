@@ -551,7 +551,7 @@ export function generateSTAPelaksanaan(geometriStas, rencanaTotalVolume) {
 
     return {
       sta: ref.sta,
-      b1, b3, h, hPrime, luas,
+      b1, b2: Math.max(b1 - 2 * slope * h, 0.1), b3, h, hPrime, luas,
       jarak: i === 0 ? 0 : (ref.jarak || 0),
       volume: 0,
       isSTA0: i === 0,
