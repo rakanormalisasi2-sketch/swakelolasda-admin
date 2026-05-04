@@ -478,13 +478,16 @@ export function generateSTAPerencanaan(params) {
     const variansi = 1 + (Math.sin(i * 13) * 0.05);
 
     const curB1 = b1 * variansi;
+    const curHPrime = hPrime * variansi;
     const curH = h * variansi;
     // b2 dan b3 dihitung ulang berdasarkan slope
     const curB2 = Math.max(curB1 - 2 * (slope * curH), 0.1);
     const curB3 = curB1 + 2 * (slope * curH);
 
-    // Luasan trapezoid
-    const luas = ((curB1 + curB3) / 2) * curH;
+    // Luasan galian trapezoid: ((b1 + b_top_galian) / 2) * hPrime
+    // b_top_galian = b1 + 2 * slope * hPrime
+    // Maka luas = (b1 + slope * hPrime) * hPrime
+    const luas = (curB1 + slope * curHPrime) * curHPrime;
 
     stas.push({
       sta: `0+${String(Math.round(cumulative)).padStart(3, '0')}`,
@@ -492,7 +495,7 @@ export function generateSTAPerencanaan(params) {
       b2: curB2,
       b3: curB3,
       h: curH,
-      hPrime,
+      hPrime: curHPrime,
       luas,
       isSTA0: i === 0,
       index: i
@@ -972,11 +975,17 @@ export function distributeBBMDrops(dailyData, H) {
 
   const bbmHariArray = dailyData.map(d => d.jam * H);
 
-  // 1. Identify drop indices
+  // 1. Check if user provided explicit drops
+  const hasExplicitDrops = dailyData.some(d => d.bbmDiterima > 0);
+  if (hasExplicitDrops) {
+    return dailyData.map(d => d.bbmDiterima || 0);
+  }
+
+  // 2. Identify drop indices (Fallback algorithmic logic)
   const dropIndices = [];
   dailyData.forEach((d, i) => {
     const note = (d.keterangan || '') + ' ' + (d.catatan || '');
-    if (i === 0 || d.bbmDiterima > 0 || /(bbm|solar|drop|kirim|terima)/i.test(note)) {
+    if (i === 0 || /(bbm|solar|drop|kirim|terima)/i.test(note)) {
       dropIndices.push(i);
     }
   });

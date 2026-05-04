@@ -200,20 +200,15 @@ const CrossSectionSVG = ({
           <rect x={0} y={130} width={kopWidth} height={20} fill="none" stroke="#000" strokeWidth="1.5" />
           <text x={kopWidth/2} y={143} textAnchor="middle" fontSize="9" fontWeight="bold">KEGIATAN</text>
           <rect x={0} y={150} width={kopWidth} height={50} fill="none" stroke="#000" strokeWidth="1.5" />
-          <foreignObject x={5} y={155} width={kopWidth-10} height={40}>
-            <div xmlns="http://www.w3.org/1999/xhtml" style={{fontSize:'9px', textAlign:'center', lineHeight:1.2, fontWeight:'bold'}}>
-              {kopData?.kegiatan || '-'}
-            </div>
-          </foreignObject>
+          <text x={kopWidth/2} y={165} textAnchor="middle" fontSize="9" fontWeight="bold">{(kopData?.kegiatan || '-').substring(0, 30)}</text>
+          <text x={kopWidth/2} y={178} textAnchor="middle" fontSize="9" fontWeight="bold">{(kopData?.kegiatan || '').substring(30, 60)}</text>
+          <text x={kopWidth/2} y={191} textAnchor="middle" fontSize="9" fontWeight="bold">{(kopData?.kegiatan || '').substring(60, 90)}</text>
 
           <rect x={0} y={200} width={kopWidth} height={20} fill="none" stroke="#000" strokeWidth="1.5" />
           <text x={kopWidth/2} y={213} textAnchor="middle" fontSize="9" fontWeight="bold">PEKERJAAN</text>
           <rect x={0} y={220} width={kopWidth} height={40} fill="none" stroke="#000" strokeWidth="1.5" />
-          <foreignObject x={5} y={225} width={kopWidth-10} height={30}>
-            <div xmlns="http://www.w3.org/1999/xhtml" style={{fontSize:'9px', textAlign:'center', lineHeight:1.2}}>
-              {kopData?.pekerjaan || '-'}
-            </div>
-          </foreignObject>
+          <text x={kopWidth/2} y={233} textAnchor="middle" fontSize="8">{(kopData?.pekerjaan || '-').substring(0, 35)}</text>
+          <text x={kopWidth/2} y={245} textAnchor="middle" fontSize="8">{(kopData?.pekerjaan || '').substring(35, 70)}</text>
 
           <rect x={0} y={260} width={kopWidth/2} height={15} fill="none" stroke="#000" strokeWidth="1.5" />
           <text x={kopWidth/4} y={271} textAnchor="middle" fontSize="8" fontWeight="bold">LOKASI</text>

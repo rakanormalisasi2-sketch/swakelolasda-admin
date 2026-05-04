@@ -174,9 +174,23 @@ export default function RapWizard() {
   // DERIVED CALCULATIONS (Real-time)
   // ════════════════════════════════════
   const b2 = useMemo(() => Math.max(geometri.b3 - 2 * geometri.slope * geometri.h, 0.1), [geometri]);
-  const luasGalian = useMemo(() => ((geometri.b1 + geometri.b3) / 2) * geometri.hGalian, [geometri]);
-  const volumeGalian = useMemo(() => luasGalian * geometri.panjang, [luasGalian, geometri.panjang]);
-  const volumeStripping = useMemo(() => geometri.lebarStripping * geometri.kedalamanStripping * geometri.panjang, [geometri.lebarStripping, geometri.kedalamanStripping, geometri.panjang]);
+  
+  // Calculate exact volume using STA method to match table perfectly
+  const { stas: stasRencana, totalVolume: volumeGalian, totalStripping: volumeStripping } = useMemo(() => {
+    return generateSTAPerencanaan({
+      panjang: geometri.panjang,
+      b1: geometri.b1,
+      b2: b2,
+      b3: geometri.b3,
+      h: geometri.h,
+      hPrime: geometri.hGalian,
+      slope: geometri.slope,
+      lebarStripping: geometri.lebarStripping,
+      kedalamanStripping: geometri.kedalamanStripping,
+      kopData: kopData
+    });
+  }, [geometri, b2, kopData]);
+
   const totalVolume = useMemo(() => volumeGalian + volumeStripping, [volumeGalian, volumeStripping]);
 
   // Checkbox aggregation

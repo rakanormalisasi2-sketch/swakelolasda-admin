@@ -71,9 +71,13 @@ export async function printCrossSections(rapState) {
       doc.setFontSize(9); doc.text('DINAS PEKERJAAN UMUM SUMBER DAYA AIR',w/2,15,{align:'center'});
       doc.setLineWidth(0.5); doc.line(10,17,w-10,17);
       doc.setFontSize(9); doc.setFont('helvetica','bold');
-      doc.text(t,w/2,22,{align:'center'});
+      
+      const titleLines = t.split('\n');
+      doc.text(titleLines, w/2, 22, {align:'center'});
+      
       doc.setFontSize(7); doc.setFont('helvetica','normal');
-      let y=27;
+      let y = 22 + (titleLines.length * 5); // dynamically adjust Y start
+      
       doc.text('SUB KEGIATAN',12,y); doc.text(': '+subKeg,55,y); y+=4;
       doc.text('PEKERJAAN',12,y); doc.text(': '+pekerjaan,55,y); y+=4;
       if(extra?.volume) { doc.text('VOLUME',12,y); doc.text(': '+f(extra.volume)+' m³',55,y); y+=4; }
@@ -220,7 +224,7 @@ export async function printCrossSections(rapState) {
         i+1, dt.getDate(), dt.toLocaleString('id-ID',{month:'short'}), dt.getFullYear(),
         d.hmAwal||'', d.hmAkhir||'',
         f(d.jam,1), f(q1Pel), f(g2), f(cumV),
-        f(HPel), f(iterH), (drops[i]||0)>0?f(drops[i],0):'', f(Math.max(0,sisa))
+        f(HPel), f(iterH), (drops[i]||0)>0?f(drops[i],0):'', f(sisa)
       ];
     });
     a7.push([{content:'TOTAL',colSpan:6,styles:{fontStyle:'bold'}},'','',f(volPel),f(volPel),'',f(cumBBM),'','']);
