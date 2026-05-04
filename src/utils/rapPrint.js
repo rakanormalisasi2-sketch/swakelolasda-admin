@@ -222,7 +222,9 @@ export async function printCrossSections(rapState) {
 
     // === HAL 7: RINCIAN KEBUTUHAN & HASIL PELAKSANAAN ===
     const dP = (dailyData||[]).length||1;
-    const volPel = bp?.totalVolume || selTotals?.galian || vol;
+    // Canonical pelaksanaan volume: sum STA volumes exactly (single source of truth for both tables)
+    const volPelRaw = (bp?.stas||[]).reduce((a,s)=>a+(s.volume||0),0);
+    const volPel = Math.round(volPelRaw * 100) / 100;
     np('landscape'); const y7s_header=kop('RINCIAN KEBUTUHAN DAN HASIL PELAKSANAAN','landscape');
     
     // Mathematical Alignment for Pelaksanaan Volume and BBM
@@ -302,7 +304,7 @@ export async function printCrossSections(rapState) {
     // === HAL 9: BACKUP VOLUME PELAKSANAAN ===
     np('landscape'); const y9s=kop('BACKUP VOLUME PELAKSANAAN','landscape');
     const bvp = (bp?.stas||[]).map((s,i) => [i+1,s.sta,f(s.b1),f(s.b3),f(s.h),f(s.hPrime||hGal),f(s.luas),f(s.jarak||0,0),i===0?'-':f(s.volume||0)]);
-    bvp.push(['','','','','','','TOTAL','',f((bp?.stas||[]).reduce((a,s)=>a+(s.volume||0),0))]);
+    bvp.push(['','','','','','','TOTAL','',f(volPel)]);
     autoTable(doc,{startY:y9s,head:[['No','STA','b1(m)','b3(m)','h(m)',"h'(m)",'Luas(m²)','Jarak(m)','Volume(m³)']],body:bvp,styles:tS,headStyles:hS,theme:'grid'});
 
     // === HAL 10: AHSP PELAKSANAAN ===
