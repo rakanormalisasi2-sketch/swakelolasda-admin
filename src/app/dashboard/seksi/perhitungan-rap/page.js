@@ -191,6 +191,7 @@ export default function RapWizard() {
     });
   }, [geometri, b2, kopData]);
 
+  const luasGalian = stasRencana?.[0]?.luas || 0;
   const totalVolume = useMemo(() => volumeGalian + volumeStripping, [volumeGalian, volumeStripping]);
 
   // Checkbox aggregation
