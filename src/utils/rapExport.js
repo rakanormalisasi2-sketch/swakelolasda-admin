@@ -1,7 +1,7 @@
 import ExcelJS from 'exceljs';
 import { saveAs } from 'file-saver';
 import { generateAllSVGs } from './rapPrint';
-
+import { distributeBBMDrops } from './calcRapMath';
 const templateMap = {
   'PC50': '/pc 50.xlsx',
   'PC75': '/PC75.xlsx',
@@ -150,6 +150,8 @@ export async function downloadExcel(data) {
          });
       }
 
+      const drops = distributeBBMDrops(selectedData, H);
+
       selectedData.forEach((d, index) => {
          try {
          const rowIndex = 10 + index;
@@ -159,13 +161,7 @@ export async function downloadExcel(data) {
          const bbmHari = d.jam * H;
          const galianHari = d.jam * q1;
          
-         // Drop BBM from daily log data
-         let drop = d.bbmDiterima || 0;
-         if(!drop && d.catatan) {
-           const m = d.catatan.match(/(?:bbm|solar|drop|kirim|terima)\s*[:=]?\s*(\d+)/i);
-           if(m) drop = parseInt(m[1]);
-         }
-         if(index === 0 && drop === 0) drop = 400;
+         let drop = drops[index] || 0;
          
          currentSisa = currentSisa + drop - bbmHari;
          if(currentSisa < 0) currentSisa = 0;

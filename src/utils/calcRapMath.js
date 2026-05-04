@@ -952,3 +952,66 @@ export function goalSeekBisectionPelaksanaan(params) {
     dariDataField: dailyData.length > 0
   };
 }
+
+/**
+ * Calculates optimal BBM drops ensuring Sisa never drops below 0 
+ * and ends between 40-150 Liters realistically.
+ */
+export function distributeBBMDrops(dailyData, H) {
+  if (!dailyData || dailyData.length === 0) return [];
+  const N = dailyData.length;
+  
+  // Deterministic random
+  const dRand = (seed) => {
+    const x = Math.sin(seed + 1) * 10000;
+    return x - Math.floor(x);
+  };
+
+  const bbmHariArray = dailyData.map(d => d.jam * H);
+
+  // 1. Identify drop indices
+  const dropIndices = [];
+  dailyData.forEach((d, i) => {
+    const note = (d.keterangan || '') + ' ' + (d.catatan || '');
+    if (i === 0 || d.bbmDiterima > 0 || /(bbm|solar|drop|kirim|terima)/i.test(note)) {
+      dropIndices.push(i);
+    }
+  });
+
+  // 2. Calculate drops
+  const drops = new Array(N).fill(0);
+  let currentSisa = 0;
+
+  for (let k = 0; k < dropIndices.length; k++) {
+    const idx = dropIndices[k];
+    const nextIdx = k < dropIndices.length - 1 ? dropIndices[k+1] : N;
+    
+    // Consumption in this interval
+    let intervalCons = 0;
+    for (let j = idx; j < nextIdx; j++) {
+      intervalCons += bbmHariArray[j];
+    }
+    
+    let dropAmount = 0;
+    if (k === dropIndices.length - 1) {
+      // Last drop: target final sisa between 40-150
+      const targetFinal = 40 + dRand(idx) * 110; 
+      dropAmount = intervalCons + targetFinal - currentSisa;
+      // Round to nearest 5
+      dropAmount = Math.ceil(dropAmount / 5) * 5;
+    } else {
+      // Intermediate drop: target sisa before next drop to be between 40-100
+      const targetBeforeNext = 40 + dRand(idx) * 60;
+      dropAmount = intervalCons + targetBeforeNext - currentSisa;
+      // Round to nearest 10
+      dropAmount = Math.ceil(dropAmount / 10) * 10; 
+    }
+    
+    if (dropAmount < 0) dropAmount = 0;
+    drops[idx] = dropAmount;
+    
+    currentSisa = currentSisa + dropAmount - intervalCons;
+  }
+  
+  return drops;
+}

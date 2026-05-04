@@ -1,7 +1,7 @@
 'use client';
 import { renderToString } from 'react-dom/server';
 import CrossSectionSVG from '../components/CrossSectionSVG';
-
+import { distributeBBMDrops } from './calcRapMath';
 export function generatePrintableSVG(staData, kopData, options = {}) {
   const { width = 1200, height = 750, jenis = 'PERENCANAAN' } = options;
   return renderToString(
@@ -171,14 +171,16 @@ export async function printCrossSections(rapState) {
     const dP = (dailyData||[]).length||1;
     const volPel = bp?.totalVolume || selTotals?.galian || vol;
     np('landscape'); const y7s=kop('RINCIAN KEBUTUHAN DAN HASIL PELAKSANAAN','landscape',{volume:volPel,durasi:dP});
+    
+    // Gunakan fungsi distribusi BBM agar sisa akhir 40-150 & tidak pernah minus
+    const drops = distributeBBMDrops(dailyData || [], H);
+    
     let cumV=0, sisa=0, cumBBM=0;
     const a7 = (dailyData||[]).map((d,i) => {
       const g2=d.jam*q1, bb=d.jam*H;
-      let drop = d.bbmDiterima || 0;
-      if(!drop && d.catatan) { const m=d.catatan.match(/(?:bbm|solar|drop|kirim|terima)\s*[:=]?\s*(\d+)/i); if(m) drop=parseInt(m[1]); }
-      if(i===0 && drop===0) drop=400;
+      let drop = drops[i] || 0;
       sisa = sisa + drop - bb;
-      if(sisa<0) sisa=0;
+      if(sisa<0) sisa=0; // safety
       cumV += g2; cumBBM += bb;
       const dt = new Date(d.tanggal);
       return [i+1,dt.getDate(),dt.toLocaleString('id-ID',{month:'short'}),dt.getFullYear(),
