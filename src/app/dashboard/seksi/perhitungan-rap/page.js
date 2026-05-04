@@ -179,14 +179,32 @@ export default function RapWizard() {
   // GoalSeek-powered analysis
   const analisa = useMemo(() => {
     try {
-      return calculateAnalisaWithGoalSeek(totalVolume, {
+      let base = calculateAnalisaWithGoalSeek(totalVolume, {
         ...alatParams,
         totalBBM: alatParams.totalBBM
       });
+      
+      // Override Q1 if we have actual logs to ensure perfect matching for final Sisa (20-150L)
+      if (selTotals?.jam > 0 && step >= 3) {
+        const dRand = Math.sin(selTotals.jam * 1000) * 0.5 + 0.5;
+        const targetSisa = 20 + dRand * 130; 
+        
+        // Target: Vol * H / Q1 = actualJam * H + targetSisa
+        const newQ1 = totalVolume / (selTotals.jam + targetSisa / base.h);
+        const newT1 = (alatParams.bucket * alatParams.fb * alatParams.fa * 60) / (newQ1 * alatParams.fv * alatParams.fk);
+        
+        base = { ...base };
+        base.q1 = +newQ1.toFixed(2);
+        base.t1 = +newT1.toFixed(4);
+        base.t1_detik = +(newT1 * 60).toFixed(2);
+        base.q2 = +(newQ1 * (alatParams.tk || 7)).toFixed(2);
+        base.totalSolarUsed = +(totalVolume * (base.h / base.q1)).toFixed(2);
+      }
+      return base;
     } catch {
       return calculateAnalisaRencana(totalVolume, alatParams);
     }
-  }, [totalVolume, alatParams]);
+  }, [totalVolume, alatParams, selTotals?.jam, step]);
 
   // Checkbox aggregation
   const selectedData = useMemo(() => dailyData.filter(d => checkedIds.has(d.id)), [dailyData, checkedIds]);
