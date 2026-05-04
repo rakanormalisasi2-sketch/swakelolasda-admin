@@ -202,15 +202,8 @@ export async function printCrossSections(rapState) {
     const FdPelRaw = T1PelSec <= 0 ? 1 : (wGali / T1PelSec) + ((T1PelSec - wGali) / T1PelSec) * 0.7;
     const FdPel = Math.min(1.0, Math.max(0.3, FdPelRaw));
     
-    // Total drops directly from daily log data field (including regex extraction from catatan)
-    const totalDiterimaLogs = (dailyData||[]).reduce((acc, d) => {
-      let dVal = d.bbmDiterima || 0;
-      if (!dVal && d.catatan) {
-        const m = d.catatan.match(/(?:bbm|solar|drop|kirim|terima)\s*[:=]?\s*(\d+)/i);
-        if (m) dVal = parseInt(m[1]);
-      }
-      return acc + dVal;
-    }, 0);
+    // Total drops directly from daily log data (now populated from DB2 BBM pemakaian API)
+    const totalDiterimaLogs = (dailyData||[]).reduce((acc, d) => acc + (d.bbmDiterima || 0), 0);
     const targetKonsumsiPel = totalDiterimaLogs > 0 ? Math.max(totalDiterimaLogs - 50, sumJam * 1) : volPel * (H/q1); // fallback to rencana if no logs
     const HPelMath = targetKonsumsiPel / sumJam;
     

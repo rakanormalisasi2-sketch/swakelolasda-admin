@@ -266,7 +266,7 @@ export default function RapWizard() {
     fetchSettings();
   }, []);
 
-  // ── Fetch daily data from Supabase ──
+  // ── Fetch daily data from Supabase + BBM from DB2 ──
   useEffect(() => {
     async function fetchLogs() {
       try {
@@ -277,6 +277,23 @@ export default function RapWizard() {
             assignment:assignments(id, job_sub_type, location_district, location_village)
           `)
           .order('tanggal');
+
+        // Fetch BBM pemakaian from DB2 API to get actual receipt data
+        let bbmMap = {};
+        try {
+          const resBbm = await fetch('/api/bbm/pemakaian');
+          if (resBbm.ok) {
+            const resultBbm = await resBbm.json();
+            (resultBbm.data || []).forEach(b => {
+              const tglStr = (b.tanggal_kirim || '').split('T')[0];
+              const key = `${b.assignment_id}|${tglStr}`;
+              if (!bbmMap[key]) bbmMap[key] = 0;
+              bbmMap[key] += Number(b.jumlah_liter) || 0;
+            });
+          }
+        } catch (e) {
+          console.warn('BBM API not available:', e);
+        }
           
         if (data && data.length > 0) {
           const SUB_TYPE_MAP = {
@@ -294,6 +311,11 @@ export default function RapWizard() {
             const jobType = SUB_TYPE_MAP[d.assignment?.job_sub_type] || 'NORMALISASI SUNGAI';
             const judulPekerjaan = d.custom_pekerjaan || `${jobType} DESA ${desa} KECAMATAN ${kec}`;
 
+            // Match BBM receipt by assignment_id + tanggal
+            const tglStr = (d.tanggal || '').split('T')[0];
+            const bbmKey = `${d.assignment_id}|${tglStr}`;
+            const bbmReceived = bbmMap[bbmKey] || 0;
+
             return {
               id: d.id,
               tanggal: d.tanggal,
@@ -305,7 +327,8 @@ export default function RapWizard() {
               catatan: d.keterangan_tambahan || 'Galian saluran',
               hmAwal: d.hm_awal || '',
               hmAkhir: d.hm_akhir || '',
-              bbmDiterima: d.bbm_diterima || 0,
+              bbmDiterima: bbmReceived,
+              assignmentId: d.assignment_id,
             };
           }));
         } else {
