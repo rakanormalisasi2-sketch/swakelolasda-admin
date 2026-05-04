@@ -200,6 +200,10 @@ function RootPageContent() {
   const [recentAssignments, setRecentAssignments] = useState([]);
   const [mapItems, setMapItems] = useState([]);
 
+  // Yearly Stats for public dashboard
+  const [tahun, setTahun] = useState(new Date().getFullYear());
+  const [yearlyStats, setYearlyStats] = useState(null);
+
   // Filters
   const [filterKecamatan, setFilterKecamatan] = useState('semua');
   const [filterStatus, setFilterStatus] = useState('semua');
@@ -323,6 +327,33 @@ function RootPageContent() {
       return true;
     });
   }, [mapItems, filterKecamatan, filterStatus, filterSearch]);
+
+  // Load Yearly Stats
+  useEffect(() => {
+    async function loadYearly() {
+      try {
+        const [resTarget, resData] = await Promise.all([
+          fetch(`/api/checklist-normalisasi/target?tahun=${tahun}`),
+          fetch(`/api/checklist-normalisasi?tahun=${tahun}`)
+        ]);
+        const target = await resTarget.json();
+        const data = await resData.json();
+        
+        const totalPanjang = (data || []).reduce((sum, d) => sum + (Number(d.panjang)||0), 0);
+        const totalSolar = (data || []).reduce((sum, d) => sum + (Number(d.solar)||0), 0);
+        
+        setYearlyStats({
+          target: target?.target_panjang_normalisasi || 0,
+          totalPanjang,
+          totalSolar,
+          lokasi: (data || []).length
+        });
+      } catch (e) {
+        console.error(e);
+      }
+    }
+    loadYearly();
+  }, [tahun]);
 
   // Filtered assignments for the list
   const filteredAssignments = useMemo(() => {
@@ -544,6 +575,71 @@ function RootPageContent() {
                 );
               })
             )}
+          </div>
+        </section>
+
+        {/* ── PENCAPAIAN TAHUNAN SECTION ─────────────────────────────── */}
+        <section style={{ marginTop: '24px' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+            <h2 style={{ fontSize: '16px', fontWeight: 'bold', color: '#0b1c30' }}>Pencapaian Tahunan</h2>
+            <select value={tahun} onChange={e => setTahun(Number(e.target.value))} style={{ padding: '6px 12px', borderRadius: 6, border: '1px solid #c2c6d3', outline: 'none', fontWeight: 'bold' }}>
+              {[2024, 2025, 2026, 2027, 2028].map(y => <option key={y} value={y}>{y}</option>)}
+            </select>
+          </div>
+          
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(350px, 1fr))', gap: '20px' }}>
+            {/* Card Normalisasi */}
+            <div style={{ background: 'linear-gradient(135deg, #00346f, #004a99)', borderRadius: '12px', padding: '24px', color: 'white', position: 'relative', overflow: 'hidden', boxShadow: '0 10px 30px -10px rgba(0,52,111,0.5)' }}>
+              <div style={{ position: 'absolute', right: -20, top: -20, opacity: 0.1, fontSize: 120 }}>🏗️</div>
+              <h3 style={{ fontSize: '18px', fontWeight: 'bold', marginBottom: '16px', display: 'flex', alignItems: 'center', gap: 8 }}>
+                🏗️ NORMALISASI SUNGAI
+              </h3>
+              
+              {yearlyStats ? (() => {
+                const target = yearlyStats.target;
+                const dev = yearlyStats.totalPanjang - target;
+                const devPct = target > 0 ? (Math.abs(dev) / target * 100).toFixed(1) : 0;
+                return (
+                  <div style={{ display: 'grid', gap: '16px' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', borderBottom: '1px solid rgba(255,255,255,0.2)', paddingBottom: 8 }}>
+                      <span style={{ fontSize: 13, opacity: 0.8 }}>Total Panjang</span>
+                      <span style={{ fontSize: 24, fontWeight: 900 }}>{yearlyStats.totalPanjang.toLocaleString('id-ID')} <span style={{ fontSize: 14, fontWeight: 'normal' }}>meter</span></span>
+                    </div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', opacity: 0.9 }}>
+                      <span style={{ fontSize: 13 }}>Target Tahun {tahun}</span>
+                      <span style={{ fontSize: 16, fontWeight: 'bold' }}>{target.toLocaleString('id-ID')} meter</span>
+                    </div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <span style={{ fontSize: 13 }}>Deviasi</span>
+                      <span style={{ fontSize: 13, fontWeight: 'bold', background: dev < 0 ? '#ef4444' : '#10b981', padding: '2px 8px', borderRadius: 4 }}>
+                        {target > 0 ? (dev < 0 ? `Kurang ${Math.abs(dev).toLocaleString('id-ID')}m (${devPct}%)` : `Surplus ${dev.toLocaleString('id-ID')}m (+${devPct}%)`) : 'Target belum diset'}
+                      </span>
+                    </div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 8 }}>
+                      <div style={{ background: 'rgba(255,255,255,0.1)', padding: '8px 12px', borderRadius: 8 }}>
+                        <div style={{ fontSize: 11, opacity: 0.8 }}>Total Lokasi</div>
+                        <div style={{ fontSize: 16, fontWeight: 'bold' }}>{yearlyStats.lokasi}</div>
+                      </div>
+                      <div style={{ background: 'rgba(255,255,255,0.1)', padding: '8px 12px', borderRadius: 8, textAlign: 'right' }}>
+                        <div style={{ fontSize: 11, opacity: 0.8 }}>Total Solar</div>
+                        <div style={{ fontSize: 16, fontWeight: 'bold' }}>{yearlyStats.totalSolar.toLocaleString('id-ID')} Liter</div>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })() : <div style={{ opacity: 0.5 }}>Memuat data...</div>}
+            </div>
+
+            {/* Card Embung Placeholder */}
+            <div style={{ background: '#ffffff', borderRadius: '12px', padding: '24px', border: '1px solid #c2c6d3', position: 'relative', overflow: 'hidden' }}>
+              <h3 style={{ fontSize: '18px', fontWeight: 'bold', marginBottom: '16px', display: 'flex', alignItems: 'center', gap: 8, color: '#0b1c30' }}>
+                🌊 REHABILITASI EMBUNG
+              </h3>
+              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '140px', background: '#f8f9ff', borderRadius: 8, border: '1px dashed #cbd5e1' }}>
+                <span style={{ fontSize: 13, color: '#64748b', fontWeight: 'bold' }}>Modul Checklist Embung Belum Tersedia</span>
+                <span style={{ fontSize: 11, color: '#94a3b8', marginTop: 4 }}>Menunggu pengembangan fitur selanjutnya</span>
+              </div>
+            </div>
           </div>
         </section>
 
