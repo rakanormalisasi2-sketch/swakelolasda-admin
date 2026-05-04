@@ -497,6 +497,60 @@ export default function RapWizard() {
     });
   };
 
+  const handleTeruskanChecklist = async () => {
+    const selectedLogs = dailyData.filter(d => checkedIds.has(d.id));
+    if (selectedLogs.length === 0) {
+      alert('Pilih minimal satu log pekerjaan untuk diteruskan ke checklist.');
+      return;
+    }
+    
+    // Sort dates to find min and max
+    const dates = selectedLogs.map(d => new Date(d.tanggal)).sort((a,b) => a - b);
+    const minDate = dates[0];
+    const maxDate = dates[dates.length - 1];
+    const tahun = minDate.getFullYear();
+
+    const desa = selectedLogs[0]?.assignment?.location_village || '';
+    const kec = selectedLogs[0]?.assignment?.location_district || '';
+    const pekerjaan = selectedLogs[0]?.keterangan || kopData.pekerjaan || 'Normalisasi Sungai';
+
+    const jamTotal = selectedLogs.reduce((acc, d) => acc + (d.jam || 0), 0);
+    // Recalculate total BBM received for selected logs
+    const totalDiterima = selectedLogs.reduce((acc, d) => {
+      let dVal = d.bbmDiterima || 0;
+      if (!dVal && d.catatan) {
+        const m = d.catatan.match(/(?:bbm|solar|drop|kirim|terima)\s*[:=]?\s*(\d+)/i);
+        if (m) dVal = parseInt(m[1]);
+      }
+      return acc + dVal;
+    }, 0);
+
+    const payload = {
+      tahun,
+      kegiatan: `${pekerjaan} Desa ${desa} Kec. ${kec}`,
+      jam_total: jamTotal,
+      desa,
+      solar: totalDiterima,
+      panjang: geometri.panjang,
+      tanggal_mulai: minDate.toISOString().split('T')[0],
+      tanggal_selesai: maxDate.toISOString().split('T')[0]
+    };
+
+    try {
+      const res = await fetch('/api/checklist-normalisasi', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+      if (!res.ok) throw new Error('Gagal menyimpan');
+      alert('✅ Data berhasil diteruskan ke Checklist Normalisasi!');
+    } catch (e) {
+      console.error(e);
+      alert('Gagal meneruskan data ke checklist.');
+    }
+  };
+
+
   // ════════════════════════════════════
   // RENDER
   // ════════════════════════════════════
@@ -765,14 +819,18 @@ export default function RapWizard() {
                   Next Step <ChevronRight size={18} />
                 </button>
               ) : (
-                <div style={{ display: 'flex', gap: '12px' }}>
+                <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
                   <button onClick={handlePrint}
-                    style={{ padding: '8px 20px', borderRadius: '8px', border: '2px solid #00346f', color: '#00346f', fontWeight: 600, fontSize: '12px', display: 'flex', alignItems: 'center', gap: '8px', background: 'transparent', cursor: 'pointer', transition: 'all 0.2s' }}>
-                    <Printer size={18} /> Cetak Langsung
+                    style={{ padding: '8px 16px', borderRadius: '8px', border: '2px solid #00346f', color: '#00346f', fontWeight: 600, fontSize: '12px', display: 'flex', alignItems: 'center', gap: '6px', background: 'transparent', cursor: 'pointer', transition: 'all 0.2s' }}>
+                    <Printer size={16} /> Cetak
                   </button>
                   <button onClick={handleExportExcel}
-                    style={{ padding: '8px 20px', borderRadius: '8px', color: '#ffffff', fontWeight: 600, fontSize: '12px', display: 'flex', alignItems: 'center', gap: '8px', transition: 'all 0.2s', border: 'none', cursor: 'pointer', background: 'linear-gradient(135deg, #00346f, #004a99)', boxShadow: '0 8px 24px -4px rgba(0,52,111,0.2)' }}>
-                    <Download size={18} /> Unduh XLSX
+                    style={{ padding: '8px 16px', borderRadius: '8px', color: '#ffffff', fontWeight: 600, fontSize: '12px', display: 'flex', alignItems: 'center', gap: '6px', transition: 'all 0.2s', border: 'none', cursor: 'pointer', background: 'linear-gradient(135deg, #00346f, #004a99)', boxShadow: '0 4px 12px -4px rgba(0,52,111,0.2)' }}>
+                    <Download size={16} /> XLSX
+                  </button>
+                  <button onClick={handleTeruskanChecklist}
+                    style={{ padding: '8px 16px', borderRadius: '8px', color: '#ffffff', fontWeight: 600, fontSize: '12px', display: 'flex', alignItems: 'center', gap: '6px', transition: 'all 0.2s', border: 'none', cursor: 'pointer', background: '#10b981', boxShadow: '0 4px 12px -4px rgba(16,185,129,0.2)' }}>
+                    ▶ Teruskan ke Checklist
                   </button>
                 </div>
               )}

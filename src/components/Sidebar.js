@@ -42,6 +42,7 @@ const NAV_CONFIG = {
         { href: '/dashboard/seksi/laporan', label: 'Laporan Pelaksanaan', icon: 'file-text' },
         { href: '/dashboard/seksi/bbm', label: 'Manajemen BBM', icon: 'database' },
         { href: '/dashboard/seksi/perhitungan-rap', label: 'Perhitungan RAP', icon: 'calculator' },
+        { href: '/dashboard/seksi/checklist-normalisasi', label: 'Checklist Normalisasi', icon: 'clipboard' },
         { href: '/dashboard/seksi/proposal', label: 'Perencanaan Proposal', icon: 'book' },
         { href: '/dashboard/seksi/pengaturan', label: 'Pengaturan Sistem', icon: 'settings' },
       ],
