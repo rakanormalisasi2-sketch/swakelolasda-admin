@@ -96,41 +96,20 @@ export async function printCrossSections(rapState) {
     const tahunAnggaran = kopData?.tahun || new Date().getFullYear();
     const alatLabel = (selectedExcavator||'').toLowerCase().includes('bull') ? (selectedExcavator||'Bulldozer') : 'Excavator';
     
-    // Pre-load logo as base64 for PDF embedding
-    let logoBase64 = null;
-    try {
-      const logoResp = await fetch('/logo-bojonegoro.png');
-      const logoBlob = await logoResp.blob();
-      logoBase64 = await new Promise(resolve => {
-        const reader = new FileReader();
-        reader.onloadend = () => resolve(reader.result);
-        reader.readAsDataURL(logoBlob);
-      });
-    } catch(e) { console.warn('Logo not loaded:', e); }
-    
     const kop = (t,o,extra) => {
       const w = o==='portrait'?215.9:330.2;
       
-      // Add logo if available
-      let logoOffset = 0;
-      if (logoBase64) {
-        try {
-          doc.addImage(logoBase64, 'PNG', w/2 - 5, 3, 10, 11);
-          logoOffset = 6;
-        } catch(e) {}
-      }
-      
       doc.setFont('helvetica','bold'); doc.setFontSize(11);
-      doc.text('PEMERINTAH KABUPATEN BOJONEGORO',w/2,10+logoOffset,{align:'center'});
-      doc.setFontSize(9); doc.text('DINAS PEKERJAAN UMUM SUMBER DAYA AIR',w/2,15+logoOffset,{align:'center'});
-      doc.setLineWidth(0.5); doc.line(10,17+logoOffset,w-10,17+logoOffset);
+      doc.text('PEMERINTAH KABUPATEN BOJONEGORO',w/2,10,{align:'center'});
+      doc.setFontSize(9); doc.text('DINAS PEKERJAAN UMUM SUMBER DAYA AIR',w/2,15,{align:'center'});
+      doc.setLineWidth(0.5); doc.line(10,17,w-10,17);
       doc.setFontSize(9); doc.setFont('helvetica','bold');
       
       const titleLines = t.split('\n');
-      doc.text(titleLines, w/2, 22+logoOffset, {align:'center'});
+      doc.text(titleLines, w/2, 22, {align:'center'});
       
       doc.setFontSize(7); doc.setFont('helvetica','normal');
-      let y = 22 + logoOffset + (titleLines.length * 5);
+      let y = 22 + (titleLines.length * 5);
       
       doc.text('SUB KEGIATAN',12,y); doc.text(': '+subKeg,55,y); y+=4;
       doc.text('PEKERJAAN',12,y); doc.text(': '+pekerjaan,55,y); y+=4;

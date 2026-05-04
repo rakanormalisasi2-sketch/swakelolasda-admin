@@ -216,7 +216,20 @@ const CrossSectionSVG = ({
           <text x={(kopWidth*3)/4} y={271} textAnchor="middle" fontSize="8" fontWeight="bold">TAHUN</text>
 
           <rect x={0} y={275} width={kopWidth/2} height={25} fill="none" stroke="#000" strokeWidth="1.5" />
-          <text x={kopWidth/4} y={291} textAnchor="middle" fontSize="9">{kopData?.lokasi || '-'}</text>
+          {(() => {
+            const lokTxt = kopData?.lokasi || '-';
+            const maxW = kopWidth/2 - 8;
+            if (lokTxt.length <= 16) {
+              return <text x={kopWidth/4} y={291} textAnchor="middle" fontSize="7">{lokTxt}</text>;
+            }
+            const mid = Math.ceil(lokTxt.length / 2);
+            const sp = lokTxt.lastIndexOf(' ', mid);
+            const cut = sp > 0 ? sp : mid;
+            return <>
+              <text x={kopWidth/4} y={285} textAnchor="middle" fontSize="6.5">{lokTxt.substring(0, cut)}</text>
+              <text x={kopWidth/4} y={294} textAnchor="middle" fontSize="6.5">{lokTxt.substring(cut).trim()}</text>
+            </>;
+          })()}
           <rect x={kopWidth/2} y={275} width={kopWidth/2} height={25} fill="none" stroke="#000" strokeWidth="1.5" />
           <text x={(kopWidth*3)/4} y={291} textAnchor="middle" fontSize="9" fontWeight="bold">{kopData?.tahun || '-'}</text>
 
