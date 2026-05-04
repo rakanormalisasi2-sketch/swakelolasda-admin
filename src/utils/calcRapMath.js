@@ -524,90 +524,50 @@ export function generateSTAPerencanaan(params) {
  * Constraint: STA 0 = STA 0 TAB 1, Total = targetVolume
  */
 export function generateSTAPelaksanaan(geometriStas, totalVolume) {
-  // Support both old 3-param and new 2-param signatures
   const stasInput = typeof geometriStas === 'number' ? arguments[2] : geometriStas;
   const targetVolume = typeof geometriStas === 'number' ? geometriStas : (totalVolume || 0);
-  const refSTA0 = stasInput?.[0];
 
-  if (!refSTA0) {
+  if (!stasInput || stasInput.length === 0) {
     return { stas: [], totalVolume: 0 };
   }
 
-  const nSTA = 5;
-  const panjang = stasInput.length > 1
-    ? (parseFloat(stasInput[stasInput.length - 1]?.sta?.replace('0+', '') || '0') * 1000)
-    : (targetVolume > 0 ? 500 : 500);
-  const interval = panjang / (nSTA - 1);
+  const nSTA = stasInput.length || 5;
 
-  // STA 0 = sama persis dengan refSTA0
-  let stas = [{
-    ...refSTA0,
-    isSTA0: true
-  }];
+  // Build pelaksanaan STAs with ±2% variation from perencanaan dimensions
+  let stas = stasInput.map((ref, i) => {
+    // Small realistic variation per STA (field measurement differences)
+    const seed = Math.sin(i * 31 + 7) * 0.5 + 0.5; // 0-1 deterministic
+    const dimVar = 0.98 + seed * 0.04; // 0.98 to 1.02
 
-  // Volume STA 0
-  const volSTA0 = refSTA0?.volume ?? 0;
-
-  // Volume sisa untuk STA 1-4
-  const volumeSisa = targetVolume - volSTA0;
-  const avgVolumePerSTA = volumeSisa / (nSTA - 1);
-
-  let cumulative = interval;
-
-  for (let i = 1; i < nSTA; i++) {
-    // Variasi 95%-105% dari rata-rata
-    const variansi = 0.95 + (Math.sin(i * 17) * 0.05);
-    const targetVol = avgVolumePerSTA * variansi;
-
-    // Reverse engineer dimensi dari target volume
-    // Luas = Volume / Interval
-    const luasTarget = targetVol / interval;
-
-    // Ambil dimensi dari refSTA0 sebagai base
-    const baseB1 = refSTA0.b1;
-    const baseH = refSTA0.h;
+    const b1 = +(ref.b1 * dimVar).toFixed(3);
+    const h = +(ref.h * dimVar).toFixed(3);
     const slope = 1;
+    const b3 = +(b1 + 2 * slope * h).toFixed(3);
+    const hPrime = ref.hPrime || ref.h;
+    const luas = +( ((b1 + b3) / 2) * h ).toFixed(4);
+    const jarak = i === 0 ? 0 : (ref.jarak || 0);
 
-    // Hitung faktor scaling untuk mencapai luasTarget
-    // Luas = ((b1 + b3) / 2) × h
-    // b3 = b1 + 2 × slope × h
-    // Luas = ((b1 + b1 + 2 × slope × h) / 2) × h
-    // Luas = (b1 + slope × h) × h
-    // Ini adalah persamaan kuadrat, tapi untuk simplify kita pakai scaling
-
-    const baseLuas = refSTA0.luas;
-    const scaleFactor = Math.sqrt(luasTarget / baseLuas);
-
-    const curB1 = baseB1 * scaleFactor;
-    const curH = baseH * scaleFactor;
-    const curB3 = curB1 + 2 * slope * curH;
-    const curB2 = curB1 - 2 * slope * curH;
-
-    stas.push({
-      sta: `0+${String(Math.round(cumulative)).padStart(3, '0')}`,
-      b1: curB1,
-      b2: Math.max(curB2, 0.1),
-      b3: curB3,
-      h: curH,
-      hPrime: refSTA0.hPrime,
-      luas: ((curB1 + curB3) / 2) * curH,
-      volume: targetVol,
-      jarak: interval,
-      isSTA0: false,
+    return {
+      sta: ref.sta,
+      b1, b3, h, hPrime, luas, jarak,
+      volume: 0, // will be calculated below
+      isSTA0: i === 0,
       index: i
-    });
+    };
+  });
 
-    cumulative += interval;
+  // Calculate raw volumes using average-end-area method
+  for (let i = 1; i < stas.length; i++) {
+    stas[i].volume = +( ((stas[i-1].luas + stas[i].luas) / 2) * stas[i].jarak ).toFixed(2);
   }
+  stas[0].volume = 0; // STA 0 has no volume (it's the starting point)
 
-  // Normalisasi final agar total persis = targetVolume
-  const currentTotal = stas.reduce((sum, s) => sum + s.volume, 0);
-
-  if (Math.abs(currentTotal - targetVolume) > 0.01) {
-    const adjustment = targetVolume / currentTotal;
-    stas.forEach(s => {
-      s.volume *= adjustment;
-      s.luas *= adjustment;
+  // Normalize so total = targetVolume
+  const rawTotal = stas.reduce((sum, s) => sum + s.volume, 0);
+  if (rawTotal > 0 && targetVolume > 0) {
+    const factor = targetVolume / rawTotal;
+    stas.forEach((s, i) => {
+      if (i > 0) s.volume = +(s.volume * factor).toFixed(2);
     });
   }
 

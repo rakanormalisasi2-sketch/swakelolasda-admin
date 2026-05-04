@@ -21,7 +21,7 @@ import {
   CheckCircle2, ChevronLeft, ChevronRight, Eye,
   ZoomIn, ZoomOut, Focus, Fuel, Download, Printer,
   FileText, BarChart3, Table2, Image as ImageIcon,
-  HelpCircle, BookOpen, Plus, Check, CloudOff, PenLine, Activity
+  HelpCircle, BookOpen, Plus, Check, CloudOff, PenLine
 } from 'lucide-react';
 
 /* ═══════════════════════════════════════════════════════════
@@ -115,6 +115,7 @@ function MetricCard({ label, value, unit, sub, accent = false }) {
    ═══════════════════════════════════════════════════════════ */
 export default function RapWizard() {
   const [step, setStep] = useState(1);
+  const [gsToast, setGsToast] = useState(null);
 
   // ── STATE: Step 1 — Geometri ──
   const [geometri, setGeometri] = useState({
@@ -140,6 +141,9 @@ export default function RapWizard() {
     preparedBy: 'Ir. Budi Santoso, MT',
     approvedBy: 'Dr. Hendra Wijaya, IAI'
   });
+
+  // ── STATE: Kredensial Dokumen (dari section_settings) ──
+  const [subKegiatan, setSubKegiatan] = useState('NORMALISASI / RESTORASI SUNGAI');
 
   // ── STATE: Harga Default (Auto-save localStorage) ──
   const [hargaBBM, setHargaBBM] = useState(22300);
@@ -212,6 +216,26 @@ export default function RapWizard() {
     }
   }, [selectedExcavator]);
 
+  // ── Show toast when GoalSeek recalculates ──
+  useEffect(() => {
+    if (analisa && step === 2) {
+      setGsToast(true);
+      const t = setTimeout(() => setGsToast(false), 4000);
+      return () => clearTimeout(t);
+    }
+  }, [analisa?.t1, analisa?.q1, analisa?.H]);
+
+  // ── Fetch section_settings for subKegiatan ──
+  useEffect(() => {
+    async function fetchSettings() {
+      try {
+        const { data } = await supabase.from('section_settings').select('*').limit(1).single();
+        if (data?.pdf_sub_kegiatan) setSubKegiatan(data.pdf_sub_kegiatan);
+      } catch {}
+    }
+    fetchSettings();
+  }, []);
+
   // ── Fetch daily data from Supabase ──
   useEffect(() => {
     async function fetchLogs() {
@@ -248,11 +272,12 @@ export default function RapWizard() {
               bbm: (d.jam_kerja || 7) * (analisa?.H || 6),
               unit: d.override_alat || d.unit_alat || selectedExcavator,
               keterangan: judulPekerjaan,
-              catatan: d.keterangan || 'Galian saluran'
+              catatan: d.keterangan_tambahan || 'Galian saluran',
+              hmAwal: d.hm_awal || '',
+              hmAkhir: d.hm_akhir || '',
             };
           }));
         } else {
-          // Demo data if DB empty
           setDailyData([
             { id: 1, tanggal: '2025-07-17', jam: 6.7, galian: 355.6, bbm: 46.2, unit: 'EXC-01', keterangan: 'Galian Segmen A' },
             { id: 2, tanggal: '2025-07-21', jam: 8.0, galian: 424.6, bbm: 55.1, unit: 'EXC-01', keterangan: 'Galian Segmen B' },
@@ -307,14 +332,18 @@ export default function RapWizard() {
     const volRealisasi = analisa?.volRealisasi || selTotals.galian || totalVolume;
     const stasPelaksanaan = generateSTAPelaksanaan(stasRencana.stas, volRealisasi);
 
+    const selectedLogs = dailyData.filter(d => checkedIds.has(d.id));
+    // Derive pekerjaan from first selected daily log group title
+    const pekerjaan = selectedLogs[0]?.keterangan || kopData.pekerjaan || 'Normalisasi Sungai';
+
     const rapStateForPrint = {
       geometri: { stas: stasRencana.stas, kopData, slope: geometri.slope, ...geometri, hPrime: geometri.hGalian, volumeGalian, volumeStripping, totalVolume },
       backupPelaksanaan: { stas: stasPelaksanaan.stas, totalVolume: volRealisasi },
       analisaRencana: alatParams,
       personil: { durasiHari: durasiHOK, penjagaMalam: 2 },
       selTotals,
-      dailyData: dailyData.filter(d => checkedIds.has(d.id)),
-      kopData,
+      dailyData: selectedLogs,
+      kopData: { ...kopData, pekerjaan, subKegiatan },
       grandTotal,
       costBBM,
       costPenjaga,
@@ -476,23 +505,28 @@ export default function RapWizard() {
                     </div>
                   </Section>
 
-                  <Section icon={Activity} title="Hasil Kalkulasi GoalSeek (Auto)">
-                    <div className="grid grid-cols-2 md:grid-cols-4 gap-3 bg-[#f8f9ff] p-4 rounded-xl border border-[#c2c6d3]/30">
-                      <div><div className="text-[10px] text-[#424751] uppercase tracking-wide font-bold">Waktu Siklus (T.1)</div><div className="font-mono text-sm font-bold text-[#00346f]">{analisa?.t1_detik || 0} det / {analisa?.t1 || 0} mnt</div></div>
-                      <div><div className="text-[10px] text-[#424751] uppercase tracking-wide font-bold">Faktor Kedalaman (Fd)</div><div className="font-mono text-sm font-bold text-[#00346f]">{analisa?.fd || 0}</div></div>
-                      <div><div className="text-[10px] text-[#424751] uppercase tracking-wide font-bold">Faktor Efisiensi (Fe)</div><div className="font-mono text-sm font-bold text-[#00346f]">{analisa?.fe || 0}</div></div>
-                      <div><div className="text-[10px] text-[#424751] uppercase tracking-wide font-bold">Tenaga Output (kW)</div><div className="font-mono text-sm font-bold text-[#00346f]">{analisa?.kW || 0}</div></div>
-                      <div><div className="text-[10px] text-[#424751] uppercase tracking-wide font-bold">Produksi Jam (Q1)</div><div className="font-mono text-sm font-bold text-[#00346f]">{analisa?.q1 || 0} m³/jam</div></div>
-                      <div><div className="text-[10px] text-[#424751] uppercase tracking-wide font-bold">Produksi Hari (Q2)</div><div className="font-mono text-sm font-bold text-[#00346f]">{analisa?.q2 || 0} m³/hari</div></div>
-                      <div><div className="text-[10px] text-[#424751] uppercase tracking-wide font-bold">Konsumsi (H)</div><div className="font-mono text-sm font-bold text-[#00346f]">{analisa?.H || 0} L/jam</div></div>
-                      <div><div className="text-[10px] text-[#424751] uppercase tracking-wide font-bold">Sisa BBM Akhir</div><div className="font-mono text-sm font-bold text-[#00346f]">{analisa?.sisaAkhir || 0} Liter</div></div>
-                    </div>
-                    {analisa?.converged === false && (
-                      <div className="mt-2 p-2 bg-red-50 border border-red-200 rounded-lg text-[10px] text-red-700">
-                        ⚠️ GoalSeek gagal menemukan titik temu optimal. Nilai ditampilkan adalah estimasi terbaik (Best Effort).
-                      </div>
-                    )}
-                  </Section>
+                   {/* GoalSeek runs in background — show toast on change */}
+                   {gsToast && (
+                     <div style={{
+                       position:'fixed', bottom:24, right:24, zIndex:999,
+                       background:'linear-gradient(135deg,#1e3a8a,#2563eb)', color:'#fff',
+                       padding:'14px 20px', borderRadius:12, boxShadow:'0 8px 32px rgba(0,0,0,0.3)',
+                       fontSize:12, maxWidth:340, animation:'slideIn 0.3s ease'
+                     }}>
+                       <div style={{fontWeight:700, marginBottom:4}}>📊 Hasil GoalSeek (Auto)</div>
+                       <div style={{display:'grid', gridTemplateColumns:'1fr 1fr', gap:'2px 12px', fontFamily:'monospace', fontSize:11}}>
+                         <span>T.1: {analisa?.t1||0} mnt</span>
+                         <span>Q1: {analisa?.q1||0} m³/j</span>
+                         <span>H: {analisa?.H||0} L/j</span>
+                         <span>Sisa: {analisa?.sisaAkhir||0} L</span>
+                         <span>Fd: {analisa?.fd||0}</span>
+                         <span>Fe: {analisa?.fe||0}</span>
+                       </div>
+                       {analisa?.converged === false && (
+                         <div style={{marginTop:4, color:'#fbbf24', fontSize:10}}>⚠️ Best Effort — tidak konvergen</div>
+                       )}
+                     </div>
+                   )}
                 </div>
               )}
 
