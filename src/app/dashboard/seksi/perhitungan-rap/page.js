@@ -185,6 +185,8 @@ export default function RapWizard() {
   useEffect(() => {
     try {
       const sigData = {
+        pekerjaan: kopData.pekerjaan,
+        lokasi: kopData.lokasi,
         jabatanMenyetujui: kopData.jabatanMenyetujui,
         namaMenyetujui: kopData.namaMenyetujui,
         nipMenyetujui: kopData.nipMenyetujui,
@@ -194,7 +196,7 @@ export default function RapWizard() {
       };
       localStorage.setItem('rap_signature_data', JSON.stringify(sigData));
     } catch {}
-  }, [kopData.jabatanMenyetujui, kopData.namaMenyetujui, kopData.nipMenyetujui, kopData.jabatanMengetahui, kopData.namaMengetahui, kopData.nipMengetahui]);
+  }, [kopData]);
 
   // ════════════════════════════════════
   // DERIVED CALCULATIONS (Real-time)
