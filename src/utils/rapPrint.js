@@ -40,7 +40,10 @@ export async function printCrossSections(rapState) {
     const preparedBy = kopData?.preparedBy || 'Ir. Budi Santoso, MT';
     const approvedBy = kopData?.approvedBy || 'Dr. Hendra Wijaya, IAI';
     const addSignature = (doc, y, w) => {
-      const col1 = 30, col2 = w - 100;
+      // Center the two signature blocks on the page
+      const centerX = w / 2;
+      const col1 = centerX - 100; // left block centered
+      const col2 = centerX + 30;  // right block centered
       const subKegShort = subKeg || 'NORMALISASI/RESTORASI SUNGAI';
       
       const jabMenyetujui = kopData?.jabatanMenyetujui || 'KUASA PENGGUNA ANGGARAN';
@@ -405,16 +408,16 @@ export async function printCrossSections(rapState) {
             const svgEl = container.querySelector('svg');
             if (svgEl) {
               const canvas = document.createElement('canvas');
-              canvas.width=1800; canvas.height=1125;
+              canvas.width=2400; canvas.height=1500;
               const ctx = canvas.getContext('2d');
-              ctx.fillStyle='#fff'; ctx.fillRect(0,0,1800,1125);
+              ctx.fillStyle='#fff'; ctx.fillRect(0,0,2400,1500);
               const blob = new Blob([new XMLSerializer().serializeToString(svgEl)],{type:'image/svg+xml'});
               const url = URL.createObjectURL(blob);
               const img = new Image();
               await new Promise((r,j)=>{img.onload=r;img.onerror=j;img.src=url;});
-              ctx.drawImage(img,0,0,1800,1125);
+              ctx.drawImage(img,0,0,2400,1500);
               URL.revokeObjectURL(url);
-              doc.addImage(canvas.toDataURL('image/jpeg', 0.65),'JPEG',5,5,320.2,205.9);
+              doc.addImage(canvas.toDataURL('image/jpeg', 0.7),'JPEG',5,5,320.2,205.9);
             }
             document.body.removeChild(container);
           } catch(imgErr) {

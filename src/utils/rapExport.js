@@ -22,14 +22,14 @@ const svgToJpegBase64 = (svgString) => {
       const url = URL.createObjectURL(blob);
       img.onload = () => {
         const canvas = document.createElement('canvas');
-        canvas.width = 1800;
-        canvas.height = 1125;
+        canvas.width = 2400;
+        canvas.height = 1500;
         const ctx = canvas.getContext('2d');
         ctx.fillStyle = '#ffffff';
         ctx.fillRect(0, 0, canvas.width, canvas.height);
         ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
         URL.revokeObjectURL(url);
-        resolve(canvas.toDataURL('image/jpeg', 0.65).split(',')[1]);
+        resolve(canvas.toDataURL('image/jpeg', 0.7).split(',')[1]);
       };
       img.onerror = (e) => reject(e);
       img.src = url;
