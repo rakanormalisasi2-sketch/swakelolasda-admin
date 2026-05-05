@@ -1,5 +1,6 @@
 'use client';
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useState, useCallback, useRef } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/context/AuthContext';
 import StorageWarning from '@/components/StorageWarning';
@@ -13,6 +14,10 @@ const STATUS_MAP = {
 
 export default function PeralatanPage() {
   const { profile } = useAuth();
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const editParam = searchParams.get('edit');
+  const hasTriggeredEdit = useRef(false);
   
   // Data States
   const [alat, setAlat] = useState([]);
@@ -110,6 +115,19 @@ export default function PeralatanPage() {
     if (error) { alert('Gagal menghapus: ' + error.message); return; }
     load();
   };
+
+  // ================= AUTO-OPEN EDIT MODAL FROM URL PARAM =================
+  useEffect(() => {
+    if (editParam && alat.length > 0 && !hasTriggeredEdit.current) {
+      const eq = alat.find(a => a.id === editParam);
+      if (eq) {
+        openEdit(eq);
+        hasTriggeredEdit.current = true;
+        // Optional: clear the param from URL
+        router.replace('/dashboard/peralatan', { scroll: false });
+      }
+    }
+  }, [editParam, alat, router]);
 
   // ================= EDIT EQUIPMENT =================
   const openEdit = (a) => {

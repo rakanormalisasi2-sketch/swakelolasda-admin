@@ -3,6 +3,7 @@ import React, { useEffect, useState, useCallback, useMemo } from 'react';
 import dynamic from 'next/dynamic';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/context/AuthContext';
+import { useRouter } from 'next/navigation';
 import { geocodeLocation } from '@/lib/geocoder';
 
 const MapComponent = dynamic(() => import('@/components/MapComponent'), {
@@ -19,12 +20,11 @@ const JOB_LABELS = { normalisasi: 'Normalisasi', embung: 'Embung', lainnya: 'Lai
 
 export default function SebaranPage() {
   const { profile } = useAuth();
+  const router = useRouter();
   const [mapItems, setMapItems] = useState([]);
   const [assignments, setAssignments] = useState([]);
   const [equipment, setEquipment] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [editModal, setEditModal] = useState(null);
-  const [saving, setSaving] = useState(false);
   const [panelOpen, setPanelOpen] = useState(true);
   const [panelTab, setPanelTab] = useState('semua');
   const [focusCoord, setFocusCoord] = useState(null);
@@ -131,40 +131,9 @@ export default function SebaranPage() {
     window.open(`https://www.google.com/maps/dir/?api=1&destination=${lat},${lng}&travelmode=driving`, '_blank');
   };
 
-  // Edit kondisi alat
+  // Edit kondisi alat redirect
   const openEditModal = (eqId) => {
-    const eq = equipment.find(e => e.id === eqId);
-    if (!eq) return;
-    setEditModal({
-      id: eq.id, name: eq.name, nomor_lambung: eq.nomor_lambung,
-      condition_percentage: eq.condition_percentage || 100,
-      status: eq.status || 'ready', damage_description: '',
-    });
-  };
-
-  const saveEdit = async () => {
-    if (!editModal) return;
-    setSaving(true);
-    // Update equipment
-    await supabase.from('heavy_equipment').update({
-      condition_percentage: parseInt(editModal.condition_percentage),
-      status: editModal.status,
-    }).eq('id', editModal.id);
-
-    // If changed to maintenance, create log
-    const origEq = equipment.find(e => e.id === editModal.id);
-    if (editModal.status === 'maintenance' && origEq?.status !== 'maintenance' && editModal.damage_description.trim()) {
-      await supabase.from('maintenance_logs').insert({
-        equipment_id: editModal.id,
-        reported_by: profile?.id,
-        damage_description: editModal.damage_description,
-        progress_status: 'diterima',
-        mechanic_details: {},
-      });
-    }
-    setSaving(false);
-    setEditModal(null);
-    load();
+    router.push(`/dashboard/peralatan?edit=${eqId}`);
   };
 
   const condColor = (p) => p >= 70 ? '#16a34a' : p >= 40 ? '#d97706' : '#dc2626';
@@ -282,60 +251,6 @@ export default function SebaranPage() {
         </button>
       </div>
 
-      {/* MODAL EDIT KONDISI */}
-      {editModal && (
-        <div className="modal-overlay" onClick={e => e.target === e.currentTarget && setEditModal(null)}>
-          <div className="modal" style={{ maxWidth: 460 }}>
-            <div className="modal-header">
-              <h3 className="modal-title">Edit Kondisi Alat - {editModal.name}</h3>
-              <button className="btn-icon" onClick={() => setEditModal(null)}>✖</button>
-            </div>
-            <div className="modal-body">
-              <div style={{ background: '#f1f5f9', padding: '10px 14px', borderRadius: 6, marginBottom: 16, fontSize: 12, color: '#64748b' }}>
-                No. Lambung: <strong style={{ color: '#0f172a' }}>{editModal.nomor_lambung || '-'}</strong>
-              </div>
-
-              <div className="form-group">
-                <label className="form-label">Kondisi Alat (%)</label>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                  <input type="range" min={0} max={100} value={editModal.condition_percentage}
-                    onChange={e => setEditModal({ ...editModal, condition_percentage: e.target.value })}
-                    style={{ flex: 1 }} />
-                  <span style={{ fontWeight: 700, fontSize: 18, color: condColor(editModal.condition_percentage), minWidth: 50, textAlign: 'right' }}>
-                    {editModal.condition_percentage}%
-                  </span>
-                </div>
-              </div>
-
-              <div className="form-group">
-                <label className="form-label">Status Operasional</label>
-                <select className="form-control" value={editModal.status} onChange={e => setEditModal({ ...editModal, status: e.target.value })}>
-                  <option value="ready">Ready (Siap Ditugaskan)</option>
-                  <option value="operating">Beroperasi</option>
-                  <option value="maintenance">Maintenance</option>
-                </select>
-              </div>
-
-              {editModal.status === 'maintenance' && equipment.find(e => e.id === editModal.id)?.status !== 'maintenance' && (
-                <div className="form-group" style={{ background: '#fef2f2', padding: 12, borderRadius: 6 }}>
-                  <label className="form-label" style={{ color: '#b91c1c' }}>Keterangan Kerusakan (Wajib)</label>
-                  <textarea className="form-control" rows={3} placeholder="Jelaskan gejala kerusakan..."
-                    value={editModal.damage_description}
-                    onChange={e => setEditModal({ ...editModal, damage_description: e.target.value })} />
-                  <div style={{ fontSize: 10, color: '#94a3b8', marginTop: 4 }}>
-                    Data ini akan masuk ke Rekap Perbaikan & Status Alat Berat
-                  </div>
-                </div>
-              )}
-            </div>
-            <div className="modal-footer">
-              <button className="btn btn-primary" disabled={saving} onClick={saveEdit}>
-                {saving ? 'Menyimpan...' : 'Simpan Perubahan'}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
     </>
   );
 }
