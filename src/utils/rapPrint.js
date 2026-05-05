@@ -42,8 +42,8 @@ export async function printCrossSections(rapState) {
     const addSignature = (doc, y, w) => {
       // Center the two signature blocks on the page
       const centerX = w / 2;
-      const col1 = centerX - 100; // left block centered
-      const col2 = centerX + 30;  // right block centered
+      const col1Center = centerX - 70; // left block center point
+      const col2Center = centerX + 70; // right block center point
       const subKegShort = subKeg || 'NORMALISASI/RESTORASI SUNGAI';
       
       const jabMenyetujui = kopData?.jabatanMenyetujui || 'KUASA PENGGUNA ANGGARAN';
@@ -55,35 +55,35 @@ export async function printCrossSections(rapState) {
       const nipMengetahui = kopData?.nipMengetahui || '-';
       
       doc.setFontSize(8); doc.setFont('helvetica','normal');
-      doc.text('Menyetujui :', col1, y);
-      doc.text('Mengetahui :', col2, y);
+      doc.text('Menyetujui :', col1Center, y, { align: 'center' });
+      doc.text('Mengetahui :', col2Center, y, { align: 'center' });
       
       // Jabatan
       doc.setFontSize(7); doc.setFont('helvetica','bold');
-      doc.text(jabMenyetujui, col1, y + 8);
-      doc.text(jabMengetahui, col2, y + 8);
+      doc.text(jabMenyetujui, col1Center, y + 8, { align: 'center' });
+      doc.text(jabMengetahui, col2Center, y + 8, { align: 'center' });
       
       // Sub Kegiatan line
       doc.setFont('helvetica','normal');
-      doc.text('SUB KEGIATAN ' + subKegShort, col1, y + 12);
-      doc.text('SUB KEGIATAN ' + subKegShort, col2, y + 12);
+      doc.text('SUB KEGIATAN ' + subKegShort, col1Center, y + 12, { align: 'center' });
+      doc.text('SUB KEGIATAN ' + subKegShort, col2Center, y + 12, { align: 'center' });
       
       // Nama (bold, underlined)
       doc.setFontSize(8); doc.setFont('helvetica','bold');
-      doc.text(namMenyetujui, col1, y + 30);
-      doc.text(namMengetahui, col2, y + 30);
+      doc.text(namMenyetujui, col1Center, y + 30, { align: 'center' });
+      doc.text(namMengetahui, col2Center, y + 30, { align: 'center' });
       
       // Underline below name
       const nameW1 = doc.getTextWidth(namMenyetujui);
       const nameW2 = doc.getTextWidth(namMengetahui);
       doc.setLineWidth(0.3);
-      doc.line(col1, y + 31, col1 + nameW1, y + 31);
-      doc.line(col2, y + 31, col2 + nameW2, y + 31);
+      doc.line(col1Center - nameW1/2, y + 31, col1Center + nameW1/2, y + 31);
+      doc.line(col2Center - nameW2/2, y + 31, col2Center + nameW2/2, y + 31);
       
       // NIP
       doc.setFontSize(7); doc.setFont('helvetica','normal');
-      doc.text('NIP.' + nipMenyetujui, col1, y + 35);
-      doc.text('NIP. ' + nipMengetahui, col2, y + 35);
+      doc.text('NIP. ' + nipMenyetujui, col1Center, y + 35, { align: 'center' });
+      doc.text('NIP. ' + nipMengetahui, col2Center, y + 35, { align: 'center' });
     };
     const f = (n,d=2) => Number(n||0).toFixed(d);
     const fR = n => 'Rp ' + Math.round(n||0).toLocaleString('id-ID');
