@@ -117,6 +117,9 @@ async function buildMapItems(assignments, equipment) {
     const assignment = assignments.find(a => a.equipment_id === e.id);
     const locDesa = assignment?.location_village_override || assignment?.location_village;
     const locKec = assignment?.location_district_override || assignment?.location_district;
+    let lat = null;
+    let lng = null;
+    let coordSource = null;
 
     // =============================================
     // PRIORITAS 1: MANUAL KOORDINAT (Input Presisi)
@@ -228,84 +231,98 @@ function RootPageContent() {
     async function loadPublicOverview() {
       setPageLoading(true);
       
-      // Ambil data assignments dengan operator & helper lengkap
-      const assignmentsRes = await supabase
-        .from('assignments')
-        .select(`
-          id, job_type, job_sub_type, created_by_role,
-          location_district, location_village,
-          location_district_override, location_village_override,
-          latitude, longitude,
-          start_date, equipment_id,
-          equipment:heavy_equipment(name, merk_type, nomor_lambung, status),
-          operator:user_profiles!assignments_operator_id_fkey(id, full_name),
-          helper:user_profiles!assignments_helper_id_fkey(id, full_name)
-        `)
-        .eq('status', 'active')
-        .order('start_date', { ascending: false });
-      
-      // Ambil semua operator dengan data lengkap
-      const operatorsRes = await supabase
-        .from('user_profiles')
-        .select('id, full_name, role')
-        .eq('role', 'operator');
-      
-      // Ambil semua equipment
-      const equipmentRes = await supabase.from('heavy_equipment').select('*').order('name');
+      try {
+        // Suppress auth refresh errors for public page by clearing stale tokens
+        try {
+          const { error: sessionErr } = await supabase.auth.getSession();
+          if (sessionErr) {
+            // Token is stale/invalid - clear it so anon queries work
+            localStorage.removeItem(`sb-ratmptlcrjifuplokask-auth-token`);
+          }
+        } catch {}
 
-      const assignmentRows = assignmentsRes.data || [];
-      const operatorRows = operatorsRes.data || [];
-      const equipmentRows = equipmentRes.data || [];
-      
-      // Buat mapping equipment_id -> assignment untuk cari operator yang beroperasi
-      const equipmentToAssignment = {};
-      assignmentRows.forEach(a => {
-        if (a.equipment_id) {
-          equipmentToAssignment[a.equipment_id] = a;
-        }
-      });
-      
-      // Pisahkan operator: beroperasi vs ready
-      const operatingOperators = [];
-      const readyOperators = [...operatorRows];
-      
-      // Hapus operator yang beroperasi dari daftar ready
-      assignmentRows.forEach(a => {
-        if (a.operator?.id) {
-          operatingOperators.push({
-            ...a.operator,
-            assignment: a,
-            equipment: a.equipment
-          });
-          // Hapus dari ready
-          const idx = readyOperators.findIndex(op => op.id === a.operator.id);
-          if (idx > -1) readyOperators.splice(idx, 1);
-        }
-      });
+        // Ambil data assignments dengan operator & helper lengkap
+        const assignmentsRes = await supabase
+          .from('assignments')
+          .select(`
+            id, job_type, job_sub_type, created_by_role,
+            location_district, location_village,
+            location_district_override, location_village_override,
+            latitude, longitude,
+            start_date, equipment_id,
+            equipment:heavy_equipment(name, merk_type, nomor_lambung, status),
+            operator:user_profiles!assignments_operator_id_fkey(id, full_name),
+            helper:user_profiles!assignments_helper_id_fkey(id, full_name)
+          `)
+          .eq('status', 'active')
+          .order('start_date', { ascending: false });
+        
+        // Ambil semua operator dengan data lengkap
+        const operatorsRes = await supabase
+          .from('user_profiles')
+          .select('id, full_name, role')
+          .eq('role', 'operator');
+        
+        // Ambil semua equipment
+        const equipmentRes = await supabase.from('heavy_equipment').select('*').order('name');
 
-      setOverview({
-        activeAssignments: assignmentRows.length,
-        totalOperators: operatorRows.length,
-        totalEquipment: equipmentRows.length,
-        readyEquipment: equipmentRows.filter(item => item.status === 'ready').length,
-        operatingEquipment: equipmentRows.filter(item => item.status === 'operating').length,
-        maintenanceEquipment: equipmentRows.filter(item => item.status === 'maintenance').length,
-        bySection: {
-          seksi_normalisasi: assignmentRows.filter(item => item.created_by_role === 'seksi_normalisasi').length,
-          seksi_embung: assignmentRows.filter(item => item.created_by_role === 'seksi_embung').length,
-        },
-        equipmentList: equipmentRows,
-        assignmentList: assignmentRows,
-        operatingOperators,
-        readyOperators,
-      });
+        const assignmentRows = assignmentsRes.data || [];
+        const operatorRows = operatorsRes.data || [];
+        const equipmentRows = equipmentRes.data || [];
+        
+        // Buat mapping equipment_id -> assignment untuk cari operator yang beroperasi
+        const equipmentToAssignment = {};
+        assignmentRows.forEach(a => {
+          if (a.equipment_id) {
+            equipmentToAssignment[a.equipment_id] = a;
+          }
+        });
+        
+        // Pisahkan operator: beroperasi vs ready
+        const operatingOperators = [];
+        const readyOperators = [...operatorRows];
+        
+        // Hapus operator yang beroperasi dari daftar ready
+        assignmentRows.forEach(a => {
+          if (a.operator?.id) {
+            operatingOperators.push({
+              ...a.operator,
+              assignment: a,
+              equipment: a.equipment
+            });
+            // Hapus dari ready
+            const idx = readyOperators.findIndex(op => op.id === a.operator.id);
+            if (idx > -1) readyOperators.splice(idx, 1);
+          }
+        });
 
-      setRecentAssignments(assignmentRows.slice(0, 10));
+        setOverview({
+          activeAssignments: assignmentRows.length,
+          totalOperators: operatorRows.length,
+          totalEquipment: equipmentRows.length,
+          readyEquipment: equipmentRows.filter(item => item.status === 'ready').length,
+          operatingEquipment: equipmentRows.filter(item => item.status === 'operating').length,
+          maintenanceEquipment: equipmentRows.filter(item => item.status === 'maintenance').length,
+          bySection: {
+            seksi_normalisasi: assignmentRows.filter(item => item.created_by_role === 'seksi_normalisasi').length,
+            seksi_embung: assignmentRows.filter(item => item.created_by_role === 'seksi_embung').length,
+          },
+          equipmentList: equipmentRows,
+          assignmentList: assignmentRows,
+          operatingOperators,
+          readyOperators,
+        });
 
-      // Build map items asynchronously after first render
-      const items = await buildMapItems(assignmentRows, equipmentRows);
-      setMapItems(items);
-      setPageLoading(false);
+        setRecentAssignments(assignmentRows.slice(0, 10));
+
+        // Build map items asynchronously after first render
+        const items = await buildMapItems(assignmentRows, equipmentRows);
+        setMapItems(items);
+      } catch (err) {
+        console.error('Failed to load public overview:', err);
+      } finally {
+        setPageLoading(false);
+      }
     }
 
     loadPublicOverview();

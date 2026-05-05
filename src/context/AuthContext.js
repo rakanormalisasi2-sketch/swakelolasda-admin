@@ -65,6 +65,21 @@ export function AuthProvider({ children }) {
     if (!hasToken) {
       // Not logged in → show login page immediately (no loading screen)
       setLoading(false);
+    } else {
+      // Has token → validate it immediately. If stale, clear it.
+      supabase.auth.getSession().then(({ data, error }) => {
+        if (error || !data?.session) {
+          // Token is invalid/expired - clean up
+          try { localStorage.removeItem(`sb-ratmptlcrjifuplokask-auth-token`); } catch {}
+          if (!cancelled) {
+            setUser(null);
+            setProfile(null);
+            setLoading(false);
+          }
+        }
+      }).catch(() => {
+        if (!cancelled) setLoading(false);
+      });
     }
 
     // Use onAuthStateChange ONLY for INITIAL_SESSION (session recovery on refresh)
