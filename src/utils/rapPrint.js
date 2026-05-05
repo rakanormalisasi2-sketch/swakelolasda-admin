@@ -13,10 +13,7 @@ export function generateAllSVGs(rapState) {
   const { geometri, backupPelaksanaan } = rapState;
   const svgs = [];
   
-  // LIMIT TO 3 STAS PER JENIS to prevent massive exports (e.g. 100MB files)
-  const maxStas = 3;
-
-  const stasRen = geometri.stas?.slice(0, maxStas) || [];
+  const stasRen = geometri.stas || [];
   stasRen.forEach((sta, i) => {
     svgs.push({ jenis: 'PERENCANAAN', sta: sta.sta, index: i,
       svg: generatePrintableSVG({ dimensi: { b1: sta.b1, b2: sta.b2, b3: sta.b3, h: sta.h, hPrime: sta.hPrime, slope: geometri.slope }, luasGalian: sta.luas },
@@ -24,7 +21,7 @@ export function generateAllSVGs(rapState) {
     });
   });
 
-  const stasPel = backupPelaksanaan.stas?.slice(0, maxStas) || [];
+  const stasPel = backupPelaksanaan.stas || [];
   stasPel.forEach((sta, i) => {
     svgs.push({ jenis: 'PELAKSANAAN', sta: sta.sta, index: i,
       svg: generatePrintableSVG({ dimensi: { b1: sta.b1, b2: sta.b2, b3: sta.b3, h: sta.h, hPrime: sta.hPrime, slope: geometri.slope }, luasGalian: sta.luas },
@@ -407,17 +404,17 @@ export async function printCrossSections(rapState) {
           const svgEl = container.querySelector('svg');
           if (svgEl) {
             const canvas = document.createElement('canvas');
-            canvas.width=1600; canvas.height=1000;
+            canvas.width=1200; canvas.height=750;
             const ctx = canvas.getContext('2d');
-            ctx.fillStyle='#fff'; ctx.fillRect(0,0,1600,1000);
+            ctx.fillStyle='#fff'; ctx.fillRect(0,0,1200,750);
             const blob = new Blob([new XMLSerializer().serializeToString(svgEl)],{type:'image/svg+xml'});
             const url = URL.createObjectURL(blob);
             const img = new Image();
             await new Promise((r,j)=>{img.onload=r;img.onerror=j;img.src=url;});
-            ctx.drawImage(img,0,0,1600,1000);
+            ctx.drawImage(img,0,0,1200,750);
             URL.revokeObjectURL(url);
             // Fit to page (full landscape) - USE JPEG FOR SMALLER FILE SIZE
-            doc.addImage(canvas.toDataURL('image/jpeg', 0.7),'JPEG',5,5,320.2,205.9);
+            doc.addImage(canvas.toDataURL('image/jpeg', 0.5),'JPEG',5,5,320.2,205.9);
           }
           document.body.removeChild(container);
         }
