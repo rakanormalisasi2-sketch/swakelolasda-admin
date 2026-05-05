@@ -596,34 +596,15 @@ function RootPageContent() {
               </h3>
               
               {yearlyStats ? (() => {
-                const target = yearlyStats.target;
-                const dev = yearlyStats.totalPanjang - target;
-                const devPct = target > 0 ? (Math.abs(dev) / target * 100).toFixed(1) : 0;
                 return (
                   <div style={{ display: 'grid', gap: '16px' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', borderBottom: '1px solid rgba(255,255,255,0.2)', paddingBottom: 8 }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', borderBottom: '1px solid rgba(255,255,255,0.2)', paddingBottom: 16 }}>
                       <span style={{ fontSize: 13, opacity: 0.8 }}>Total Panjang</span>
                       <span style={{ fontSize: 24, fontWeight: 900 }}>{yearlyStats.totalPanjang.toLocaleString('id-ID')} <span style={{ fontSize: 14, fontWeight: 'normal' }}>meter</span></span>
                     </div>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', opacity: 0.9 }}>
-                      <span style={{ fontSize: 13 }}>Target Tahun {tahun}</span>
-                      <span style={{ fontSize: 16, fontWeight: 'bold' }}>{target.toLocaleString('id-ID')} meter</span>
-                    </div>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                      <span style={{ fontSize: 13 }}>Deviasi</span>
-                      <span style={{ fontSize: 13, fontWeight: 'bold', background: dev < 0 ? '#ef4444' : '#10b981', padding: '2px 8px', borderRadius: 4 }}>
-                        {target > 0 ? (dev < 0 ? `Kurang ${Math.abs(dev).toLocaleString('id-ID')}m (${devPct}%)` : `Surplus ${dev.toLocaleString('id-ID')}m (+${devPct}%)`) : 'Target belum diset'}
-                      </span>
-                    </div>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 8 }}>
-                      <div style={{ background: 'rgba(255,255,255,0.1)', padding: '8px 12px', borderRadius: 8 }}>
-                        <div style={{ fontSize: 11, opacity: 0.8 }}>Total Lokasi</div>
-                        <div style={{ fontSize: 16, fontWeight: 'bold' }}>{yearlyStats.lokasi}</div>
-                      </div>
-                      <div style={{ background: 'rgba(255,255,255,0.1)', padding: '8px 12px', borderRadius: 8, textAlign: 'right' }}>
-                        <div style={{ fontSize: 11, opacity: 0.8 }}>Total Solar</div>
-                        <div style={{ fontSize: 16, fontWeight: 'bold' }}>{yearlyStats.totalSolar.toLocaleString('id-ID')} Liter</div>
-                      </div>
+                      <span style={{ fontSize: 13, opacity: 0.8 }}>Total Lokasi Pekerjaan</span>
+                      <span style={{ fontSize: 18, fontWeight: 'bold' }}>{yearlyStats.lokasi}</span>
                     </div>
                   </div>
                 );
