@@ -85,10 +85,14 @@ export default function ChecklistNormalisasi() {
   async function deleteRow(id) {
     if (!confirm('Yakin hapus baris ini?')) return;
     try {
-      await fetch(`/api/checklist-normalisasi?id=${id}`, { method: 'DELETE' });
+      const res = await fetch(`/api/checklist-normalisasi?id=${id}`, { method: 'DELETE' });
+      if (!res.ok) {
+        const errData = await res.json().catch(()=>({}));
+        throw new Error(errData.error || 'Gagal dari server');
+      }
       setData(data.filter(d => d.id !== id));
     } catch (e) {
-      alert('Gagal hapus baris');
+      alert('Gagal hapus baris: ' + e.message);
     }
   }
 

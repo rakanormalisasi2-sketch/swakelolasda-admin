@@ -12,18 +12,26 @@ export function generatePrintableSVG(staData, kopData, options = {}) {
 export function generateAllSVGs(rapState) {
   const { geometri, backupPelaksanaan } = rapState;
   const svgs = [];
-  geometri.stas?.forEach((sta, i) => {
+  
+  // LIMIT TO 3 STAS PER JENIS to prevent massive exports (e.g. 100MB files)
+  const maxStas = 3;
+
+  const stasRen = geometri.stas?.slice(0, maxStas) || [];
+  stasRen.forEach((sta, i) => {
     svgs.push({ jenis: 'PERENCANAAN', sta: sta.sta, index: i,
       svg: generatePrintableSVG({ dimensi: { b1: sta.b1, b2: sta.b2, b3: sta.b3, h: sta.h, hPrime: sta.hPrime, slope: geometri.slope }, luasGalian: sta.luas },
-        { ...geometri.kopData, sta: sta.sta, noLembar: i+1, jumlahLembar: geometri.stas?.length||5, jenis: 'PERENCANAAN' }, { jenis: 'PERENCANAAN' })
+        { ...geometri.kopData, sta: sta.sta, noLembar: i+1, jumlahLembar: stasRen.length, jenis: 'PERENCANAAN' }, { jenis: 'PERENCANAAN' })
     });
   });
-  backupPelaksanaan.stas?.forEach((sta, i) => {
+
+  const stasPel = backupPelaksanaan.stas?.slice(0, maxStas) || [];
+  stasPel.forEach((sta, i) => {
     svgs.push({ jenis: 'PELAKSANAAN', sta: sta.sta, index: i,
       svg: generatePrintableSVG({ dimensi: { b1: sta.b1, b2: sta.b2, b3: sta.b3, h: sta.h, hPrime: sta.hPrime, slope: geometri.slope }, luasGalian: sta.luas },
-        { ...geometri.kopData, sta: sta.sta, noLembar: i+1, jumlahLembar: backupPelaksanaan.stas?.length||5, jenis: 'PELAKSANAAN' }, { jenis: 'PELAKSANAAN' })
+        { ...geometri.kopData, sta: sta.sta, noLembar: i+1, jumlahLembar: stasPel.length, jenis: 'PELAKSANAAN' }, { jenis: 'PELAKSANAAN' })
     });
   });
+
   return svgs;
 }
 

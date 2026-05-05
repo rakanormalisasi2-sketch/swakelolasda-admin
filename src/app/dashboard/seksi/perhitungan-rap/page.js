@@ -382,6 +382,8 @@ export default function RapWizard() {
               hmAkhir: d.hm_akhir || '',
               bbmDiterima: bbmReceived,
               assignmentId: d.assignment_id,
+              desa,
+              kec,
             };
           }));
         } else {
@@ -520,8 +522,8 @@ export default function RapWizard() {
     const maxDate = dates[dates.length - 1];
     const tahun = minDate.getFullYear();
 
-    const desa = selectedLogs[0]?.assignment?.location_village || '';
-    const kec = selectedLogs[0]?.assignment?.location_district || '';
+    const desa = selectedLogs[0]?.desa || '';
+    const kec = selectedLogs[0]?.kec || '';
     const pekerjaan = selectedLogs[0]?.keterangan || kopData.pekerjaan || 'Normalisasi Sungai';
 
     const jamTotal = selectedLogs.reduce((acc, d) => acc + (d.jam || 0), 0);
