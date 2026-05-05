@@ -212,6 +212,10 @@ function RootPageContent() {
   const [filterStatus, setFilterStatus] = useState('semua');
   const [filterSearch, setFilterSearch] = useState('');
 
+  // Accordion states
+  const [isPekerjaanAktifOpen, setIsPekerjaanAktifOpen] = useState(false);
+  const [isAlatBeroperasiOpen, setIsAlatBeroperasiOpen] = useState(false);
+
   // Role-based redirect
   useEffect(() => {
     if (authLoading) return;
@@ -546,53 +550,62 @@ function RootPageContent() {
 
         {/* Recent assignments — filtered */}
         <section className="card public-activity-card">
-          <div className="card-header public-card-header-split">
+          <div 
+            className="card-header public-card-header-split" 
+            style={{ cursor: 'pointer', transition: 'background 0.2s', userSelect: 'none' }}
+            onClick={() => setIsPekerjaanAktifOpen(!isPekerjaanAktifOpen)}
+          >
             <div>
               <span className="card-title">Pekerjaan Aktif {filterKecamatan !== 'semua' || filterSearch ? '(Terfilter)' : 'Terbaru'}</span>
               <div className="header-subtitle">Ditampilkan dalam versi ringkas untuk publik</div>
             </div>
-            <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-              <span className="public-assignment-count">{filteredAssignments.length} pekerjaan</span>
-              <Link href="/login" className="public-inline-login">Login Internal</Link>
+            <div style={{ display: 'flex', gap: 16, alignItems: 'center' }}>
+              <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                <span className="public-assignment-count">{filteredAssignments.length} pekerjaan</span>
+                <Link href="/login" className="public-inline-login" onClick={(e) => e.stopPropagation()}>Login Internal</Link>
+              </div>
+              <svg style={{ transform: isPekerjaanAktifOpen ? 'rotate(180deg)' : 'rotate(0deg)', transition: 'transform 0.3s' }} width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#64748b" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="6 9 12 15 18 9"></polyline></svg>
             </div>
           </div>
-          <div className="card-body public-activity-list">
-            {pageLoading ? (
-              <div className="empty-state">
-                <h3>Memuat data publik...</h3>
-              </div>
-            ) : filteredAssignments.length === 0 ? (
-              <div className="empty-state">
-                <h3>Tidak ada pekerjaan yang cocok dengan filter</h3>
-                <p>Coba ubah filter kecamatan atau kata kunci pencarian.</p>
-              </div>
-            ) : (
-              filteredAssignments.map(item => {
-                const equipment = Array.isArray(item.equipment) ? item.equipment[0] : item.equipment;
-                const locKec = item.location_district_override || item.location_district;
-                const sectionLabel = item.created_by_role === 'seksi_embung' ? 'Embung' : 'Normalisasi';
-                const statusLabel = equipment?.status || 'operating';
-                return (
-                  <article className="public-activity-item" key={item.id}>
-                    <div className="public-activity-top">
-                      <span className={`badge ${item.job_type === 'embung' ? 'badge-success' : 'badge-primary'}`}>
-                        {JOB_LABELS[item.job_type] || sectionLabel}
-                      </span>
-                      <span className={`badge ${STATUS_BADGE_CLASS[statusLabel] || 'badge-warning'}`}>
-                        {statusLabel === 'maintenance' ? 'Alat Maintenance' : statusLabel === 'ready' ? 'Alat Ready' : 'Alat Beroperasi'}
-                      </span>
-                    </div>
-                    <h3>{item.job_sub_type || JOB_LABELS[item.job_type] || 'Pekerjaan Lapangan'}</h3>
-                    <div style={{fontSize: '13px', color: 'var(--text-muted)', marginTop: '6px', display: 'flex', flexDirection: 'column', gap: '3px'}}>
-                      <div><strong>Lokasi:</strong> Desa {item.location_village || '—'}, Kec. {locKec || '—'}</div>
-                      <div><strong>Armada:</strong> {equipment ? `(${equipment.nomor_lambung||'-'}) ${equipment.merk_type||''} - ${equipment.name}` : '—'}</div>
-                      <div><strong>Personil:</strong> Op. {item.operator?.full_name || '—'}{item.helper?.full_name ? ` & Hp. ${item.helper.full_name}` : ''}</div>
-                    </div>
-                  </article>
-                );
-              })
-            )}
-          </div>
+          {isPekerjaanAktifOpen && (
+            <div className="card-body public-activity-list">
+              {pageLoading ? (
+                <div className="empty-state">
+                  <h3>Memuat data publik...</h3>
+                </div>
+              ) : filteredAssignments.length === 0 ? (
+                <div className="empty-state">
+                  <h3>Tidak ada pekerjaan yang cocok dengan filter</h3>
+                  <p>Coba ubah filter kecamatan atau kata kunci pencarian.</p>
+                </div>
+              ) : (
+                filteredAssignments.map(item => {
+                  const equipment = Array.isArray(item.equipment) ? item.equipment[0] : item.equipment;
+                  const locKec = item.location_district_override || item.location_district;
+                  const sectionLabel = item.created_by_role === 'seksi_embung' ? 'Embung' : 'Normalisasi';
+                  const statusLabel = equipment?.status || 'operating';
+                  return (
+                    <article className="public-activity-item" key={item.id}>
+                      <div className="public-activity-top">
+                        <span className={`badge ${item.job_type === 'embung' ? 'badge-success' : 'badge-primary'}`}>
+                          {JOB_LABELS[item.job_type] || sectionLabel}
+                        </span>
+                        <span className={`badge ${STATUS_BADGE_CLASS[statusLabel] || 'badge-warning'}`}>
+                          {statusLabel === 'maintenance' ? 'Alat Maintenance' : statusLabel === 'ready' ? 'Alat Ready' : 'Alat Beroperasi'}
+                        </span>
+                      </div>
+                      <h3>{item.job_sub_type || JOB_LABELS[item.job_type] || 'Pekerjaan Lapangan'}</h3>
+                      <div style={{fontSize: '13px', color: 'var(--text-muted)', marginTop: '6px', display: 'flex', flexDirection: 'column', gap: '3px'}}>
+                        <div><strong>Lokasi:</strong> Desa {item.location_village || '—'}, Kec. {locKec || '—'}</div>
+                        <div><strong>Armada:</strong> {equipment ? `(${equipment.nomor_lambung||'-'}) ${equipment.merk_type||''} - ${equipment.name}` : '—'}</div>
+                        <div><strong>Personil:</strong> Op. {item.operator?.full_name || '—'}{item.helper?.full_name ? ` & Hp. ${item.helper.full_name}` : ''}</div>
+                      </div>
+                    </article>
+                  );
+                })
+              )}
+            </div>
+          )}
         </section>
 
         {/* ── PENCAPAIAN TAHUNAN SECTION ─────────────────────────────── */}
@@ -646,60 +659,69 @@ function RootPageContent() {
 
           {/* (1) ALAT BEROPERASI — full width, tampilkan operator di dalamnya */}
           <div className="card" style={{ marginBottom: 20 }}>
-            <div className="card-header" style={{ background: '#fef3c7' }}>
-              <span className="card-title">🚜 Alat Beroperasi ({operatingEquipments.length})</span>
-              <div className="header-subtitle">Armada yang sedang aktif di lapangan beserta operatornya</div>
-            </div>
-            <div className="card-body" style={{ padding: '0' }}>
-              <div style={{ overflowX: 'auto' }}>
-                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
-                  <thead style={{ background: '#fffbeb' }}>
-                    <tr>
-                      <th style={{ padding: '10px 16px', textAlign: 'left', borderBottom: '2px solid #fde68a', color: '#92400e', fontWeight: 700 }}>Alat Berat</th>
-                      <th style={{ padding: '10px 16px', textAlign: 'left', borderBottom: '2px solid #fde68a', color: '#92400e', fontWeight: 700 }}>No. Lambung</th>
-                      <th style={{ padding: '10px 16px', textAlign: 'left', borderBottom: '2px solid #fde68a', color: '#92400e', fontWeight: 700 }}>Operator</th>
-                      <th style={{ padding: '10px 16px', textAlign: 'left', borderBottom: '2px solid #fde68a', color: '#92400e', fontWeight: 700 }}>Lokasi</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {pageLoading ? (
-                      <tr><td colSpan={4} style={{ padding: '24px', textAlign: 'center', color: '#64748b' }}>Memuat data...</td></tr>
-                    ) : operatingEquipments.length === 0 ? (
-                      <tr><td colSpan={4} style={{ padding: '24px', textAlign: 'center', color: '#64748b' }}>Tidak ada alat sedang beroperasi</td></tr>
-                    ) : operatingEquipments.map(eq => {
-                      const asgn = overview.assignmentList?.find(a => a.equipment_id === eq.id);
-                      const locVillage = asgn?.location_village_override || asgn?.location_village;
-                      const locDistrict = asgn?.location_district_override || asgn?.location_district;
-                      return (
-                        <tr key={eq.id} style={{ borderBottom: '1px solid #f1f5f9' }}>
-                          <td style={{ padding: '12px 16px' }}>
-                            <div style={{ fontWeight: 600, color: '#0f172a' }}>{eq.name}</div>
-                            <div style={{ fontSize: '11px', color: '#64748b', marginTop: 2 }}>{eq.merk_type || '—'}</div>
-                          </td>
-                          <td style={{ padding: '12px 16px' }}>
-                            <span style={{ background: '#e2e8f0', color: '#334155', padding: '2px 8px', borderRadius: 4, fontWeight: 700, fontSize: 12 }}>
-                              {eq.nomor_lambung || '-'}
-                            </span>
-                          </td>
-                          <td style={{ padding: '12px 16px' }}>
-                            <div style={{ fontWeight: 500, color: '#1e40af' }}>{asgn?.operator?.full_name || '—'}</div>
-                            {asgn?.helper?.full_name && <div style={{ fontSize: '11px', color: '#64748b', marginTop: 2 }}>Helper: {asgn.helper.full_name}</div>}
-                          </td>
-                          <td style={{ padding: '12px 16px' }}>
-                            {locVillage ? (
-                              <div style={{ fontSize: '12px', color: '#334155' }}>
-                                <div>Desa {locVillage}</div>
-                                <div style={{ color: '#64748b' }}>Kec. {locDistrict || '—'}</div>
-                              </div>
-                            ) : <span style={{ color: '#94a3b8', fontSize: 12 }}>—</span>}
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
+            <div 
+              className="card-header" 
+              style={{ background: '#fef3c7', cursor: 'pointer', display: 'flex', justifyContent: 'space-between', alignItems: 'center', userSelect: 'none' }}
+              onClick={() => setIsAlatBeroperasiOpen(!isAlatBeroperasiOpen)}
+            >
+              <div>
+                <span className="card-title">🚜 Alat Beroperasi ({operatingEquipments.length})</span>
+                <div className="header-subtitle">Armada yang sedang aktif di lapangan beserta operatornya</div>
               </div>
+              <svg style={{ transform: isAlatBeroperasiOpen ? 'rotate(180deg)' : 'rotate(0deg)', transition: 'transform 0.3s' }} width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#92400e" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="6 9 12 15 18 9"></polyline></svg>
             </div>
+            {isAlatBeroperasiOpen && (
+              <div className="card-body" style={{ padding: '0' }}>
+                <div style={{ overflowX: 'auto' }}>
+                  <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
+                    <thead style={{ background: '#fffbeb' }}>
+                      <tr>
+                        <th style={{ padding: '10px 16px', textAlign: 'left', borderBottom: '2px solid #fde68a', color: '#92400e', fontWeight: 700 }}>Alat Berat</th>
+                        <th style={{ padding: '10px 16px', textAlign: 'left', borderBottom: '2px solid #fde68a', color: '#92400e', fontWeight: 700 }}>No. Lambung</th>
+                        <th style={{ padding: '10px 16px', textAlign: 'left', borderBottom: '2px solid #fde68a', color: '#92400e', fontWeight: 700 }}>Operator</th>
+                        <th style={{ padding: '10px 16px', textAlign: 'left', borderBottom: '2px solid #fde68a', color: '#92400e', fontWeight: 700 }}>Lokasi</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {pageLoading ? (
+                        <tr><td colSpan={4} style={{ padding: '24px', textAlign: 'center', color: '#64748b' }}>Memuat data...</td></tr>
+                      ) : operatingEquipments.length === 0 ? (
+                        <tr><td colSpan={4} style={{ padding: '24px', textAlign: 'center', color: '#64748b' }}>Tidak ada alat sedang beroperasi</td></tr>
+                      ) : operatingEquipments.map(eq => {
+                        const asgn = overview.assignmentList?.find(a => a.equipment_id === eq.id);
+                        const locVillage = asgn?.location_village_override || asgn?.location_village;
+                        const locDistrict = asgn?.location_district_override || asgn?.location_district;
+                        return (
+                          <tr key={eq.id} style={{ borderBottom: '1px solid #f1f5f9' }}>
+                            <td style={{ padding: '12px 16px' }}>
+                              <div style={{ fontWeight: 600, color: '#0f172a' }}>{eq.name}</div>
+                              <div style={{ fontSize: '11px', color: '#64748b', marginTop: 2 }}>{eq.merk_type || '—'}</div>
+                            </td>
+                            <td style={{ padding: '12px 16px' }}>
+                              <span style={{ background: '#e2e8f0', color: '#334155', padding: '2px 8px', borderRadius: 4, fontWeight: 700, fontSize: 12 }}>
+                                {eq.nomor_lambung || '-'}
+                              </span>
+                            </td>
+                            <td style={{ padding: '12px 16px' }}>
+                              <div style={{ fontWeight: 500, color: '#1e40af' }}>{asgn?.operator?.full_name || '—'}</div>
+                              {asgn?.helper?.full_name && <div style={{ fontSize: '11px', color: '#64748b', marginTop: 2 }}>Helper: {asgn.helper.full_name}</div>}
+                            </td>
+                            <td style={{ padding: '12px 16px' }}>
+                              {locVillage ? (
+                                <div style={{ fontSize: '12px', color: '#334155' }}>
+                                  <div>Desa {locVillage}</div>
+                                  <div style={{ color: '#64748b' }}>Kec. {locDistrict || '—'}</div>
+                                </div>
+                              ) : <span style={{ color: '#94a3b8', fontSize: 12 }}>—</span>}
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
           </div>
 
           {/* (2) DAFTAR OPERATOR & DAFTAR ALAT BERAT — side by side */}
