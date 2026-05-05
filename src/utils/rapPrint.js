@@ -405,16 +405,16 @@ export async function printCrossSections(rapState) {
             const svgEl = container.querySelector('svg');
             if (svgEl) {
               const canvas = document.createElement('canvas');
-              canvas.width=1200; canvas.height=750;
+              canvas.width=1800; canvas.height=1125;
               const ctx = canvas.getContext('2d');
-              ctx.fillStyle='#fff'; ctx.fillRect(0,0,1200,750);
+              ctx.fillStyle='#fff'; ctx.fillRect(0,0,1800,1125);
               const blob = new Blob([new XMLSerializer().serializeToString(svgEl)],{type:'image/svg+xml'});
               const url = URL.createObjectURL(blob);
               const img = new Image();
               await new Promise((r,j)=>{img.onload=r;img.onerror=j;img.src=url;});
-              ctx.drawImage(img,0,0,1200,750);
+              ctx.drawImage(img,0,0,1800,1125);
               URL.revokeObjectURL(url);
-              doc.addImage(canvas.toDataURL('image/jpeg', 0.5),'JPEG',5,5,320.2,205.9);
+              doc.addImage(canvas.toDataURL('image/jpeg', 0.65),'JPEG',5,5,320.2,205.9);
             }
             document.body.removeChild(container);
           } catch(imgErr) {

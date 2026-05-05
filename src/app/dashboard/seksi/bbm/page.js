@@ -242,7 +242,16 @@ export default function BBMPage() {
     const sheetName = activeTab === 'pemakaian' ? 'BBM_Keluar' : 'BBM_Masuk';
     XLSX.utils.book_append_sheet(wb, ws, sheetName);
     
-    XLSX.writeFile(wb, `Laporan_${sheetName}_${tahunAnggaran}.xlsx`);
+    const xlOut = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
+    const xlBlob = new Blob([xlOut], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+    const xlUrl = URL.createObjectURL(xlBlob);
+    const a = document.createElement('a');
+    a.href = xlUrl;
+    a.download = `Laporan_${sheetName}_${tahunAnggaran}.xlsx`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    setTimeout(() => URL.revokeObjectURL(xlUrl), 1000);
   };
 
   const totalPengadaan = bbmPengadaan.reduce((sum, item) => sum + Number(item.jumlah_liter), 0);

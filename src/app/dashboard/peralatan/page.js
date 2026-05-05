@@ -360,7 +360,16 @@ export default function PeralatanPage() {
     const worksheet = XLSX.utils.json_to_sheet(wsData);
     const workbook = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(workbook, worksheet, "Arsip_Servis");
-    XLSX.writeFile(workbook, "Arsip_Riwayat_Mekanik.xlsx");
+    const xlOut = XLSX.write(workbook, { bookType: 'xlsx', type: 'array' });
+    const xlBlob = new Blob([xlOut], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+    const xlUrl = URL.createObjectURL(xlBlob);
+    const a = document.createElement('a');
+    a.href = xlUrl;
+    a.download = 'Arsip_Riwayat_Mekanik.xlsx';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    setTimeout(() => URL.revokeObjectURL(xlUrl), 1000);
   };
 
   const getCondColor = (pct) => pct >= 70 ? 'green' : pct >= 40 ? 'orange' : 'red';

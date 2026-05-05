@@ -432,7 +432,16 @@ export default function LaporanPelaksanaanPage() {
     XLSX.utils.book_append_sheet(workbook, worksheet, "Format_Master_RAB");
 
     // Download!
-    XLSX.writeFile(workbook, `Rekap_RAB_Alat_Berat_${new Date().getTime()}.xlsx`);
+    const xlOut = XLSX.write(workbook, { bookType: 'xlsx', type: 'array' });
+    const xlBlob = new Blob([xlOut], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+    const xlUrl = URL.createObjectURL(xlBlob);
+    const a = document.createElement('a');
+    a.href = xlUrl;
+    a.download = `Rekap_RAB_Alat_Berat_${new Date().getTime()}.xlsx`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    setTimeout(() => URL.revokeObjectURL(xlUrl), 1000);
     setPrintModalInfo({open:false, type:''});
   };
 

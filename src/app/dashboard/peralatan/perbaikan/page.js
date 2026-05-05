@@ -117,7 +117,16 @@ export default function RekapPerbaikanPage() {
     const range = filterFrom || filterTo
       ? `_${filterFrom || 'awal'}_sd_${filterTo || 'sekarang'}`
       : '';
-    XLSX.writeFile(wb, `Rekap_Perbaikan_${label}${range}.xlsx`);
+    const xlOut = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
+    const xlBlob = new Blob([xlOut], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+    const xlUrl = URL.createObjectURL(xlBlob);
+    const a = document.createElement('a');
+    a.href = xlUrl;
+    a.download = `Rekap_Perbaikan_${label}${range}.xlsx`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    setTimeout(() => URL.revokeObjectURL(xlUrl), 1000);
   };
 
   // ============ CETAK REKAP PDF ============
