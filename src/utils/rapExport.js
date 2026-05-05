@@ -203,12 +203,20 @@ export async function downloadExcel(data) {
       if (name === 'backup volume rencana') {
          const analisaRen = wb.getWorksheet('ANALISA perencanaan');
          if (analisaRen) {
-             analisaRen.getCell('K42').formula = `='backup volume rencana'!M${y}`;
+           try {
+             analisaRen.getCell('K42').value = { formula: `'backup volume rencana'!M${y}`, result: totalVolRaw };
+           } catch(e) {
+             analisaRen.getCell('K42').value = totalVolRaw;
+           }
          }
       } else {
          const analisaPel = wb.getWorksheet('Analisa Pelaksanaan ');
          if (analisaPel) {
-             analisaPel.getCell('K42').formula = `='backup volume Pelaksanaan'!M${y}`;
+           try {
+             analisaPel.getCell('K42').value = { formula: `'backup volume Pelaksanaan'!M${y}`, result: totalVolRaw };
+           } catch(e) {
+             analisaPel.getCell('K42').value = totalVolRaw;
+           }
          }
       }
     });
@@ -302,7 +310,8 @@ export async function downloadExcel(data) {
 
     // 5. Export The Workbook
     const buffer = await wb.xlsx.writeBuffer();
-    saveAs(new Blob([buffer]), `RAP_${kopData?.pekerjaan || 'Proyek'}_${selectedExcavator || 'Alat'}.xlsx`);
+    const safeNameXL = (kopData?.pekerjaan || 'Proyek').replace(/[^a-zA-Z0-9_\- ]/g, '').substring(0, 50);
+    saveAs(new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }), `RAP_${safeNameXL}_${selectedExcavator || 'Alat'}.xlsx`);
 
   } catch (error) {
     console.error('Failed EXCEL generation', error);

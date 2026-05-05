@@ -63,13 +63,17 @@ export async function DELETE(request) {
     
     if (!id) return NextResponse.json({ error: 'ID is required' }, { status: 400 });
 
-    const { error } = await supabaseBBM
+    const { data, error } = await supabaseBBM
       .from('checklist_normalisasi')
       .delete()
-      .eq('id', id);
+      .eq('id', id)
+      .select();
 
     if (error) throw error;
-    return NextResponse.json({ success: true });
+    if (!data || data.length === 0) {
+      return NextResponse.json({ error: 'Baris tidak ditemukan atau gagal dihapus' }, { status: 404 });
+    }
+    return NextResponse.json({ success: true, deleted: data });
   } catch (error) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }

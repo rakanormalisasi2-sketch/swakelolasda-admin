@@ -396,34 +396,38 @@ export async function printCrossSections(rapState) {
         doc.text(title,330.2/2,215.9/2,{align:'center'});
         // Each drawing fit-to-page landscape
         for (const s of items) {
-          doc.addPage([330.2,215.9],'landscape');
-          const container = document.createElement('div');
-          container.innerHTML = s.svg;
-          container.style.cssText = 'position:fixed;left:-9999px;width:1200px;height:750px';
-          document.body.appendChild(container);
-          const svgEl = container.querySelector('svg');
-          if (svgEl) {
-            const canvas = document.createElement('canvas');
-            canvas.width=1200; canvas.height=750;
-            const ctx = canvas.getContext('2d');
-            ctx.fillStyle='#fff'; ctx.fillRect(0,0,1200,750);
-            const blob = new Blob([new XMLSerializer().serializeToString(svgEl)],{type:'image/svg+xml'});
-            const url = URL.createObjectURL(blob);
-            const img = new Image();
-            await new Promise((r,j)=>{img.onload=r;img.onerror=j;img.src=url;});
-            ctx.drawImage(img,0,0,1200,750);
-            URL.revokeObjectURL(url);
-            // Fit to page (full landscape) - USE JPEG FOR SMALLER FILE SIZE
-            doc.addImage(canvas.toDataURL('image/jpeg', 0.5),'JPEG',5,5,320.2,205.9);
+          try {
+            doc.addPage([330.2,215.9],'landscape');
+            const container = document.createElement('div');
+            container.innerHTML = s.svg;
+            container.style.cssText = 'position:fixed;left:-9999px;width:1200px;height:750px';
+            document.body.appendChild(container);
+            const svgEl = container.querySelector('svg');
+            if (svgEl) {
+              const canvas = document.createElement('canvas');
+              canvas.width=1200; canvas.height=750;
+              const ctx = canvas.getContext('2d');
+              ctx.fillStyle='#fff'; ctx.fillRect(0,0,1200,750);
+              const blob = new Blob([new XMLSerializer().serializeToString(svgEl)],{type:'image/svg+xml'});
+              const url = URL.createObjectURL(blob);
+              const img = new Image();
+              await new Promise((r,j)=>{img.onload=r;img.onerror=j;img.src=url;});
+              ctx.drawImage(img,0,0,1200,750);
+              URL.revokeObjectURL(url);
+              doc.addImage(canvas.toDataURL('image/jpeg', 0.5),'JPEG',5,5,320.2,205.9);
+            }
+            document.body.removeChild(container);
+          } catch(imgErr) {
+            console.warn('Skip CAD image:', imgErr.message);
           }
-          document.body.removeChild(container);
         }
       };
       await renderCADSection('LAMPIRAN GAMBAR TEKNIK PERENCANAAN', perencanaan);
       await renderCADSection('LAMPIRAN GAMBAR TEKNIK PELAKSANAAN', pelaksanaan);
     } catch(e) { console.warn('CAD error:', e); }
 
-    doc.save(`RAP_${kopData?.pekerjaan||'Proyek'}.pdf`);
+    const safeName = (kopData?.pekerjaan||'Proyek').replace(/[^a-zA-Z0-9_\- ]/g, '').substring(0,50);
+    doc.save(`RAP_${safeName}.pdf`);
   } catch(err) {
     console.error('PDF Error:', err);
     alert('Error PDF: ' + err.message);
