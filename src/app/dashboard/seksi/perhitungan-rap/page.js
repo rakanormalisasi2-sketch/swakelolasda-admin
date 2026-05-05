@@ -168,7 +168,15 @@ export default function RapWizard() {
       const savedSig = localStorage.getItem('rap_signature_data');
       if (savedSig) {
         const sig = JSON.parse(savedSig);
-        setKopData(prev => ({ ...prev, ...sig }));
+        setKopData(prev => ({ 
+          ...prev, 
+          jabatanMenyetujui: sig.jabatanMenyetujui || prev.jabatanMenyetujui,
+          namaMenyetujui: sig.namaMenyetujui || '',
+          nipMenyetujui: sig.nipMenyetujui || '',
+          jabatanMengetahui: sig.jabatanMengetahui || prev.jabatanMengetahui,
+          namaMengetahui: sig.namaMengetahui || '',
+          nipMengetahui: sig.nipMengetahui || '',
+        }));
       }
     } catch {}
   }, []);
@@ -181,22 +189,7 @@ export default function RapWizard() {
     } catch {}
   }, [hargaBBM, hargaPenjaga]);
 
-  // Auto-save signature data to localStorage
-  useEffect(() => {
-    try {
-      const sigData = {
-        pekerjaan: kopData.pekerjaan,
-        lokasi: kopData.lokasi,
-        jabatanMenyetujui: kopData.jabatanMenyetujui,
-        namaMenyetujui: kopData.namaMenyetujui,
-        nipMenyetujui: kopData.nipMenyetujui,
-        jabatanMengetahui: kopData.jabatanMengetahui,
-        namaMengetahui: kopData.namaMengetahui,
-        nipMengetahui: kopData.nipMengetahui,
-      };
-      localStorage.setItem('rap_signature_data', JSON.stringify(sigData));
-    } catch {}
-  }, [kopData]);
+  // Signature data is saved manually during finalization actions
 
   // ════════════════════════════════════
   // DERIVED CALCULATIONS (Real-time)
@@ -466,10 +459,12 @@ export default function RapWizard() {
       selectedExcavator: selectedExcavator === 'LAINNYA' ? customAlat || 'Alat Berat' : selectedExcavator
     };
     
+    saveSignatureData();
     printCrossSections(rapStateForPrint);
   };
 
   const handleExportExcel = () => {
+    saveSignatureData();
     const stasRencana = generateSTAPerencanaan({ ...geometri, b1: geometri.b1, b3: geometri.b3, h: geometri.h, hPrime: geometri.hGalian, panjang: geometri.panjang });
     
     const stasPelaksanaanXL = generateSTAPelaksanaan(stasRencana.stas, totalVolume);
@@ -497,7 +492,22 @@ export default function RapWizard() {
     });
   };
 
+  const saveSignatureData = () => {
+    try {
+      const sigData = {
+        jabatanMenyetujui: kopData.jabatanMenyetujui,
+        namaMenyetujui: kopData.namaMenyetujui,
+        nipMenyetujui: kopData.nipMenyetujui,
+        jabatanMengetahui: kopData.jabatanMengetahui,
+        namaMengetahui: kopData.namaMengetahui,
+        nipMengetahui: kopData.nipMengetahui,
+      };
+      localStorage.setItem('rap_signature_data', JSON.stringify(sigData));
+    } catch {}
+  };
+
   const handleTeruskanChecklist = async () => {
+    saveSignatureData();
     const selectedLogs = dailyData.filter(d => checkedIds.has(d.id));
     if (selectedLogs.length === 0) {
       alert('Pilih minimal satu log pekerjaan untuk diteruskan ke checklist.');
@@ -800,7 +810,7 @@ export default function RapWizard() {
                       </div>
                     </div>
                     <div className="mt-3 p-2 bg-emerald-50 border border-emerald-200 rounded-lg">
-                      <p className="text-[10px] text-emerald-700">✅ Data tanda tangan otomatis tersimpan sebagai default untuk laporan berikutnya.</p>
+                      <p className="text-[10px] text-emerald-700">✅ Data tanda tangan akan otomatis tersimpan sebagai default saat Anda menekan tombol Cetak, XLSX, atau Teruskan ke Checklist.</p>
                     </div>
                   </Section>
                 </div>
