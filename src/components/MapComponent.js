@@ -135,6 +135,8 @@ function buildPopupHtml(item) {
       Buka Rute di Google Maps
     </a>` : '';
 
+  const editBtn = `<button class="map-popup-edit-btn" data-eq-id="${item.id}" style="width:100%;margin-top:6px;padding:6px 10px;background:#fef3c7;color:#92400e;border:1px solid #fcd34d;border-radius:6px;font-size:11px;font-weight:600;cursor:pointer;text-align:center;">✏️ Edit Kondisi Alat</button>`;
+
   return `<div class="map-popup">
     <div class="map-popup-header">
       <div style="flex:1;">
@@ -145,6 +147,7 @@ function buildPopupHtml(item) {
     </div>
     <div class="map-popup-body">${rows.join('')}</div>
     ${routeBtn}
+    ${editBtn}
   </div>`;
 }
 
@@ -189,7 +192,7 @@ function loadDependencies() {
   return loadDependenciesPromise;
 }
 
-export default function MapComponent({ mapItems, previewMode = false }) {
+export default function MapComponent({ mapItems, previewMode = false, focusCoord = null, onMarkerEdit = null }) {
   const mapRef = useRef(null);
   const mapInstanceRef = useRef(null);
   const clusterGroupRef = useRef(null);
@@ -240,6 +243,26 @@ export default function MapComponent({ mapItems, previewMode = false }) {
     renderMarkers(window.L, mapInstanceRef.current, clusterGroupRef.current, safeItems);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [mapItems]);
+
+  // Focus on specific coordinate when focusCoord changes
+  useEffect(() => {
+    if (!focusCoord || !mapInstanceRef.current) return;
+    mapInstanceRef.current.setView([focusCoord.lat, focusCoord.lng], 15, { animate: true });
+  }, [focusCoord]);
+
+  // Listen for edit button clicks in popups
+  useEffect(() => {
+    if (!onMarkerEdit) return;
+    const handler = (e) => {
+      const btn = e.target.closest('.map-popup-edit-btn');
+      if (btn) {
+        const eqId = btn.getAttribute('data-eq-id');
+        if (eqId) onMarkerEdit(eqId);
+      }
+    };
+    document.addEventListener('click', handler);
+    return () => document.removeEventListener('click', handler);
+  }, [onMarkerEdit]);
 
   function renderMarkers(L, map, clusterGroup, items) {
     clusterGroup.clearLayers();

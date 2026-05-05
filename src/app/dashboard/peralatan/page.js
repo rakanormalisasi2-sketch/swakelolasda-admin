@@ -45,7 +45,8 @@ export default function PeralatanPage() {
         *,
         assignments (
           id, status, job_type, location_district, location_village,
-          operator:user_profiles!assignments_operator_id_fkey(full_name)
+          operator:user_profiles!assignments_operator_id_fkey(full_name),
+          helper:user_profiles!assignments_helper_id_fkey(full_name)
         )
       `).order('name');
       
@@ -448,7 +449,7 @@ export default function PeralatanPage() {
                 ) : (
                   <table>
                     <thead>
-                      <tr><th>No. Lambung</th><th>Nama Alat</th><th>Merk / Tipe</th><th>Status</th><th>Posisi Penugasan</th><th>Kondisi (%)</th><th>Tiket Servis</th><th>Pengaturan</th></tr>
+                      <tr><th>No. Lambung</th><th>Nama Alat</th><th>Merk / Tipe</th><th>Status</th><th>Personil</th><th>Posisi Penugasan</th><th>Kondisi (%)</th><th>Tiket Servis</th><th>Pengaturan</th></tr>
                     </thead>
                     <tbody>
                       {filteredAlat.map(a => {
@@ -460,6 +461,18 @@ export default function PeralatanPage() {
                             <td className="font-semibold">{a.name}</td>
                             <td className="text-muted text-sm">{a.merk_type || '—'}</td>
                             <td><span className={`badge ${statusObj.badge}`}><span className="badge-dot"/>{statusObj.label}</span></td>
+                            <td>
+                              {(() => {
+                                const act = a.assignments?.find(asg => asg.status === 'active');
+                                if (!act) return <span className="text-xs text-muted">—</span>;
+                                return (
+                                  <div style={{lineHeight:1.5}}>
+                                    <div style={{fontSize:12}}><span style={{color:'#64748b',fontSize:10}}>👤</span> {act.operator?.full_name || '—'}</div>
+                                    <div style={{fontSize:11,color:'#64748b'}}><span style={{fontSize:10}}>🤝</span> {act.helper?.full_name || '—'}</div>
+                                  </div>
+                                );
+                              })()}
+                            </td>
                             <td>
                               {a.status === 'operating' ? (() => {
                                  const act = a.assignments?.find(asg => asg.status === 'active');
