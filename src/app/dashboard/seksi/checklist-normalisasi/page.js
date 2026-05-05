@@ -166,7 +166,15 @@ export default function ChecklistNormalisasi() {
       headStyles: { fillColor: [0, 52, 111], textColor: [255, 255, 255], fontStyle: 'bold' }
     });
     
-    doc.save(`Checklist_Normalisasi_${tahun}.pdf`);
+    const pdfBlob = doc.output('blob');
+    const pdfUrl = URL.createObjectURL(pdfBlob);
+    const a = document.createElement('a');
+    a.href = pdfUrl;
+    a.download = `Checklist_Normalisasi_${tahun}.pdf`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    setTimeout(() => URL.revokeObjectURL(pdfUrl), 1000);
   }
 
   async function exportExcel() {
@@ -221,7 +229,15 @@ export default function ChecklistNormalisasi() {
     ];
     
     const buffer = await wb.xlsx.writeBuffer();
-    saveAs(new Blob([buffer]), `Checklist_Normalisasi_${tahun}.xlsx`);
+    const xlBlob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+    const xlUrl = URL.createObjectURL(xlBlob);
+    const a = document.createElement('a');
+    a.href = xlUrl;
+    a.download = `Checklist_Normalisasi_${tahun}.xlsx`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    setTimeout(() => URL.revokeObjectURL(xlUrl), 1000);
   }
 
   const Th = ({ children, w }) => <th style={{ padding:'12px 8px', border:'1px solid #c2c6d3', background:'#f8f9ff', color:'#00346f', fontSize:12, fontWeight:600, textAlign:'center', width: w }}>{children}</th>;

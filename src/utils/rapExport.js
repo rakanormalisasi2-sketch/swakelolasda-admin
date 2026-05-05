@@ -311,7 +311,15 @@ export async function downloadExcel(data) {
     // 5. Export The Workbook
     const buffer = await wb.xlsx.writeBuffer();
     const safeNameXL = (kopData?.pekerjaan || 'Proyek').replace(/[^a-zA-Z0-9_\- ]/g, '').substring(0, 50);
-    saveAs(new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }), `RAP_${safeNameXL}_${selectedExcavator || 'Alat'}.xlsx`);
+    const xlBlob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+    const xlUrl = URL.createObjectURL(xlBlob);
+    const a = document.createElement('a');
+    a.href = xlUrl;
+    a.download = `RAP_${safeNameXL}_${selectedExcavator || 'Alat'}.xlsx`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    setTimeout(() => URL.revokeObjectURL(xlUrl), 1000);
 
   } catch (error) {
     console.error('Failed EXCEL generation', error);

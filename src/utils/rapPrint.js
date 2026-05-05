@@ -427,7 +427,15 @@ export async function printCrossSections(rapState) {
     } catch(e) { console.warn('CAD error:', e); }
 
     const safeName = (kopData?.pekerjaan||'Proyek').replace(/[^a-zA-Z0-9_\- ]/g, '').substring(0,50);
-    doc.save(`RAP_${safeName}.pdf`);
+    const pdfBlob = doc.output('blob');
+    const pdfUrl = URL.createObjectURL(pdfBlob);
+    const a = document.createElement('a');
+    a.href = pdfUrl;
+    a.download = `RAP_${safeName}.pdf`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    setTimeout(() => URL.revokeObjectURL(pdfUrl), 1000);
   } catch(err) {
     console.error('PDF Error:', err);
     alert('Error PDF: ' + err.message);
