@@ -10,7 +10,7 @@ const templateMap = {
   'PC200 LONG ARM': '/PC200LA.xlsx',
 };
 
-const svgToPngBase64 = (svgString) => {
+const svgToJpegBase64 = (svgString) => {
   return new Promise((resolve, reject) => {
     try {
       const img = new Image();
@@ -29,7 +29,7 @@ const svgToPngBase64 = (svgString) => {
         ctx.fillRect(0, 0, canvas.width, canvas.height);
         ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
         URL.revokeObjectURL(url);
-        resolve(canvas.toDataURL('image/png').split(',')[1]);
+        resolve(canvas.toDataURL('image/jpeg', 0.7).split(',')[1]);
       };
       img.onerror = (e) => reject(e);
       img.src = url;
@@ -269,16 +269,16 @@ export async function downloadExcel(data) {
     // 4. Tambahkan Gambar CAD sebagai Lampiran
     try {
       const svgs = generateAllSVGs(data);
-      const pngBase64List = await Promise.all(svgs.map(s => svgToPngBase64(s.svg)));
+      const jpegBase64List = await Promise.all(svgs.map(s => svgToJpegBase64(s.svg)));
       
       const cadSheet = wb.addWorksheet('LAMPIRAN CAD', {
         pageSetup: { paperSize: 9, orientation: 'landscape', fitToPage: true }
       });
 
-      pngBase64List.forEach((base64, idx) => {
+      jpegBase64List.forEach((base64, idx) => {
         const imageId = wb.addImage({
           base64: base64,
-          extension: 'png',
+          extension: 'jpeg',
         });
         
         // Satu gambar satu lembar (Page Break)
@@ -292,7 +292,7 @@ export async function downloadExcel(data) {
         cadSheet.getCell(startRow + 1, 2).value = title;
         cadSheet.getCell(startRow + 1, 2).font = { bold: true, size: 14 };
         
-        if (idx < pngBase64List.length - 1) {
+        if (idx < jpegBase64List.length - 1) {
           cadSheet.getRow(startRow + 44).addPageBreak();
         }
       });
