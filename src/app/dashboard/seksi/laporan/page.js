@@ -71,6 +71,7 @@ export default function LaporanPelaksanaanPage() {
   const [filterTab, setFilterTab] = useState('semua');
   const [printModalInfo, setPrintModalInfo] = useState({ open: false, type: '' });
   const [printSelectedIds, setPrintSelectedIds] = useState([]);
+  const [batchDeleteIds, setBatchDeleteIds] = useState([]); // Batch delete state
   const [customPrintPekerjaan, setCustomPrintPekerjaan] = useState('');
   
   const [dokModalOpen, setDokModalOpen] = useState(false);
@@ -229,6 +230,35 @@ export default function LaporanPelaksanaanPage() {
     setSaving(false);
     if (error) alert('Gagal menghapus baris: ' + error.message);
     else loadData();
+  };
+
+  // Batch Delete Functions
+  const toggleBatchDelete = (id) => {
+    setBatchDeleteIds(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]);
+  };
+
+  const toggleBatchDeleteAll = (groupIds) => {
+    const allSelected = groupIds.every(id => batchDeleteIds.includes(id));
+    if (allSelected) {
+      setBatchDeleteIds(prev => prev.filter(id => !groupIds.includes(id)));
+    } else {
+      const n = [...batchDeleteIds];
+      groupIds.forEach(id => { if (!n.includes(id)) n.push(id); });
+      setBatchDeleteIds(n);
+    }
+  };
+
+  const handleDeleteBatch = async () => {
+    if (batchDeleteIds.length === 0) return;
+    if (!confirm(`Apakah Anda yakin ingin menghapus ${batchDeleteIds.length} laporan yang dipilih?`)) return;
+    setSaving(true);
+    const { error } = await supabase.from('operator_logs').delete().in('id', batchDeleteIds);
+    setSaving(false);
+    if (error) alert('Gagal menghapus baris: ' + error.message);
+    else {
+      setBatchDeleteIds([]);
+      loadData();
+    }
   };
 
   const handleUploadTambahan = async (event, logId, type = 'lapangan') => {
@@ -914,6 +944,11 @@ export default function LaporanPelaksanaanPage() {
         </div>
         <div className="header-right" style={{display:'flex', gap: 8, flexWrap:'wrap', justifyContent:'flex-end'}}>
            {saving && <span style={{marginRight: 10, color:'#1e3a5f', fontWeight:'bold', display:'flex', alignItems:'center'}}>💾 Memproses...</span>}
+           {batchDeleteIds.length > 0 && (
+             <button className="btn btn-danger" onClick={handleDeleteBatch} style={{background:'#dc3545', color:'white', border:'none', padding:'8px 16px', borderRadius:6, cursor:'pointer', fontWeight:'bold'}}>
+               🗑️ Hapus Terpilih ({batchDeleteIds.length})
+             </button>
+           )}
            <button className="btn btn-outline" onClick={() => openPrintModal('harian')}>📄 Cetak Harian</button>
            <button className="btn btn-outline" onClick={() => openPrintModal('mingguan')}>📘 Cetak Mingguan</button>
            <button className="btn btn-outline" onClick={openDokumentasi}>📷 Buat Dokumentasi</button>
@@ -951,6 +986,13 @@ export default function LaporanPelaksanaanPage() {
               <table style={{fontSize: 12, borderCollapse:'collapse', minWidth: 1500, whiteSpace:'nowrap'}}>
                 <thead style={{position:'sticky', top:0, zIndex:10}}>
                   <tr style={{background:'#d9ead3', color:'#000'}}>
+                    <th style={{padding:'8px 12px', border:'1px solid #ccc', fontWeight:'bold', textAlign:'center', width:40}}>
+                      <input type="checkbox" onChange={(e) => {
+                        const allIds = Object.values(mainTableGroups).flat().map(l => l.id);
+                        if (e.target.checked) setBatchDeleteIds(allIds);
+                        else setBatchDeleteIds([]);
+                      }} checked={batchDeleteIds.length > 0 && batchDeleteIds.length === Object.values(mainTableGroups).flat().map(l => l.id).length} title="Pilih Semua" />
+                    </th>
                     <th style={{padding:'8px 12px', border:'1px solid #ccc', fontWeight:'bold', textAlign:'center'}}>Aksi</th>
                     <th style={{padding:'8px 12px', border:'1px solid #ccc', fontWeight:'bold'}}>Timestamp</th>
                     <th style={{padding:'8px 12px', border:'1px solid #ccc', fontWeight:'bold'}}>Tanggal</th>
@@ -981,7 +1023,11 @@ export default function LaporanPelaksanaanPage() {
                   {Object.keys(mainTableGroups).map(gId => (
                      <Fragment key={gId}>
                         <tr className="group-header">
-                           <td colSpan={16 + customColumns.length} style={{background:'#e2e8f0', color:'#1e3a5f', padding:'10px 15px', fontWeight:'bold', border:'1px solid #ccc', fontSize:14}}>🗂️ {gId}</td>
+                           <td colSpan={17 + customColumns.length} style={{background:'#e2e8f0', color:'#1e3a5f', padding:'10px 15px', fontWeight:'bold', border:'1px solid #ccc', fontSize:14}}>
+                             <input type="checkbox" style={{marginRight: 8}} onChange={() => toggleBatchDeleteAll(mainTableGroups[gId].map(l => l.id))}
+                               checked={mainTableGroups[gId].every(l => batchDeleteIds.includes(l.id))} onClick={e => e.stopPropagation()} />
+                             🗂️ {gId}
+                           </td>
                         </tr>
                         {mainTableGroups[gId].map(log => {
                            const helper = log.assignment?.helper_override || log.assignment?.helper?.full_name || '';
@@ -991,6 +1037,9 @@ export default function LaporanPelaksanaanPage() {
 
                            return (
                              <tr key={log.id} style={{background: '#fff', color:'#000'}}>
+                               <td style={{padding:'6px 12px', border:'1px solid rgba(0,0,0,0.1)', textAlign:'center', width:30}}>
+                                  <input type="checkbox" checked={batchDeleteIds.includes(log.id)} onChange={() => toggleBatchDelete(log.id)} onClick={e => e.stopPropagation()} />
+                               </td>
                                <td style={{padding:'6px 12px', border:'1px solid rgba(0,0,0,0.1)', textAlign:'center'}}>
                                   <button onClick={() => handleDeleteRow(log.id)} style={{background:'#dc3545', color:'white', border:'none', padding:'4px 8px', borderRadius:4, cursor:'pointer', fontSize:10}}>Hapus</button>
                                </td>

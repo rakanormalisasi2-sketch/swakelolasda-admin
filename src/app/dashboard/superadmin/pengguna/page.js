@@ -13,6 +13,11 @@ export default function KelolapenggnaanPage() {
   const [form, setForm] = useState({ full_name: '', username: '', password: '', role: 'seksi_normalisasi' });
   const [search, setSearch] = useState('');
 
+  // APK Password Config
+  const [apkPasswords, setApkPasswords] = useState({ apk_password_mekanik: '', apk_password_gudang: '' });
+  const [loadingPasswords, setLoadingPasswords] = useState(false);
+  const [savingPasswords, setSavingPasswords] = useState(false);
+
   const loadUsers = useCallback(async () => {
     setLoading(true);
     try {
@@ -25,7 +30,48 @@ export default function KelolapenggnaanPage() {
     }
   }, []);
 
-  useEffect(() => { loadUsers(); }, [loadUsers]);
+  useEffect(() => { loadUsers(); loadApkPasswords(); }, [loadUsers]);
+
+  // Load APK passwords from warehouse DB (DB2)
+  const loadApkPasswords = async () => {
+    setLoadingPasswords(true);
+    try {
+      const res = await fetch('/api/gudang?type=settings');
+      if (res.ok) {
+        const data = await res.json();
+        const settings = data.data || [];
+        const apkPass = {};
+        settings.forEach(s => {
+          if (s.config_key === 'apk_password_mekanik') apkPass.apk_password_mekanik = s.config_value || '';
+          if (s.config_key === 'apk_password_gudang') apkPass.apk_password_gudang = s.config_value || '';
+        });
+        setApkPasswords(apkPass);
+      }
+    } catch (e) {
+      console.warn('Gagal load APK passwords:', e);
+    } finally {
+      setLoadingPasswords(false);
+    }
+  };
+
+  const handleSaveApkPassword = async (key, value) => {
+    setSavingPasswords(true);
+    try {
+      const res = await fetch('/api/gudang', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'update_password', config_key: key, config_value: value })
+      });
+      if (res.ok) {
+        alert('Password APK berhasil diupdate!');
+        loadApkPasswords();
+      } else {
+        alert('Gagal update password');
+      }
+    } finally {
+      setSavingPasswords(false);
+    }
+  };
 
   const openAdd = () => {
     setEditUser(null);
@@ -172,6 +218,77 @@ export default function KelolapenggnaanPage() {
               </table>
             )}
           </div>
+        </div>
+      </div>
+
+      {/* APK Password Configuration Section */}
+      <div className="card" style={{ marginTop: 24 }}>
+        <div className="card-header">
+          <span className="card-title">Konfigurasi Password APK Mobile</span>
+        </div>
+        <div className="card-body">
+          <p style={{ marginBottom: 16, color: '#64748b', fontSize: 13 }}>
+            Konfigurasi password untuk mengakses halaman Mekanik dan Gudang di aplikasi mobile (APK).
+          </p>
+          {loadingPasswords ? (
+            <div style={{ padding: 20, textAlign: 'center', color: '#64748b' }}>Memuat konfigurasi...</div>
+          ) : (
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: 20 }}>
+              {/* Mekanik Password */}
+              <div style={{ padding: 20, border: '1px solid #e2e8f0', borderRadius: 8 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
+                  <div style={{ width: 36, height: 36, background: '#1e3a5f', borderRadius: 8, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white' }}>🔧</div>
+                  <div>
+                    <div style={{ fontWeight: 600, color: '#1e293b' }}>Password Mekanik</div>
+                    <div style={{ fontSize: 12, color: '#64748b' }}>Untuk akses halaman Mekanik di APK</div>
+                  </div>
+                </div>
+                <div style={{ display: 'flex', gap: 8 }}>
+                  <input
+                    type="text"
+                    className="form-control"
+                    value={apkPasswords.apk_password_mekanik}
+                    onChange={e => setApkPasswords({ ...apkPasswords, apk_password_mekanik: e.target.value })}
+                    placeholder="Masukkan password"
+                  />
+                  <button
+                    className="btn btn-primary"
+                    disabled={savingPasswords || !apkPasswords.apk_password_mekanik}
+                    onClick={() => handleSaveApkPassword('apk_password_mekanik', apkPasswords.apk_password_mekanik)}
+                  >
+                    {savingPasswords ? '...' : 'Simpan'}
+                  </button>
+                </div>
+              </div>
+
+              {/* Gudang Password */}
+              <div style={{ padding: 20, border: '1px solid #e2e8f0', borderRadius: 8 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
+                  <div style={{ width: 36, height: 36, background: '#059669', borderRadius: 8, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white' }}>📦</div>
+                  <div>
+                    <div style={{ fontWeight: 600, color: '#1e293b' }}>Password Gudang</div>
+                    <div style={{ fontSize: 12, color: '#64748b' }}>Untuk akses halaman Gudang di APK</div>
+                  </div>
+                </div>
+                <div style={{ display: 'flex', gap: 8 }}>
+                  <input
+                    type="text"
+                    className="form-control"
+                    value={apkPasswords.apk_password_gudang}
+                    onChange={e => setApkPasswords({ ...apkPasswords, apk_password_gudang: e.target.value })}
+                    placeholder="Masukkan password"
+                  />
+                  <button
+                    className="btn btn-primary"
+                    disabled={savingPasswords || !apkPasswords.apk_password_gudang}
+                    onClick={() => handleSaveApkPassword('apk_password_gudang', apkPasswords.apk_password_gudang)}
+                  >
+                    {savingPasswords ? '...' : 'Simpan'}
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
       </div>
 

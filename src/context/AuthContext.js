@@ -76,9 +76,29 @@ export function AuthProvider({ children }) {
             setProfile(null);
             setLoading(false);
           }
+        } else if (data.session) {
+          // Valid session - fetch profile
+          fetchProfile(data.session.user.id).then(prof => {
+            if (!cancelled) {
+              setUser(data.session.user);
+              setProfile(prof);
+              setLoading(false);
+            }
+          }).catch(() => {
+            if (!cancelled) setLoading(false);
+          });
+        } else {
+          if (!cancelled) setLoading(false);
         }
-      }).catch(() => {
-        if (!cancelled) setLoading(false);
+      }).catch((err) => {
+        // Handle refresh token errors gracefully
+        console.warn('Session validation failed:', err?.message);
+        try { localStorage.removeItem(`sb-ratmptlcrjifuplokask-auth-token`); } catch {}
+        if (!cancelled) {
+          setUser(null);
+          setProfile(null);
+          setLoading(false);
+        }
       });
     }
 

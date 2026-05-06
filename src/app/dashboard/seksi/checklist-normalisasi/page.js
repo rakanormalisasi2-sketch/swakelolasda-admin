@@ -14,6 +14,7 @@ export default function ChecklistNormalisasi() {
   const [targetInput, setTargetInput] = useState('');
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [batchDeleteIds, setBatchDeleteIds] = useState([]);
 
   useEffect(() => {
     fetchData();
@@ -93,6 +94,36 @@ export default function ChecklistNormalisasi() {
       setData(data.filter(d => d.id !== id));
     } catch (e) {
       alert('Gagal hapus baris: ' + e.message);
+    }
+  }
+
+  // Batch Delete Functions
+  const toggleBatchDelete = (id) => {
+    setBatchDeleteIds(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]);
+  };
+
+  const toggleBatchDeleteAll = () => {
+    if (batchDeleteIds.length === data.length) {
+      setBatchDeleteIds([]);
+    } else {
+      setBatchDeleteIds(data.map(d => d.id));
+    }
+  };
+
+  async function deleteBatch() {
+    if (batchDeleteIds.length === 0) return;
+    if (!confirm(`Hapus ${batchDeleteIds.length} baris yang dipilih?`)) return;
+    setSaving(true);
+    try {
+      await Promise.all(batchDeleteIds.map(id =>
+        fetch(`/api/checklist-normalisasi?id=${id}`, { method: 'DELETE' })
+      ));
+      setData(data.filter(d => !batchDeleteIds.includes(d.id)));
+      setBatchDeleteIds([]);
+    } catch (e) {
+      alert('Gagal hapus masal');
+    } finally {
+      setSaving(false);
     }
   }
 
@@ -288,6 +319,11 @@ export default function ChecklistNormalisasi() {
             <button onClick={addRow} style={{ padding: '8px 16px', borderRadius: 8, background: '#10b981', color: 'white', display: 'flex', alignItems: 'center', gap: 8, border: 'none', cursor: 'pointer', fontWeight: 600, fontSize: 13 }}>
               <Plus size={16} /> Tambah Data
             </button>
+            {batchDeleteIds.length > 0 && (
+              <button onClick={deleteBatch} style={{ padding: '8px 16px', borderRadius: 8, background: '#dc3545', color: 'white', display: 'flex', alignItems: 'center', gap: 8, border: 'none', cursor: 'pointer', fontWeight: 600, fontSize: 13 }}>
+                <Trash2 size={16} /> Hapus Terpilih ({batchDeleteIds.length})
+              </button>
+            )}
             <div style={{ display:'flex', gap: 8 }}>
               <button onClick={exportPDF} style={{ padding: '8px 16px', borderRadius: 8, background: '#ef4444', color: 'white', display: 'flex', alignItems: 'center', gap: 8, border: 'none', cursor: 'pointer', fontWeight: 600, fontSize: 13 }}>
                 <Printer size={16} /> Unduh PDF
@@ -303,6 +339,9 @@ export default function ChecklistNormalisasi() {
               <table style={{ width: '100%', minWidth: 1400, borderCollapse: 'collapse' }}>
                 <thead>
                   <tr>
+                    <Th w={40}>
+                      <input type="checkbox" onChange={toggleBatchDeleteAll} checked={data.length > 0 && batchDeleteIds.length === data.length} />
+                    </Th>
                     <Th w={40}>No</Th>
                     <Th w={250}>Kegiatan</Th>
                     <Th w={60}>Jam</Th>
@@ -323,10 +362,13 @@ export default function ChecklistNormalisasi() {
                 </thead>
                 <tbody>
                   {data.length === 0 && (
-                    <tr><td colSpan={16} style={{ padding: 24, textAlign: 'center', color: '#64748b' }}>Belum ada data checklist untuk tahun {tahun}</td></tr>
+                    <tr><td colSpan={17} style={{ padding: 24, textAlign: 'center', color: '#64748b' }}>Belum ada data checklist untuk tahun {tahun}</td></tr>
                   )}
                   {data.map((row, i) => (
-                    <tr key={row.id} style={{ transition: 'background 0.2s' }}>
+                    <tr key={row.id} style={{ transition: 'background 0.2s', background: batchDeleteIds.includes(row.id) ? '#fee2e2' : undefined }}>
+                      <td style={{ padding:'8px', border:'1px solid #c2c6d3', textAlign: 'center' }}>
+                        <input type="checkbox" checked={batchDeleteIds.includes(row.id)} onChange={() => toggleBatchDelete(row.id)} />
+                      </td>
                       <Td>{i + 1}</Td>
                       <TdEdit val={row.kegiatan} onChange={v => updateCell(row.id, 'kegiatan', v)} align="left" />
                       <TdEdit val={row.jam_total} type="number" onChange={v => updateCell(row.id, 'jam_total', v)} />

@@ -11,7 +11,9 @@ export default function BBMPage() {
   const [bbmPengadaan, setBbmPengadaan] = useState([]);
   const [assignments, setAssignments] = useState([]); // for dropdown
   const [saving, setSaving] = useState(false);
-  
+  const [batchDeletePemakaian, setBatchDeletePemakaian] = useState([]);
+  const [batchDeletePengadaan, setBatchDeletePengadaan] = useState([]);
+
   // Forms
   const [showModal, setShowModal] = useState(false);
   const [modalType, setModalType] = useState(''); // 'pengadaan' | 'pemakaian'
@@ -189,6 +191,49 @@ export default function BBMPage() {
     } catch(e) {}
   };
 
+  // Batch Delete Functions
+  const toggleBatchPemakaian = (id) => {
+    setBatchDeletePemakaian(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]);
+  };
+
+  const toggleBatchPengadaan = (id) => {
+    setBatchDeletePengadaan(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]);
+  };
+
+  const handleDeleteBatchPemakaian = async () => {
+    if (batchDeletePemakaian.length === 0) return;
+    if (!confirm(`Hapus ${batchDeletePemakaian.length} pemakaian BBM yang dipilih?`)) return;
+    setSaving(true);
+    try {
+      await Promise.all(batchDeletePemakaian.map(id =>
+        fetch(`/api/bbm/pemakaian?id=${id}`, { method: 'DELETE' })
+      ));
+      setBatchDeletePemakaian([]);
+      loadData();
+    } catch(e) {
+      alert('Gagal hapus masal');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleDeleteBatchPengadaan = async () => {
+    if (batchDeletePengadaan.length === 0) return;
+    if (!confirm(`Hapus ${batchDeletePengadaan.length} pengadaan BBM yang dipilih?`)) return;
+    setSaving(true);
+    try {
+      await Promise.all(batchDeletePengadaan.map(id =>
+        fetch(`/api/bbm/pengadaan?id=${id}`, { method: 'DELETE' })
+      ));
+      setBatchDeletePengadaan([]);
+      loadData();
+    } catch(e) {
+      alert('Gagal hapus masal');
+    } finally {
+      setSaving(false);
+    }
+  };
+
   // Group Pemakaian by Assignment/Kegiatan
   const groupedPemakaian = useMemo(() => {
     const groups = {};
@@ -275,6 +320,16 @@ export default function BBMPage() {
             <option value="2026">2026</option>
             <option value="2027">2027</option>
           </select>
+          {activeTab === 'pemakaian' && batchDeletePemakaian.length > 0 && (
+            <button className="btn" onClick={handleDeleteBatchPemakaian} style={{background:'#dc3545', color:'white', border:'none', padding:'8px 16px', borderRadius:6, cursor:'pointer', fontWeight:'bold'}}>
+              🗑️ Hapus Terpilih ({batchDeletePemakaian.length})
+            </button>
+          )}
+          {activeTab === 'pengadaan' && batchDeletePengadaan.length > 0 && (
+            <button className="btn" onClick={handleDeleteBatchPengadaan} style={{background:'#dc3545', color:'white', border:'none', padding:'8px 16px', borderRadius:6, cursor:'pointer', fontWeight:'bold'}}>
+              🗑️ Hapus Terpilih ({batchDeletePengadaan.length})
+            </button>
+          )}
           <button className="btn btn-primary" onClick={() => { setModalType('pemakaian'); setShowModal(true); setFormPemakaian({...formPemakaian, assignment_id:'', tanggal_kirim:'', jumlah_liter:'', keterangan:''})}}>
             + Input Pemakaian
           </button>
@@ -338,11 +393,17 @@ export default function BBMPage() {
                       </div>
                       <table style={{margin:0}}>
                          <thead style={{background:'#fff'}}>
-                           <tr><th width="50">No</th><th width="150">Tgl Kirim</th><th width="150">Jumlah LTR</th><th>Keterangan Tambahan</th><th width="80">Aksi</th></tr>
+                           <tr><th width="30">
+                             <input type="checkbox" onChange={(e) => {
+                               if (e.target.checked) setBatchDeletePemakaian(groupedPemakaian[groupName].items.map(i => i.id));
+                               else setBatchDeletePemakaian(prev => prev.filter(id => !groupedPemakaian[groupName].items.some(i => i.id === id)));
+                             }} checked={groupedPemakaian[groupName].items.every(i => batchDeletePemakaian.includes(i.id))} />
+                           </th><th width="50">No</th><th width="150">Tgl Kirim</th><th width="150">Jumlah LTR</th><th>Keterangan Tambahan</th><th width="80">Aksi</th></tr>
                          </thead>
                          <tbody>
                            {groupedPemakaian[groupName].items.map((item, idx) => (
                              <tr key={item.id}>
+                               <td style={{textAlign:'center'}}><input type="checkbox" checked={batchDeletePemakaian.includes(item.id)} onChange={() => toggleBatchPemakaian(item.id)} /></td>
                                <td style={{textAlign:'center'}}>{idx+1}</td>
                                <td>{new Date(item.tanggal_kirim).toLocaleDateString('id-ID')}</td>
                                <td style={{fontWeight:'bold', color:'#d97706'}}>{item.jumlah_liter}</td>
@@ -351,7 +412,7 @@ export default function BBMPage() {
                              </tr>
                            ))}
                            <tr style={{background:'#fcfdfd'}}>
-                              <td colSpan="2" style={{textAlign:'right', fontWeight:'bold'}}>TOTAL PEMAKAIAN PEKERJAAN INI:</td>
+                              <td colSpan="3" style={{textAlign:'right', fontWeight:'bold'}}>TOTAL PEMAKAIAN PEKERJAAN INI:</td>
                               <td style={{fontWeight:'bold', fontSize:15, color:'#d97706'}}>{groupedPemakaian[groupName].total} Liter</td>
                               <td colSpan="2"></td>
                            </tr>
@@ -363,10 +424,14 @@ export default function BBMPage() {
              ) : (
                 bbmPengadaan.length === 0 ? <div className="text-muted" style={{textAlign:'center', padding:20}}>Belum ada data pengadaan.</div> :
                 <table>
-                  <thead><tr><th>No</th><th>Tanggal Pesan</th><th>Tanggal Terima</th><th>Jumlah Liter</th><th>Keterangan</th><th>Aksi</th></tr></thead>
+                  <thead><tr><th width="30"><input type="checkbox" onChange={(e) => {
+                    if (e.target.checked) setBatchDeletePengadaan(bbmPengadaan.map(i => i.id));
+                    else setBatchDeletePengadaan([]);
+                  }} checked={bbmPengadaan.length > 0 && bbmPengadaan.every(i => batchDeletePengadaan.includes(i.id))} /></th><th>No</th><th>Tanggal Pesan</th><th>Tanggal Terima</th><th>Jumlah Liter</th><th>Keterangan</th><th>Aksi</th></tr></thead>
                   <tbody>
                     {bbmPengadaan.map((item, idx) => (
                       <tr key={item.id}>
+                        <td style={{textAlign:'center'}}><input type="checkbox" checked={batchDeletePengadaan.includes(item.id)} onChange={() => toggleBatchPengadaan(item.id)} /></td>
                         <td style={{textAlign:'center'}}>{idx+1}</td>
                         <td>{new Date(item.tanggal_pesan).toLocaleDateString('id-ID')}</td>
                         <td style={{fontWeight:'bold'}}>{new Date(item.tanggal_terima).toLocaleDateString('id-ID')}</td>

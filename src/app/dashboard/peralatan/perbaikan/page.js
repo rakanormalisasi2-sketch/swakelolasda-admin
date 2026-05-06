@@ -19,6 +19,12 @@ export default function RekapPerbaikanPage() {
   const [editingLog, setEditingLog] = useState(null);
   const [form, setForm] = useState({ progress_status: '', repair_notes: '' });
   const [saving, setSaving] = useState(false);
+  const [batchDeleteIds, setBatchDeleteIds] = useState([]);
+  const [showAddModal, setShowAddModal] = useState(false);
+  const [newLogForm, setNewLogForm] = useState({
+    equipment_id: '', damage_description: '', damage_type: 'mekanik'
+  });
+  const [availableEquipment, setAvailableEquipment] = useState([]);
 
   const loadLogs = useCallback(async () => {
     setLoading(true);
@@ -27,6 +33,11 @@ export default function RekapPerbaikanPage() {
       .select('*, equipment:heavy_equipment(name, merk_type, nomor_lambung)')
       .order('reported_at', { ascending: false });
     setLogs(data || []);
+
+    // Load available equipment for manual insert
+    const { data: eqData } = await supabase.from('heavy_equipment').select('id, name, merk_type, nomor_lambung').order('name');
+    setAvailableEquipment(eqData || []);
+
     setLoading(false);
   }, []);
 
@@ -87,6 +98,60 @@ export default function RekapPerbaikanPage() {
     if (!confirm('Hapus log perbaikan ini?')) return;
     await supabase.from('maintenance_logs').delete().eq('id', id);
     loadLogs();
+  };
+
+  // Batch Delete Functions
+  const toggleBatchDelete = (id) => {
+    setBatchDeleteIds(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]);
+  };
+
+  const toggleBatchDeleteAll = () => {
+    if (batchDeleteIds.length === orderedLogs.length) {
+      setBatchDeleteIds([]);
+    } else {
+      setBatchDeleteIds(orderedLogs.map(l => l.id));
+    }
+  };
+
+  const deleteBatch = async () => {
+    if (batchDeleteIds.length === 0) return;
+    if (!confirm(`Hapus ${batchDeleteIds.length} log perbaikan yang dipilih?`)) return;
+    setSaving(true);
+    try {
+      await supabase.from('maintenance_logs').delete().in('id', batchDeleteIds);
+      setBatchDeleteIds([]);
+      loadLogs();
+    } catch (e) {
+      alert('Gagal hapus masal');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  // Manual Insert Functions
+  const handleAddLog = async (e) => {
+    e.preventDefault();
+    if (!newLogForm.equipment_id) {
+      alert('Pilih alat berat terlebih dahulu');
+      return;
+    }
+    setSaving(true);
+    try {
+      await supabase.from('maintenance_logs').insert({
+        equipment_id: newLogForm.equipment_id,
+        damage_description: `[Input Manual] ${newLogForm.damage_description}`,
+        damage_type: newLogForm.damage_type,
+        progress_status: 'pelaporan',
+        reported_at: new Date().toISOString(),
+      });
+      setShowAddModal(false);
+      setNewLogForm({ equipment_id: '', damage_description: '', damage_type: 'mekanik' });
+      loadLogs();
+    } catch (e) {
+      alert('Gagal menambahkan log');
+    } finally {
+      setSaving(false);
+    }
   };
 
   // ============ EXPORT EXCEL ============
@@ -254,6 +319,14 @@ export default function RekapPerbaikanPage() {
           <div className="header-subtitle">Kelola seluruh laporan kerusakan &amp; maintenance alat berat. Laporan operator ditandai merah di atas.</div>
         </div>
         <div className="header-right" style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+          <button className="btn btn-outline" style={{ display: 'flex', alignItems: 'center', gap: 6 }} onClick={() => setShowAddModal(true)}>
+            ➕ Tambah Manual
+          </button>
+          {batchDeleteIds.length > 0 && (
+            <button className="btn" style={{ display: 'flex', alignItems: 'center', gap: 6, background: '#dc3545', color: 'white', border: 'none', padding: '8px 16px', borderRadius: 6, fontWeight: 'bold' }} onClick={deleteBatch}>
+              🗑️ Hapus Terpilih ({batchDeleteIds.length})
+            </button>
+          )}
           <button className="btn btn-outline" style={{ display: 'flex', alignItems: 'center', gap: 6 }} onClick={exportExcel}>
             📥 Export Excel
           </button>
@@ -340,6 +413,9 @@ export default function RekapPerbaikanPage() {
               <table style={{ fontSize: 12.5 }}>
                 <thead>
                   <tr style={{ background: '#e8f5e9' }}>
+                    <th style={{ width: 40, textAlign: 'center' }}>
+                      <input type="checkbox" onChange={toggleBatchDeleteAll} checked={orderedLogs.length > 0 && batchDeleteIds.length === orderedLogs.length} />
+                    </th>
                     <th style={{ width: 40 }}>No</th>
                     <th>Tanggal</th>
                     <th>No. Lambung</th>
@@ -359,10 +435,13 @@ export default function RekapPerbaikanPage() {
                         <tr key={log.id} onClick={() => toggleExpand(log.id)}
                           style={{
                             cursor: 'pointer',
-                            background: isUrgent ? '#fff5f5' : (isExpanded ? '#f0f9ff' : 'white'),
+                            background: batchDeleteIds.includes(log.id) ? '#fee2e2' : (isUrgent ? '#fff5f5' : (isExpanded ? '#f0f9ff' : 'white')),
                             borderLeft: isUrgent ? '4px solid #dc2626' : '4px solid transparent',
                             transition: 'background 0.2s',
                           }}>
+                          <td style={{ textAlign: 'center' }} onClick={e => e.stopPropagation()}>
+                            <input type="checkbox" checked={batchDeleteIds.includes(log.id)} onChange={() => toggleBatchDelete(log.id)} />
+                          </td>
                           <td style={{ textAlign: 'center' }}>
                             {isUrgent && <span title="Laporan dari operator — perlu segera ditangani">🚨</span>}
                             {idx + 1}
@@ -534,6 +613,53 @@ export default function RekapPerbaikanPage() {
               <div className="modal-footer">
                 <button type="button" className="btn btn-outline" onClick={() => setEditingLog(null)}>Batal</button>
                 <button type="submit" className="btn btn-primary" disabled={saving}>{saving ? 'Menyimpan...' : 'Simpan Perubahan'}</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Add Manual Modal */}
+      {showAddModal && (
+        <div className="modal-overlay" onClick={e => e.target === e.currentTarget && setShowAddModal(false)}>
+          <div className="modal" style={{ maxWidth: 500 }}>
+            <div className="modal-header">
+              <h3 className="modal-title">Tambah Log Perbaikan Manual</h3>
+              <button className="btn-icon" onClick={() => setShowAddModal(false)}>✕</button>
+            </div>
+            <form onSubmit={handleAddLog}>
+              <div className="modal-body">
+                <div className="form-group">
+                  <label className="form-label">Alat Berat *</label>
+                  <select className="form-control" required value={newLogForm.equipment_id} onChange={e => setNewLogForm({ ...newLogForm, equipment_id: e.target.value })}>
+                    <option value="">— Pilih Alat Berat —</option>
+                    {availableEquipment.map(eq => (
+                      <option key={eq.id} value={eq.id}>
+                        {eq.nomor_lambung} — {eq.name} ({eq.merk_type || '-'})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div className="form-group">
+                  <label className="form-label">Jenis Kerusakan</label>
+                  <select className="form-control" value={newLogForm.damage_type} onChange={e => setNewLogForm({ ...newLogForm, damage_type: e.target.value })}>
+                    <option value="mekanik">Mekanik</option>
+                    <option value="elektrik">Elektrik</option>
+                    <option value="body">Body / Chassis</option>
+                    <option value="hidrolik">Sistem Hidrolik</option>
+                    <option value="lainnya">Lainnya</option>
+                  </select>
+                </div>
+                <div className="form-group">
+                  <label className="form-label">Deskripsi Kerusakan *</label>
+                  <textarea className="form-control" rows={4} required
+                    placeholder="Jelaskan kerusakan atau keluhan yang ditemukan..."
+                    value={newLogForm.damage_description} onChange={e => setNewLogForm({ ...newLogForm, damage_description: e.target.value })} />
+                </div>
+              </div>
+              <div className="modal-footer">
+                <button type="button" className="btn btn-outline" onClick={() => setShowAddModal(false)}>Batal</button>
+                <button type="submit" className="btn btn-primary" disabled={saving}>{saving ? 'Menyimpan...' : 'Tambah Log'}</button>
               </div>
             </form>
           </div>
