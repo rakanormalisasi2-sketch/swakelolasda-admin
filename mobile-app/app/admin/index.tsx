@@ -93,10 +93,15 @@ export default function AdminPasswordScreen() {
       <StatusBar barStyle="light-content" backgroundColor="#92400e" />
 
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.replace('/')} style={styles.backBtn} hitSlop={{ top: 20, bottom: 20, left: 20, right: 20 }}>
-          <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-            <Text style={{ color: '#fff', fontSize: 24, marginRight: 4 }}>‹</Text>
-            <Text style={styles.backText}>Beranda</Text>
+        <TouchableOpacity 
+          onPress={() => router.replace('/')} 
+          style={styles.backBtn} 
+          hitSlop={{ top: 20, bottom: 20, left: 20, right: 20 }}
+          activeOpacity={0.7}
+        >
+          <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: 'rgba(255,255,255,0.15)', paddingVertical: 6, paddingHorizontal: 12, borderRadius: 20 }}>
+            <Text style={{ color: '#fff', fontSize: 20, marginRight: 4, fontWeight: 'bold' }}>‹</Text>
+            <Text style={styles.backText}>Kembali</Text>
           </View>
         </TouchableOpacity>
         <Text style={styles.icon}>🔐</Text>
@@ -155,7 +160,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     padding: 30,
   },
-  backBtn: { position: 'absolute', top: 10, left: 20, zIndex: 10 },
+  backBtn: { position: 'absolute', top: 20, left: 16, zIndex: 100 },
   backText: { color: 'rgba(255,255,255,0.9)', fontSize: 16, fontWeight: '600' },
   icon: { fontSize: 60, marginBottom: 12 },
   title: { color: '#fff', fontSize: 26, fontWeight: '800', letterSpacing: 1 },

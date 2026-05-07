@@ -149,9 +149,15 @@ export async function POST(request) {
         .single();
 
       const currentStock = item?.current_stock || 0;
-      const qtyAfter = payload.transaction_type === 'masuk'
+      const qtyAfter = payload.transaction_type === 'masuk' || payload.transaction_type === 'adjustment'
         ? currentStock + payload.qty
         : currentStock - payload.qty;
+
+      // Update item stock
+      await supabaseWarehouse
+        .from('warehouse_items')
+        .update({ current_stock: qtyAfter })
+        .eq('id', payload.item_id);
 
       const { data, error } = await supabaseWarehouse
         .from('warehouse_transactions')
@@ -247,7 +253,7 @@ export async function PUT(request) {
       // First, get request details
       const { data: request } = await supabaseWarehouse
         .from('warehouse_requests')
-        .select('*')
+        .select('*, item:warehouse_items(current_stock)')
         .eq('id', id)
         .single();
 
@@ -255,14 +261,25 @@ export async function PUT(request) {
 
       // Create transaction (keluar)
       const qty = request.approved_qty || request.requested_qty;
+      const currentStock = request.item?.current_stock || 0;
+      const qtyAfter = currentStock - qty;
+
       await supabaseWarehouse.from('warehouse_transactions').insert({
         item_id: request.item_id,
         transaction_type: 'keluar',
         qty: qty,
+        qty_before: currentStock,
+        qty_after: qtyAfter,
         reference_id: id,
         notes: `Fulfillment request dari ${request.requested_by}`,
         created_by: payload.fulfilled_by || 'admin',
       });
+
+      // Update master stok
+      await supabaseWarehouse
+        .from('warehouse_items')
+        .update({ current_stock: qtyAfter })
+        .eq('id', request.item_id);
 
       // Update request status
       const { data, error } = await supabaseWarehouse
@@ -290,13 +307,51 @@ export async function PUT(request) {
       return NextResponse.json({ data, message: 'Password berhasil diupdate' });
     }
 
-    // Update transaction (notes & photo)
+    // Update transaction (notes, photo, qty, type)
     if (action === 'update_transaction') {
+      // 1. Get old transaction
+      const { data: oldTrans } = await supabaseWarehouse
+        .from('warehouse_transactions')
+        .select('*')
+        .eq('id', id)
+        .single();
+      
+      if (!oldTrans) throw new Error('Transaksi tidak ditemukan');
+
+      // 2. Calculate stock difference if qty or type changed
+      if (payload.qty !== undefined || payload.transaction_type !== undefined) {
+        const newQty = payload.qty !== undefined ? parseFloat(payload.qty) : oldTrans.qty;
+        const newType = payload.transaction_type || oldTrans.transaction_type;
+        
+        const { data: item } = await supabaseWarehouse
+          .from('warehouse_items')
+          .select('current_stock')
+          .eq('id', oldTrans.item_id)
+          .single();
+        
+        if (item) {
+          let adjustedStock = item.current_stock;
+          
+          // Revert old transaction effect
+          if (oldTrans.transaction_type === 'masuk') adjustedStock -= oldTrans.qty;
+          else if (oldTrans.transaction_type === 'keluar') adjustedStock += oldTrans.qty;
+
+          // Apply new transaction effect
+          if (newType === 'masuk') adjustedStock += newQty;
+          else if (newType === 'keluar') adjustedStock -= newQty;
+
+          await supabaseWarehouse.from('warehouse_items').update({ current_stock: adjustedStock }).eq('id', oldTrans.item_id);
+        }
+      }
+
       const { data, error } = await supabaseWarehouse
         .from('warehouse_transactions')
         .update({
-          notes: payload.notes,
-          photo_url: payload.photo_url || null,
+          notes: payload.notes !== undefined ? payload.notes : oldTrans.notes,
+          photo_url: payload.photo_url !== undefined ? payload.photo_url : oldTrans.photo_url,
+          qty: payload.qty !== undefined ? parseFloat(payload.qty) : oldTrans.qty,
+          transaction_type: payload.transaction_type || oldTrans.transaction_type,
+          updated_at: new Date().toISOString(),
         })
         .eq('id', id)
         .select()

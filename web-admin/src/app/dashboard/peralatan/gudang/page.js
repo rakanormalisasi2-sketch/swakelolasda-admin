@@ -24,7 +24,10 @@ export default function GudangPage() {
   // Modal states
   const [showItemModal, setShowItemModal] = useState(false);
   const [showCategoryModal, setShowCategoryModal] = useState(false);
+  const [showPlusModal, setShowPlusModal] = useState(false);
+  const [showEditTransModal, setShowEditTransModal] = useState(false);
   const [editingItem, setEditingItem] = useState(null);
+  const [editingTrans, setEditingTrans] = useState(null);
   const [newCategoryName, setNewCategoryName] = useState('');
 
   // Form states
@@ -32,6 +35,10 @@ export default function GudangPage() {
     name: '', category_id: '', unit: '', current_stock: 0, min_stock: 0, description: '', sku: '', serial_number: '', photo_url: ''
   });
   const [photoFile, setPhotoFile] = useState(null);
+  const [plusSearch, setPlusSearch] = useState('');
+  const [plusQty, setPlusQty] = useState('1');
+  const [plusNotes, setPlusNotes] = useState('');
+  const [transForm, setTransForm] = useState({ qty: 0, transaction_type: '', notes: '' });
 
   const loadData = useCallback(async () => {
     setLoading(true);
@@ -239,17 +246,69 @@ export default function GudangPage() {
     }
   };
 
-  const handleEditTransaction = async (trans) => {
-    const newNotes = prompt('Edit keterangan:', trans.notes || '');
-    if (newNotes === null) return;
+  const handleEditTransaction = (trans) => {
+    setEditingTrans(trans);
+    setTransForm({
+      qty: trans.qty,
+      transaction_type: trans.transaction_type,
+      notes: trans.notes || ''
+    });
+    setShowEditTransModal(true);
+  };
+
+  const handleSaveTransaction = async (e) => {
+    e.preventDefault();
     setSaving(true);
     try {
-      await fetch('/api/gudang', {
+      const res = await fetch('/api/gudang', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'update_transaction', id: trans.id, notes: newNotes })
+        body: JSON.stringify({ 
+          action: 'update_transaction', 
+          id: editingTrans.id, 
+          qty: parseFloat(transForm.qty),
+          transaction_type: transForm.transaction_type,
+          notes: transForm.notes 
+        })
       });
-      loadData();
+      if (res.ok) {
+        setShowEditTransModal(false);
+        loadData();
+      } else {
+        const err = await res.json();
+        alert('Gagal: ' + err.error);
+      }
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleBarangPlus = async (e) => {
+    e.preventDefault();
+    if (!editingItem) {
+      alert('Pilih barang terlebih dahulu atau tambahkan barang baru.');
+      return;
+    }
+    setSaving(true);
+    try {
+      const res = await fetch('/api/gudang', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'create_transaction',
+          item_id: editingItem.id,
+          transaction_type: 'masuk',
+          qty: parseFloat(plusQty),
+          notes: plusNotes || 'Penambahan stok via Barang+',
+          created_by: 'Admin Gudang'
+        })
+      });
+      if (res.ok) {
+        setShowPlusModal(false);
+        setPlusSearch('');
+        setEditingItem(null);
+        loadData();
+      }
     } finally {
       setSaving(false);
     }
@@ -309,8 +368,8 @@ export default function GudangPage() {
           <button className="btn btn-outline" onClick={() => setShowCategoryModal(true)} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
             <Plus size={16} /> Kategori Baru
           </button>
-          <button className="btn btn-primary" onClick={openAddItem} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-            <Plus size={16} /> Barang Baru
+          <button className="btn btn-primary" onClick={() => { setEditingItem(null); setShowPlusModal(true); }} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '8px 24px', borderRadius: 24, boxShadow: '0 4px 12px rgba(37, 99, 235, 0.3)', fontSize: 16, fontWeight: 700 }}>
+             Barang+
           </button>
         </div>
       </div>
@@ -390,7 +449,7 @@ export default function GudangPage() {
                 <div style={{ padding: 16, display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: 16, background: '#f8fafc' }}>
                   {filteredItems.length === 0 ? (
                     <div style={{ gridColumn: '1 / -1', padding: 40, textAlign: 'center', color: '#64748b', background: '#fff', borderRadius: 12, border: '1px dashed #cbd5e1' }}>
-                      Belum ada barang. Klik "Barang Baru" untuk menambahkan.
+                      Belum ada barang. Klik "Barang+" untuk menambahkan.
                     </div>
                   ) : filteredItems.map(item => (
                     <div key={item.id} style={{ background: '#fff', borderRadius: 12, border: '1px solid #e2e8f0', overflow: 'hidden', display: 'flex', flexDirection: 'column', boxShadow: '0 1px 3px rgba(0,0,0,0.05)' }}>
@@ -544,14 +603,13 @@ export default function GudangPage() {
                         <th style={{ padding: '12px 16px', fontWeight: 600, color: '#374151', borderBottom: '1px solid #e2e8f0', textAlign: 'right' }}>Stok Sebelum</th>
                         <th style={{ padding: '12px 16px', fontWeight: 600, color: '#374151', borderBottom: '1px solid #e2e8f0', textAlign: 'right' }}>Stok Sesudah</th>
                         <th style={{ padding: '12px 16px', fontWeight: 600, color: '#374151', borderBottom: '1px solid #e2e8f0', textAlign: 'center' }}>Foto</th>
-                                                <th style={{ padding: '12px 16px', fontWeight: 600, color: '#374151', borderBottom: '1px solid #e2e8f0' }}>Keterangan</th>
+                        <th style={{ padding: '12px 16px', fontWeight: 600, color: '#374151', borderBottom: '1px solid #e2e8f0' }}>Keterangan</th>
                         <th style={{ padding: '12px 16px', fontWeight: 600, color: '#374151', borderBottom: '1px solid #e2e8f0', textAlign: 'center' }}>Aksi</th>
-
                       </tr>
                     </thead>
                     <tbody>
                       {filteredMasuk.length === 0 ? (
-                        <tr><td colSpan={6} style={{ padding: 40, textAlign: 'center', color: '#64748b' }}>Belum ada histori barang masuk.</td></tr>
+                        <tr><td colSpan={9} style={{ padding: 40, textAlign: 'center', color: '#64748b' }}>Belum ada histori barang masuk.</td></tr>
                       ) : filteredMasuk.map(trans => (
                         <tr key={trans.id} style={{ borderBottom: '1px solid #f1f5f9' }}>
                           <td style={{ padding: '12px 16px', whiteSpace: 'nowrap' }}>{new Date(trans.created_at).toLocaleDateString('id-ID')}</td>
@@ -571,12 +629,11 @@ export default function GudangPage() {
                               </a>
                             ) : <span style={{ color: '#94a3b8', fontSize: 12 }}>-</span>}
                           </td>
-                                                    <td style={{ padding: '12px 16px', fontSize: 12, color: '#64748b' }}>{trans.notes || '-'}</td>
+                          <td style={{ padding: '12px 16px', fontSize: 12, color: '#64748b' }}>{trans.notes || '-'}</td>
                           <td style={{ padding: '12px 16px', textAlign: 'center' }}>
-                            <button className="btn btn-icon" onClick={() => handleEditTransaction(trans)} title="Edit Keterangan"><Edit size={14} /></button>
+                            <button className="btn btn-icon" onClick={() => handleEditTransaction(trans)} title="Edit Transaksi"><Edit size={14} /></button>
                           </td>
                         </tr>
-
                       ))}
                     </tbody>
                   </table>
@@ -630,14 +687,13 @@ export default function GudangPage() {
                         <th style={{ padding: '12px 16px', fontWeight: 600, color: '#374151', borderBottom: '1px solid #e2e8f0', textAlign: 'right' }}>Stok Sebelum</th>
                         <th style={{ padding: '12px 16px', fontWeight: 600, color: '#374151', borderBottom: '1px solid #e2e8f0', textAlign: 'right' }}>Stok Sesudah</th>
                         <th style={{ padding: '12px 16px', fontWeight: 600, color: '#374151', borderBottom: '1px solid #e2e8f0', textAlign: 'center' }}>Foto</th>
-                                                <th style={{ padding: '12px 16px', fontWeight: 600, color: '#374151', borderBottom: '1px solid #e2e8f0' }}>Keterangan</th>
+                        <th style={{ padding: '12px 16px', fontWeight: 600, color: '#374151', borderBottom: '1px solid #e2e8f0' }}>Keterangan</th>
                         <th style={{ padding: '12px 16px', fontWeight: 600, color: '#374151', borderBottom: '1px solid #e2e8f0', textAlign: 'center' }}>Aksi</th>
-
                       </tr>
                     </thead>
                     <tbody>
                       {filteredKeluar.length === 0 ? (
-                        <tr><td colSpan={6} style={{ padding: 40, textAlign: 'center', color: '#64748b' }}>Belum ada histori barang keluar.</td></tr>
+                        <tr><td colSpan={9} style={{ padding: 40, textAlign: 'center', color: '#64748b' }}>Belum ada histori barang keluar.</td></tr>
                       ) : filteredKeluar.map(trans => (
                         <tr key={trans.id} style={{ borderBottom: '1px solid #f1f5f9' }}>
                           <td style={{ padding: '12px 16px', whiteSpace: 'nowrap' }}>{new Date(trans.created_at).toLocaleDateString('id-ID')}</td>
@@ -657,11 +713,10 @@ export default function GudangPage() {
                               </a>
                             ) : <span style={{ color: '#94a3b8', fontSize: 12 }}>-</span>}
                           </td>
-                                                    <td style={{ padding: '12px 16px', fontSize: 12, color: '#64748b' }}>{trans.notes || '-'}</td>
+                          <td style={{ padding: '12px 16px', fontSize: 12, color: '#64748b' }}>{trans.notes || '-'}</td>
                           <td style={{ padding: '12px 16px', textAlign: 'center' }}>
-                            <button className="btn btn-icon" onClick={() => handleEditTransaction(trans)} title="Edit Keterangan"><Edit size={14} /></button>
+                            <button className="btn btn-icon" onClick={() => handleEditTransaction(trans)} title="Edit Transaksi"><Edit size={14} /></button>
                           </td>
-
                         </tr>
                       ))}
                     </tbody>
@@ -761,6 +816,137 @@ export default function GudangPage() {
               <div className="modal-footer">
                 <button type="button" className="btn btn-outline" onClick={() => setShowCategoryModal(false)}>Batal</button>
                 <button type="submit" className="btn btn-primary" disabled={saving}>{saving ? 'Menyimpan...' : 'Simpan'}</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* =============== MODAL: BARANG+ (TAMBAH STOK / BARANG LAMA) =============== */}
+      {showPlusModal && (
+        <div className="modal-overlay" onClick={e => e.target === e.currentTarget && setShowPlusModal(false)}>
+          <div className="modal" style={{ maxWidth: 500 }}>
+            <div className="modal-header">
+              <h3 className="modal-title">
+                <span style={{ color: '#2563eb', fontWeight: 900 }}>Barang+</span>
+              </h3>
+              <button className="btn-icon" onClick={() => setShowPlusModal(false)}>✕</button>
+            </div>
+            <div className="modal-body">
+              <p style={{ fontSize: 13, color: '#64748b', marginBottom: 16 }}>Cari barang lama untuk tambah stok, atau tambah barang baru jika belum ada.</p>
+              
+              <div className="form-group">
+                <label className="form-label">Cari Barang Lama</label>
+                <div style={{ position: 'relative' }}>
+                  <Search size={16} style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', color: '#64748b' }} />
+                  <input 
+                    type="text" 
+                    className="form-control" 
+                    style={{ paddingLeft: 36 }}
+                    placeholder="Ketik nama barang..." 
+                    value={plusSearch} 
+                    onChange={e => setPlusSearch(e.target.value)} 
+                  />
+                </div>
+                
+                {/* Search Results Dropdown */}
+                {plusSearch.length >= 2 && (
+                  <div style={{ 
+                    marginTop: 4, background: '#fff', border: '1px solid #e2e8f0', borderRadius: 8, 
+                    maxHeight: 200, overflowY: 'auto', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.1)' 
+                  }}>
+                    {items.filter(i => i.name.toLowerCase().includes(plusSearch.toLowerCase())).map(item => (
+                      <button 
+                        key={item.id} 
+                        onClick={() => { setEditingItem(item); setPlusSearch(item.name); }}
+                        style={{ width: '100%', padding: '10px 16px', textAlign: 'left', border: 'none', background: 'transparent', borderBottom: '1px solid #f1f5f9', cursor: 'pointer' }}
+                      >
+                        <div style={{ fontWeight: 600, fontSize: 14 }}>{item.name}</div>
+                        <div style={{ fontSize: 11, color: '#64748b' }}>{item.category?.name} · Stok: {item.current_stock} {item.unit}</div>
+                      </button>
+                    ))}
+                    <button 
+                      onClick={() => { setShowPlusModal(false); openAddItem(); }}
+                      style={{ width: '100%', padding: '12px 16px', textAlign: 'left', border: 'none', background: '#f8fafc', color: '#2563eb', fontWeight: 600, fontSize: 13 }}
+                    >
+                      + Tambah Barang Baru (Tidak Ada di Daftar)
+                    </button>
+                  </div>
+                )}
+              </div>
+
+              {editingItem && (
+                <div style={{ marginTop: 20, padding: 16, background: '#f0f9ff', borderRadius: 12, border: '1px solid #bae6fd' }}>
+                  <div style={{ fontWeight: 700, color: '#0369a1', marginBottom: 12 }}>Input Stok Masuk: {editingItem.name}</div>
+                  <div className="form-grid">
+                    <div className="form-group">
+                      <label className="form-label">Jumlah Masuk ({editingItem.unit})</label>
+                      <input type="number" className="form-control" value={plusQty} onChange={e => setPlusQty(e.target.value)} />
+                    </div>
+                    <div className="form-group">
+                      <label className="form-label">Keterangan</label>
+                      <input type="text" className="form-control" value={plusNotes} onChange={e => setPlusNotes(e.target.value)} placeholder="cth: Pengadaan Mei 2024" />
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+            <div className="modal-footer">
+              <button type="button" className="btn btn-outline" onClick={() => setShowPlusModal(false)}>Batal</button>
+              <button 
+                type="button" 
+                className="btn btn-primary" 
+                onClick={handleBarangPlus} 
+                disabled={saving || !editingItem}
+              >
+                {saving ? 'Memproses...' : 'Tambah Stok'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* =============== MODAL: EDIT TRANSAKSI =============== */}
+      {showEditTransModal && (
+        <div className="modal-overlay" onClick={e => e.target === e.currentTarget && setShowEditTransModal(false)}>
+          <div className="modal" style={{ maxWidth: 450 }}>
+            <div className="modal-header">
+              <h3 className="modal-title">Edit Detail Transaksi</h3>
+              <button className="btn-icon" onClick={() => setShowEditTransModal(false)}>✕</button>
+            </div>
+            <form onSubmit={handleSaveTransaction}>
+              <div className="modal-body">
+                <div style={{ marginBottom: 16, padding: 12, background: '#f8fafc', borderRadius: 8, border: '1px solid #e2e8f0' }}>
+                  <div style={{ fontSize: 12, color: '#64748b' }}>Barang:</div>
+                  <div style={{ fontWeight: 700, color: '#1e293b' }}>{editingTrans?.item?.name || '-'}</div>
+                </div>
+
+                <div className="form-grid">
+                  <div className="form-group">
+                    <label className="form-label">Tipe Transaksi</label>
+                    <select className="form-control" value={transForm.transaction_type} onChange={e => setTransForm({ ...transForm, transaction_type: e.target.value })}>
+                      <option value="masuk">Barang Masuk (+)</option>
+                      <option value="keluar">Barang Keluar (-)</option>
+                    </select>
+                  </div>
+                  <div className="form-group">
+                    <label className="form-label">Jumlah ({editingTrans?.item?.unit || ''})</label>
+                    <input type="number" className="form-control" required value={transForm.qty} onChange={e => setTransForm({ ...transForm, qty: e.target.value })} />
+                  </div>
+                </div>
+
+                <div className="form-group">
+                  <label className="form-label">Keterangan / Catatan</label>
+                  <textarea className="form-control" rows={3} value={transForm.notes} onChange={e => setTransForm({ ...transForm, notes: e.target.value })} />
+                </div>
+
+                <div style={{ marginTop: 12, padding: 10, background: '#fffbeb', borderRadius: 8, border: '1px solid #fef3c7', fontSize: 11, color: '#92400e' }}>
+                  ⚠️ Perubahan jumlah atau tipe transaksi akan otomatis menyesuaikan stok barang saat ini secara real-time.
+                </div>
+              </div>
+              <div className="modal-footer">
+                <button type="button" className="btn btn-outline" onClick={() => setShowEditTransModal(false)}>Batal</button>
+                <button type="submit" className="btn btn-primary" disabled={saving}>{saving ? 'Menyimpan...' : 'Simpan Perubahan'}</button>
               </div>
             </form>
           </div>

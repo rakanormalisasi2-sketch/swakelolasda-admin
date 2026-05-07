@@ -1,8 +1,9 @@
 'use client';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useAuth } from '@/context/AuthContext';
+import { supabase } from '@/lib/supabase';
 
 const NAV_CONFIG = {
   superadmin: [
@@ -26,9 +27,9 @@ const NAV_CONFIG = {
       section: 'Peralatan',
       items: [
         { href: '/dashboard/peralatan', label: 'Status Alat Berat', icon: 'truck' },
-        { href: '/dashboard/peralatan/gudang', label: 'Sistem Gudang', icon: 'warehouse' },
+        { href: '/dashboard/peralatan/gudang', label: 'Sistem Gudang', icon: 'warehouse', badgeKey: 'pendingRequests' },
         { href: '/dashboard/peralatan/sebaran', label: 'Peta Sebaran Alat', icon: 'map' },
-        { href: '/dashboard/peralatan/perbaikan', label: 'Rekap Perbaikan', icon: 'tool', badge: 'maintenance_count' },
+        { href: '/dashboard/peralatan/perbaikan', label: 'Rekap Perbaikan', icon: 'tool', badgeKey: 'activeRepairs' },
         { href: '/dashboard/status-operasional', label: 'Status Operasional', icon: 'clipboard' },
         { href: '/dashboard/peralatan/pengaturan', label: 'Pengaturan Sistem', icon: 'settings' },
       ],
@@ -158,11 +159,42 @@ export default function Sidebar({ maintenanceCount = 0 }) {
   const { profile, logout } = useAuth();
   const pathname = usePathname();
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [counts, setCounts] = useState({ pendingRequests: 0, activeRepairs: 0 });
+
   const role = profile?.role || 'operator';
   const navSections = NAV_CONFIG[role] || NAV_CONFIG.operator;
   const initials = profile?.full_name
     ? profile.full_name.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase()
     : '??';
+
+  useEffect(() => {
+    if (!profile || profile.role !== 'peralatan' && profile.role !== 'superadmin') return;
+
+    const fetchCounts = async () => {
+      try {
+        // 1. Pending Warehouse Requests
+        const res = await fetch('/api/gudang?type=requests&status=pending');
+        const { data: requests } = await res.json();
+        
+        // 2. Active Repairs (progress_status != 'selesai')
+        const { count: repairCount } = await supabase
+          .from('maintenance_logs')
+          .select('*', { count: 'exact', head: true })
+          .neq('progress_status', 'selesai');
+
+        setCounts({
+          pendingRequests: requests?.length || 0,
+          activeRepairs: repairCount || 0
+        });
+      } catch (err) {
+        console.error('Failed to fetch sidebar counts:', err);
+      }
+    };
+
+    fetchCounts();
+    const interval = setInterval(fetchCounts, 30000); // 30s refresh
+    return () => clearInterval(interval);
+  }, [profile]);
 
   return (
     <>
@@ -211,6 +243,22 @@ export default function Sidebar({ maintenanceCount = 0 }) {
                   >
                     {ICONS[item.icon]}
                     {item.label}
+                    {item.badgeKey && counts[item.badgeKey] > 0 && (
+                      <span className="sidebar-badge danger pulse" style={{ 
+                        marginLeft: 'auto', 
+                        background: '#dc2626', 
+                        color: 'white', 
+                        borderRadius: '50%', 
+                        width: '18px', 
+                        height: '18px', 
+                        display: 'flex', 
+                        alignItems: 'center', 
+                        justifyContent: 'center', 
+                        fontSize: '11px', 
+                        fontWeight: '900',
+                        boxShadow: '0 0 0 2px rgba(220, 38, 38, 0.2)'
+                      }}>!</span>
+                    )}
                     {item.badge === 'maintenance_count' && maintenanceCount > 0 && (
                       <span className="sidebar-badge">{maintenanceCount}</span>
                     )}
