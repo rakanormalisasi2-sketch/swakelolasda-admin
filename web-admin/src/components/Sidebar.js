@@ -245,18 +245,18 @@ export default function Sidebar({ maintenanceCount = 0 }) {
                     {item.label}
                     {item.badgeKey && counts[item.badgeKey] > 0 && (
                       <span className="sidebar-badge danger pulse" style={{ 
-                        marginLeft: 'auto', 
+                        marginLeft: '8px', 
                         background: '#dc2626', 
                         color: 'white', 
                         borderRadius: '50%', 
                         width: '18px', 
                         height: '18px', 
-                        display: 'flex', 
+                        display: 'inline-flex', 
                         alignItems: 'center', 
                         justifyContent: 'center', 
                         fontSize: '11px', 
                         fontWeight: '900',
-                        boxShadow: '0 0 0 2px rgba(220, 38, 38, 0.2)'
+                        boxShadow: '0 0 0 2px rgba(220, 38, 26, 0.2)'
                       }}>!</span>
                     )}
                     {item.badge === 'maintenance_count' && maintenanceCount > 0 && (

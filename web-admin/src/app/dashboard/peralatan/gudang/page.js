@@ -38,6 +38,8 @@ export default function GudangPage() {
   const [plusSearch, setPlusSearch] = useState('');
   const [plusQty, setPlusQty] = useState('1');
   const [plusNotes, setPlusNotes] = useState('');
+  const [plusType, setPlusType] = useState('masuk');
+  const [plusDate, setPlusDate] = useState(new Date().toISOString().split('T')[0]);
   const [transForm, setTransForm] = useState({ qty: 0, transaction_type: '', notes: '' });
 
   const loadData = useCallback(async () => {
@@ -142,6 +144,21 @@ export default function GudangPage() {
       }
 
       const payload = { ...itemForm, photo_url: finalPhotoUrl, current_stock: parseFloat(itemForm.current_stock) || 0, min_stock: parseFloat(itemForm.min_stock) || 0 };
+      
+      // Check for duplicate name if creating new
+      if (!editingItem) {
+        const existing = items.find(i => i.name.toLowerCase() === itemForm.name.toLowerCase());
+        if (existing) {
+          if (confirm(`Barang "${itemForm.name}" sudah ada di database. \n\nApakah Anda ingin menambahkan stok ke barang yang sudah ada ini saja? \n(Klik OK untuk tambah stok ke barang lama, atau Cancel untuk tetap buat baru)`)) {
+            setEditingItem(existing);
+            setPlusSearch(existing.name);
+            setShowItemModal(false);
+            setShowPlusModal(true);
+            return;
+          }
+        }
+      }
+
       const res = editingItem
         ? await fetch('/api/gudang', {
             method: 'PUT',
@@ -297,9 +314,10 @@ export default function GudangPage() {
         body: JSON.stringify({
           action: 'create_transaction',
           item_id: editingItem.id,
-          transaction_type: 'masuk',
+          transaction_type: plusType,
           qty: parseFloat(plusQty),
-          notes: plusNotes || 'Penambahan stok via Barang+',
+          notes: plusNotes || `Penambahan stok via Barang+ (${plusType})`,
+          created_at: plusDate,
           created_by: 'Admin Gudang'
         })
       });
@@ -307,7 +325,13 @@ export default function GudangPage() {
         setShowPlusModal(false);
         setPlusSearch('');
         setEditingItem(null);
+        setPlusQty('1');
+        setPlusNotes('');
+        setPlusType('masuk');
         loadData();
+      } else {
+        const err = await res.json();
+        alert('Gagal: ' + err.error);
       }
     } finally {
       setSaving(false);
@@ -481,16 +505,20 @@ export default function GudangPage() {
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', marginTop: 'auto', paddingTop: 12, borderTop: '1px dashed #e2e8f0' }}>
                           <div>
                             <div style={{ fontSize: 11, color: '#64748b', marginBottom: 2 }}>Stok Saat Ini</div>
-                            <div style={{ fontSize: 24, fontWeight: 800, color: item.current_stock <= item.min_stock ? '#dc2626' : '#059669', lineHeight: 1 }}>
-                              {item.current_stock} <span style={{ fontSize: 13, fontWeight: 600, color: '#64748b' }}>{item.unit}</span>
+                            <div style={{ display: 'flex', alignItems: 'baseline', gap: 4 }}>
+                              <div style={{ fontSize: 24, fontWeight: 800, color: item.current_stock <= item.min_stock ? '#dc2626' : '#059669', lineHeight: 1 }}>
+                                {item.current_stock}
+                              </div>
+                              <div style={{ fontSize: 13, color: '#94a3b8' }}>/ Min: {item.min_stock} {item.unit}</div>
                             </div>
                           </div>
                           
                           <div style={{ display: 'flex', gap: 6 }}>
                             <button onClick={() => {
-                                const newStock = prompt(`Update stok ${item.name} (saat ini: ${item.current_stock}):`, item.current_stock);
-                                if (newStock && !isNaN(newStock)) handleStockAdjustment(item, parseFloat(newStock));
-                              }} style={{ background: '#fef3c7', border: 'none', width: 32, height: 32, borderRadius: 8, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#92400e' }} title="Adjust Stok">📦</button>
+                                 setEditingItem(item);
+                                 setPlusSearch(item.name);
+                                 setShowPlusModal(true);
+                               }} style={{ background: '#fef3c7', border: 'none', width: 32, height: 32, borderRadius: 8, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#92400e' }} title="Input Masuk/Keluar">📦</button>
                             <button onClick={() => openEditItem(item)} style={{ background: '#dbeafe', border: 'none', width: 32, height: 32, borderRadius: 8, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#1e40af' }} title="Edit"><Edit size={14} /></button>
                             <button onClick={() => handleDeleteItem(item.id)} style={{ background: '#fee2e2', border: 'none', width: 32, height: 32, borderRadius: 8, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#dc2626' }} title="Hapus"><Trash2 size={14} /></button>
                           </div>
@@ -873,33 +901,69 @@ export default function GudangPage() {
                     </button>
                   </div>
                 )}
-              </div>
-
-              {editingItem && (
+                {editingItem && (
                 <div style={{ marginTop: 20, padding: 16, background: '#f0f9ff', borderRadius: 12, border: '1px solid #bae6fd' }}>
-                  <div style={{ fontWeight: 700, color: '#0369a1', marginBottom: 12 }}>Input Stok Masuk: {editingItem.name}</div>
+                  <div style={{ fontWeight: 700, color: '#0369a1', marginBottom: 12, display: 'flex', justifyContent: 'space-between' }}>
+                    <span>{editingItem.name}</span>
+                    <span style={{ fontSize: 12, fontWeight: 400 }}>Stok: {editingItem.current_stock} {editingItem.unit}</span>
+                  </div>
+                  
+                  {/* Toggle Masuk/Keluar */}
+                  <div style={{ display: 'flex', background: '#fff', padding: 4, borderRadius: 8, marginBottom: 16, border: '1px solid #bae6fd' }}>
+                    <button 
+                      type="button"
+                      onClick={() => setPlusType('masuk')}
+                      style={{ 
+                        flex: 1, padding: '8px', borderRadius: 6, border: 'none', fontSize: 13, fontWeight: 700,
+                        background: plusType === 'masuk' ? '#2563eb' : 'transparent',
+                        color: plusType === 'masuk' ? '#fff' : '#64748b',
+                        cursor: 'pointer', transition: 'all 0.2s'
+                      }}
+                    >
+                      Barang Masuk (+)
+                    </button>
+                    <button 
+                      type="button"
+                      onClick={() => setPlusType('keluar')}
+                      style={{ 
+                        flex: 1, padding: '8px', borderRadius: 6, border: 'none', fontSize: 13, fontWeight: 700,
+                        background: plusType === 'keluar' ? '#dc2626' : 'transparent',
+                        color: plusType === 'keluar' ? '#fff' : '#64748b',
+                        cursor: 'pointer', transition: 'all 0.2s'
+                      }}
+                    >
+                      Barang Keluar (-)
+                    </button>
+                  </div>
+
                   <div className="form-grid">
                     <div className="form-group">
-                      <label className="form-label">Jumlah Masuk ({editingItem.unit})</label>
-                      <input type="number" className="form-control" value={plusQty} onChange={e => setPlusQty(e.target.value)} />
+                      <label className="form-label">Tanggal</label>
+                      <input type="date" className="form-control" value={plusDate} onChange={e => setPlusDate(e.target.value)} />
                     </div>
                     <div className="form-group">
-                      <label className="form-label">Keterangan</label>
-                      <input type="text" className="form-control" value={plusNotes} onChange={e => setPlusNotes(e.target.value)} placeholder="cth: Pengadaan Mei 2024" />
+                      <label className="form-label">Jumlah ({editingItem.unit})</label>
+                      <input type="number" className="form-control" value={plusQty} onChange={e => setPlusQty(e.target.value)} />
                     </div>
+                  </div>
+                  <div className="form-group" style={{ marginBottom: 0 }}>
+                    <label className="form-label">Keterangan / Tujuan</label>
+                    <input type="text" className="form-control" value={plusNotes} onChange={e => setPlusNotes(e.target.value)} placeholder={plusType === 'masuk' ? 'cth: Pengadaan baru' : 'cth: Digunakan untuk perbaikan excavator'} />
                   </div>
                 </div>
               )}
+              </div>
             </div>
             <div className="modal-footer">
               <button type="button" className="btn btn-outline" onClick={() => setShowPlusModal(false)}>Batal</button>
-              <button 
+               <button 
                 type="button" 
                 className="btn btn-primary" 
                 onClick={handleBarangPlus} 
                 disabled={saving || !editingItem}
+                style={{ background: plusType === 'keluar' ? '#dc2626' : '#2563eb' }}
               >
-                {saving ? 'Memproses...' : 'Tambah Stok'}
+                {saving ? 'Memproses...' : (plusType === 'masuk' ? 'Simpan Masuk' : 'Simpan Keluar')}
               </button>
             </div>
           </div>
