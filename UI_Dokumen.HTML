@@ -1,0 +1,587 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <base target="_top">
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: "Segoe UI", Arial, sans-serif; padding: 15px; margin: 0; background: #f8f9fa; color: #333; }
+        .container { display: flex; flex-direction: column; height: 100vh; }
+        h3 { margin-top: 0; color: #1e3a5f; border-bottom: 2px solid #e9ecef; padding-bottom: 10px; }
+        .table-container { flex: 1; overflow-y: auto; background: white; border: 1px solid #dee2e6; border-radius: 6px; max-height: 420px; }
+        table { width: 100%; border-collapse: collapse; font-size: 13px; }
+        th { background: #f1f3f5; position: sticky; top: 0; text-align: left; padding: 10px 8px; border-bottom: 2px solid #dee2e6; z-index: 10; color: #495057; }
+        td { padding: 8px; cursor: pointer; border-bottom: 1px solid rgba(0,0,0,0.05); }
+        tr.data-row:hover td { background-color: rgba(0,0,0,0.04); }
+        .group-header td { background: #e2e8f0; font-weight: 600; color: #1e3a5f; font-size: 13px; padding: 6px 8px; }
+        .footer { padding-top: 12px; text-align: right; display: flex; justify-content: space-between; align-items: center; }
+        button { background: #1e3a5f; color: white; border: none; padding: 9px 18px; border-radius: 6px; font-weight: bold; cursor: pointer; font-size: 13px; }
+        button:disabled { background: #adb5bd; cursor: not-allowed; }
+        .auth-banner { background: #dc3545; color: white; padding: 14px 16px; border-radius: 6px; margin-bottom: 10px; text-align: left; font-size: 12px; line-height: 1.6; }
+        .auth-banner h4 { margin: 0 0 8px 0; font-size: 14px; }
+        .auth-btn { background: white; color: #dc3545; border: none; padding: 8px 16px; border-radius: 6px; font-weight: bold; cursor: pointer; font-size: 13px; margin: 4px 4px 4px 0; }
+        .auth-btn:hover { background: #f8f8f8; }
+        .auth-note { background: rgba(0,0,0,0.15); padding: 8px; border-radius: 4px; margin-top: 8px; font-size: 11px; }
+        .progress-ui { display: none; text-align: center; padding: 20px; }
+        .progress-bar { width: 100%; background: #e9ecef; border-radius: 8px; margin: 15px 0; overflow: hidden; height: 22px; }
+        .progress-fill { height: 100%; background: #1e3a5f; width: 0%; transition: width 0.3s ease; display: flex; align-items: center; justify-content: center; color: white; font-size: 11px; font-weight: bold; }
+        .logs { width: 100%; font-size: 11px; color: #495057; background: #fff; padding: 10px; border-radius: 6px; height: 130px; overflow-y: auto; margin-top: 10px; border: 1px solid #ced4da; text-align: left; }
+        .spinner { border: 3px solid #f3f3f3; border-radius: 50%; border-top: 3px solid #1e3a5f; width: 28px; height: 28px; animation: spin 1s linear infinite; margin: 0 auto 10px; }
+        @keyframes spin { 100% { transform: rotate(360deg); } }
+        .accordion-content { display: none; background: #fff; border-bottom: 2px solid #dee2e6; }
+        .accordion-content.open { display: table-row; }
+        .photo-grid { display: flex; flex-wrap: wrap; gap: 10px; padding: 12px; justify-content: center; }
+        .photo-card { border: 1px solid #ced4da; border-radius: 6px; padding: 8px; background: #f8f9fa; width: 145px; text-align: center; }
+        .photo-card img { width: 128px; height: 128px; object-fit: contain; margin-bottom: 4px; background: #e9ecef; border-radius: 4px; }
+        .photo-card .plabel { display: inline-block; padding: 2px 7px; border-radius: 10px; font-size: 10px; font-weight: bold; margin-bottom: 4px; }
+        .plabel.p0 { background: #dc3545; color: white; }
+        .plabel.p50 { background: #ffc107; color: black; }
+        .plabel.p100 { background: #28a745; color: white; }
+        .plabel.skip { background: #6c757d; color: white; }
+        .photo-card input[type=radio] { margin: 2px 0; }
+        .photo-card label { display: block; font-size: 10px; text-align: left; cursor: pointer; }
+        .btn-set { background: #007bff; color: white; border: none; padding: 4px 6px; font-size: 9px; cursor: pointer; border-radius: 4px; width: 100%; margin: 2px 0; display: block; }
+        .btn-set.before { background: #ffc107; color: black; }
+        .btn-set.after { background: #28a745; }
+        .upload-area { border: 2px dashed #ced4da; border-radius: 8px; padding: 12px; text-align: center; margin: 8px 12px; cursor: pointer; transition: all 0.2s; font-size: 12px; }
+        .upload-area:hover { border-color: #1e3a5f; background: #f0f4ff; }
+        .upload-area input[type=file] { display: none; }
+        .debug-bar { background: #fff3cd; border: 1px solid #ffc107; padding: 5px 10px; font-size: 11px; color: #856404; border-radius: 4px; margin-bottom: 6px; }
+        .finish-box { margin-top: 15px; }
+        .finish-box a { display: inline-block; padding: 10px 20px; background: #28a745; color: white; text-decoration: none; border-radius: 6px; font-weight: bold; margin-bottom: 10px; }
+        .finish-box button { background: #dc3545; }
+        .td-badge { text-align: center; }
+        .td-badge span { background: #28a745; color: white; padding: 2px 6px; border-radius: 10px; font-size: 11px; }
+        .td-badge span.none { background: #dee2e6; color: #aaa; }
+    </style>
+</head>
+<body>
+    <div id="selectionUI" class="container">
+        <div id="authBanner" class="auth-banner" style="display:none;">
+            <h4>DRIVE BELUM DI AUTHORIZE</h4>
+            <p>Klik tombol di bawah untuk authorize, lalu ikuti instruksi yang muncul.</p>
+            <div>
+                <button class="auth-btn" onclick="doAuthorize()">AUTHORIZE SEKARANG</button>
+                <button class="auth-btn" style="background:transparent;color:white;border:2px solid white;margin-left:6px;" onclick="openAuthUrl()">BUKA APPS SCRIPT</button>
+            </div>
+            <div class="auth-note">
+                <b>Petunjuk:</b><br>
+                1. Klik <b>AUTHORIZE SEKARANG</b> di atas<br>
+                2. Kalau popup "Izin Diperlukan" muncul, klik <b>Izinkan</b><br>
+                3. Kalau popup tidak muncul, klik <b>BUKA APPS SCRIPT</b> untuk authorize manual
+            </div>
+        </div>
+        <h3>Pilih Data <span id="modeBadge" style="font-size:11px; background:#28a745; color:white; padding:2px 8px; border-radius:12px; margin-left:8px;">Mode</span></h3>
+        <div id="debugBar" class="debug-bar" style="display:none;"></div>
+        <div class="table-container" id="tableContainer">
+            <div style="padding:30px; text-align:center; color:#6c757d;"><div class="spinner"></div> Memuat data...</div>
+        </div>
+        <div class="footer">
+            <span id="selectionCount" style="font-weight:bold; color:#1e3a5f; font-size:13px;">0 foto dipilih</span>
+            <button id="startBtn" disabled onclick="startProcessing()">Mulai</button>
+        </div>
+    </div>
+
+    <div id="progressUI" class="progress-ui">
+        <h3 id="progressHeader">Proses...</h3>
+        <div id="spinnerWrapper"><div class="spinner"></div></div>
+        <div id="statusText" style="font-weight:bold; margin-bottom:8px; color:#495057;">Tunggu...</div>
+        <div class="progress-bar" id="progressBar" style="display:none;"><div class="progress-fill" id="fill">0%</div></div>
+        <div class="logs" id="logs" style="display:none;"></div>
+        <div id="finishAction" class="finish-box" style="display:none;">
+             <a href="#" id="folderLink" target="_blank">Buka Folder</a><br>
+             <button onclick="google.script.host.close()">Tutup</button>
+        </div>
+    </div>
+
+    <script>
+        var MODE = "<?= mode ?>";
+        var reportData = [];
+        var hmLastAfter = null;
+        var dokSelection = {};
+        var hmSelection = {};
+        var thumbCache = {};
+        var pendingUploads = {};
+        var isAuthorized = false;
+
+        function extractFileId(url) {
+            if (!url) return null;
+            var m = url.match(/\/d\/([a-zA-Z0-9_-]{25,})/);
+            if (m) return m[1];
+            m = url.match(/id=([a-zA-Z0-9_-]{25,})/);
+            if (m) return m[1];
+            return null;
+        }
+
+        function showDebug(msg) {
+            var db = document.getElementById("debugBar");
+            db.style.display = "block";
+            db.innerHTML = msg;
+        }
+
+        function doAuthorize() {
+            showDebug("Memproses authorization...");
+            google.script.run.withSuccessHandler(function(res) {
+                if (res.authorized) {
+                    isAuthorized = true;
+                    document.getElementById("authBanner").style.display = "none";
+                    showDebug("SUKSES! Drive authorized. Silakan upload foto.");
+                } else {
+                    showDebug("Gagal. ERROR: " + res.error + " - Refresh spreadsheet lalu buka Apps Script Editor untuk authorize manual.");
+                    // Buka Apps Script editor di tab baru
+                    var scriptUrl = ScriptApp.getService().getUrl();
+                    if (scriptUrl) {
+                        window.open(scriptUrl.replace("/exec", "/runscript"), "_blank");
+                    }
+                }
+            }).CHECK_DRIVE_AUTHORIZATION();
+        }
+
+        function openAuthUrl() {
+            // Buka Apps Script editor di tab baru agar user bisa authorize manual
+            var scriptId = ScriptApp.getScriptId();
+            var authUrl = "https://script.google.com/home/projects/" + scriptId + "/edit";
+            window.open(authUrl, "_blank");
+            showDebug("Buka tab Apps Script yang muncul. Pilih fungsi 'uploadPhotoToDrive', klik Run, lalu Izinkan.");
+        }
+
+        window.onload = function() {
+            google.script.run.withSuccessHandler(function(res) {
+                if (!res.authorized) {
+                    document.getElementById("authBanner").style.display = "block";
+                } else {
+                    isAuthorized = true;
+                }
+            }).CHECK_DRIVE_AUTHORIZATION();
+
+            if (MODE === "dokumentasi") {
+                document.getElementById("modeBadge").innerText = "Dokumentasi";
+            }
+            if (MODE === "hourmeter") {
+                document.getElementById("modeBadge").innerText = "Hourmeter";
+                document.querySelector("h3 + p") && (document.querySelector("h3 + p").innerText = "Klik baris untuk pilih foto Before & After.");
+            }
+            google.script.run
+                .withSuccessHandler(renderTable)
+                .withFailureHandler(function(err) { alert("Gagal: " + err.message); })
+                .getAvailableReports(100);
+        };
+
+        function renderTable(data) {
+            reportData = data;
+            var totalPhotos = 0;
+            for (var di = 0; di < data.length; di++) {
+                if (data[di].fotoUrls && data[di].fotoUrls.length) totalPhotos += data[di].fotoUrls.length;
+            }
+            showDebug(totalPhotos + " foto ditemukan.");
+
+            if (data.length === 0) {
+                document.getElementById("tableContainer").innerHTML = "<div style='padding:20px; text-align:center;'>Belum ada data.</div>";
+                return;
+            }
+            var html = "<table><thead><tr>";
+            html += "<th style='width:25px;'></th>";
+            html += "<th>Tanggal</th><th>Lokasi</th><th>Operator</th><th>Alat</th><th>Foto</th>";
+            html += "</tr></thead><tbody>";
+            var colorPool = ["#FFB3BA","#FFDFBA","#FFFFBA","#BAFFC9","#BAE1FF","#E6B3FF","#FFD6E8","#D5FFCC","#CCE5FF","#FFF2CC"];
+            var currentGroup = "", colorIdx = -1;
+            for (var i = 0; i < data.length; i++) {
+                var row = data[i];
+                var gk = row.operator + "|" + row.alat + "|" + row.desa + "," + row.kecamatan;
+                if (gk !== currentGroup) {
+                    currentGroup = gk;
+                    colorIdx = (colorIdx + 1) % colorPool.length;
+                    html += "<tr class='group-header'><td></td><td colspan='5'><b>" + currentGroup + "</b></td></tr>";
+                }
+                var fc = (row.fotoUrls && row.fotoUrls.length) ? row.fotoUrls.length : 0;
+                var badge = fc > 0
+                    ? "<span>" + fc + " foto</span>"
+                    : "<span class='none'>0</span>";
+                html += "<tr class='data-row' onclick='toggleRow(" + i + ")' style='background:" + colorPool[colorIdx] + ";'>";
+                html += "<td style='text-align:center;color:#888;font-size:11px;'>v</td>";
+                html += "<td>" + row.tanggal + "</td>";
+                html += "<td>" + row.desa + ", " + row.kecamatan + "</td>";
+                html += "<td>" + row.operator + "</td>";
+                html += "<td>" + row.alat + "</td>";
+                html += "<td class='td-badge'>" + badge + "</td>";
+                html += "</tr>";
+                html += "<tr id='acc_" + i + "' class='accordion-content'><td colspan='6' id='acc_cell_" + i + "'></td></tr>";
+            }
+            html += "</tbody></table>";
+            document.getElementById("tableContainer").innerHTML = html;
+        }
+
+        var currentlyOpenIdx = -1;
+        function toggleRow(idx) {
+            if (currentlyOpenIdx !== -1 && currentlyOpenIdx !== idx) {
+                document.getElementById("acc_" + currentlyOpenIdx).classList.remove("open");
+                document.getElementById("acc_cell_" + currentlyOpenIdx).innerHTML = "";
+            }
+            var acc = document.getElementById("acc_" + idx);
+            if (acc.classList.contains("open")) {
+                acc.classList.remove("open");
+                document.getElementById("acc_cell_" + idx).innerHTML = "";
+                currentlyOpenIdx = -1;
+            } else {
+                acc.classList.add("open");
+                document.getElementById("acc_cell_" + idx).innerHTML = "<div style='padding:20px;text-align:center;'><div class='spinner'></div></div>";
+                loadAndRenderPhotos(idx);
+                currentlyOpenIdx = idx;
+            }
+        }
+
+        function loadAndRenderPhotos(idx) {
+            var row = reportData[idx];
+            var urls = row.fotoUrls || [];
+            var idsToFetch = [];
+            for (var i = 0; i < urls.length; i++) {
+                var fid = extractFileId(urls[i]);
+                if (fid && !thumbCache[fid]) idsToFetch.push(fid);
+            }
+            if (idsToFetch.length > 0) {
+                google.script.run
+                    .withSuccessHandler(function(thumbMap) {
+                        for (var k in thumbMap) thumbCache[k] = thumbMap[k];
+                        renderPhotos(idx);
+                    })
+                    .withFailureHandler(function(err) {
+                        showDebug("Gagal thumbnail: " + err.message);
+                        renderPhotos(idx);
+                    })
+                    .getPhotoThumbnails(idsToFetch);
+            } else {
+                renderPhotos(idx);
+            }
+        }
+
+        function getThumbSrc(fid) {
+            if (thumbCache[fid] && thumbCache[fid].indexOf("ERROR:") === -1) return thumbCache[fid];
+            return "https://via.placeholder.com/128x128?text=Foto";
+        }
+
+        function renderPhotos(idx) {
+            var cell = document.getElementById("acc_cell_" + idx);
+            var row = reportData[idx];
+            var urls = row.fotoUrls || [];
+            var html = "";
+
+            if (MODE === "dokumentasi") {
+                if (urls.length === 0) {
+                    html += "<div style='padding:8px;margin:8px;color:#856404;background:#fff3cd;border-radius:4px;font-size:12px;'>Tidak ada foto. Upload di bawah.</div>";
+                } else {
+                    html += "<div class='photo-grid'>";
+                    for (var p = 0; p < urls.length; p++) {
+                        var fid = extractFileId(urls[p]);
+                        if (!fid) continue;
+                        var selObj = dokSelection[fid];
+                        var curVal = selObj ? selObj.progress : "";
+                        var lClass = "skip", lText = "Lewati";
+                        if (curVal === "0%") { lClass = "p0"; lText = "P. 0%"; }
+                        else if (curVal === "50%") { lClass = "p50"; lText = "P. 50%"; }
+                        else if (curVal === "100%") { lClass = "p100"; lText = "P. 100%"; }
+                        html += "<div class='photo-card'>";
+                        html += "<img src='" + getThumbSrc(fid) + "'>";
+                        html += "<div class='plabel " + lClass + "'>" + lText + "</div>";
+                        html += "<label><input type='radio' name='rdo_" + fid + "' value='' onchange='setDok(\"" + fid + "\",\"\"," + row.rowIdx + ")' " + (curVal === "" ? "checked" : "") + "> Lewati</label>";
+                        html += "<label><input type='radio' name='rdo_" + fid + "' value='0' onchange='setDok(\"" + fid + "\",\"0%\"," + row.rowIdx + ")' " + (curVal === "0%" ? "checked" : "") + "> P. 0%</label>";
+                        html += "<label><input type='radio' name='rdo_" + fid + "' value='50' onchange='setDok(\"" + fid + "\",\"50%\"," + row.rowIdx + ")' " + (curVal === "50%" ? "checked" : "") + "> P. 50%</label>";
+                        html += "<label><input type='radio' name='rdo_" + fid + "' value='100' onchange='setDok(\"" + fid + "\",\"100%\"," + row.rowIdx + ")' " + (curVal === "100%" ? "checked" : "") + "> P. 100%</label>";
+                        html += "</div>";
+                    }
+                    html += "</div>";
+                }
+                html += "<div class='upload-area' onclick='document.getElementById(\"fileInput_" + idx + "\").click()'>";
+                html += "<input type='file' id='fileInput_" + idx + "' accept='image/*' multiple onchange='handleUpload(this," + idx + ")'>";
+                html += "<b>Klik upload foto</b><br><span style='font-size:11px;color:#888;'>JPG / PNG</span>";
+                html += "</div>";
+
+            } else if (MODE === "hourmeter") {
+                if (!hmSelection[row.rowIdx]) hmSelection[row.rowIdx] = { before: hmLastAfter || "", after: "" };
+                var sel = hmSelection[row.rowIdx];
+                html += "<div style='display:flex;justify-content:space-around;padding:10px;'>";
+                html += "<div style='width:44%;background:#e2e8f0;padding:8px;border-radius:6px;text-align:center;'>";
+                html += "<div style='font-size:12px;font-weight:bold;margin-bottom:5px;'>BEFORE</div>";
+                html += "<img id='img_bf_" + row.rowIdx + "' src='" + (sel.before ? getThumbSrc(sel.before) : "https://via.placeholder.com/130x100?text=BELUM") + "' style='width:130px;height:100px;object-fit:cover;border:1px solid #ccc;border-radius:4px;'>";
+                html += "</div>";
+                html += "<div style='width:44%;background:#e2e8f0;padding:8px;border-radius:6px;text-align:center;'>";
+                html += "<div style='font-size:12px;font-weight:bold;margin-bottom:5px;'>AFTER</div>";
+                html += "<img id='img_af_" + row.rowIdx + "' src='" + (sel.after ? getThumbSrc(sel.after) : "https://via.placeholder.com/130x100?text=BELUM") + "' style='width:130px;height:100px;object-fit:cover;border:1px solid #ccc;border-radius:4px;'>";
+                html += "</div>";
+                html += "</div>";
+                html += "<div style='font-size:12px;text-align:center;margin-top:8px;color:#1e3a5f;'>Pilih Foto:</div>";
+                if (urls.length > 0) {
+                    html += "<div class='photo-grid'>";
+                    for (var q = 0; q < urls.length; q++) {
+                        var fid2 = extractFileId(urls[q]);
+                        if (!fid2) continue;
+                        html += "<div class='photo-card'>";
+                        html += "<img src='" + getThumbSrc(fid2) + "'>";
+                        html += "<button class='btn-set before' onclick='setHm(" + row.rowIdx + ",\"before\",\"" + fid2 + "\")'>Before</button>";
+                        html += "<button class='btn-set after' onclick='setHm(" + row.rowIdx + ",\"after\",\"" + fid2 + "\")'>After</button>";
+                        html += "</div>";
+                    }
+                    html += "</div>";
+                } else {
+                    html += "<div style='padding:8px;margin:8px;color:#856404;background:#fff3cd;border-radius:4px;font-size:12px;text-align:center;'>Tidak ada foto. Upload di bawah.</div>";
+                }
+                html += "<div class='upload-area' onclick='document.getElementById(\"fileInput_" + idx + "\").click()'>";
+                html += "<input type='file' id='fileInput_" + idx + "' accept='image/*' multiple onchange='handleUpload(this," + idx + ")'>";
+                html += "<b>Klik upload foto</b><br><span style='font-size:11px;color:#888;'>JPG / PNG</span>";
+                html += "</div>";
+            }
+            cell.innerHTML = html;
+            updateCount();
+        }
+
+        function handleUpload(inputEl, idx) {
+            var files = inputEl.files;
+            if (!files || files.length === 0) return;
+            var row = reportData[idx];
+            var rowIdx = row.rowIdx;
+            showDebug("Mengupload " + files.length + " foto...");
+            if (!pendingUploads[rowIdx]) pendingUploads[rowIdx] = { count: 0, finished: 0 };
+
+            for (var fi = 0; fi < files.length; fi++) {
+                (function(file) {
+                    var capRowIdx = rowIdx;
+                    var capRow = row;
+                    pendingUploads[capRowIdx].count++;
+                    var reader = new FileReader();
+                    reader.onload = function(e) {
+                        var base64 = e.target.result.split(",")[1];
+                        var fileName = file.name || ("upload_" + Date.now() + ".jpg");
+                        google.script.run
+                            .withSuccessHandler(function(res) {
+                                if (!pendingUploads[capRowIdx]) return;
+                                pendingUploads[capRowIdx].finished++;
+                                if (res.success) {
+                                    if (!capRow.fotoUrls) capRow.fotoUrls = [];
+                                    capRow.fotoUrls.push(res.url);
+                                    thumbCache[res.fileId] = e.target.result;
+                                    if (pendingUploads[capRowIdx].finished >= pendingUploads[capRowIdx].count) {
+                                        showDebug("Berhasil! " + pendingUploads[capRowIdx].count + " foto ditambahkan.");
+                                        delete pendingUploads[capRowIdx];
+                                        if (typeof renderPhotos === 'function') renderPhotos(currentlyOpenIdx);
+                                    }
+                                } else {
+                                    var errMsg = res.error || "Unknown error";
+                                    if (errMsg.indexOf("Access denied") !== -1 || errMsg.indexOf("DriveApp") !== -1) {
+                                        document.getElementById("authBanner").style.display = "block";
+                                        showDebug("GAGAL: Drive belum authorized. Ikuti langkah di banner merah di atas.");
+                                    } else {
+                                        showDebug("Gagal: " + errMsg);
+                                    }
+                                    if (pendingUploads[capRowIdx].finished >= pendingUploads[capRowIdx].count) {
+                                        delete pendingUploads[capRowIdx];
+                                        if (typeof renderPhotos === 'function') renderPhotos(currentlyOpenIdx);
+                                    }
+                                }
+                            })
+                            .withFailureHandler(function(err) {
+                                if (!pendingUploads[capRowIdx]) return;
+                                pendingUploads[capRowIdx].finished++;
+                                var errMsg = err.message || "";
+                                if (errMsg.indexOf("Access denied") !== -1 || errMsg.indexOf("DriveApp") !== -1) {
+                                    document.getElementById("authBanner").style.display = "block";
+                                    showDebug("GAGAL: Drive belum authorized. Buka Apps Script, Run 'uploadPhotoToDrive', Izinkan.");
+                                } else {
+                                    showDebug("Error: " + err.message);
+                                }
+                                if (pendingUploads[capRowIdx].finished >= pendingUploads[capRowIdx].count) {
+                                    delete pendingUploads[capRowIdx];
+                                    if (typeof renderPhotos === 'function') renderPhotos(currentlyOpenIdx);
+                                }
+                            })
+                            .uploadPhotoToDrive(base64, fileName, capRowIdx);
+                    };
+                    reader.readAsDataURL(file);
+                })(files[fi]);
+            }
+        }
+
+        function setDok(fid, val, rowIdx) {
+            if (!val || val === "") { delete dokSelection[fid]; }
+            else { dokSelection[fid] = { progress: val, rowIdx: rowIdx }; }
+            if (currentlyOpenIdx !== -1) renderPhotos(currentlyOpenIdx);
+            updateCount();
+        }
+
+        function setHm(rowIdx, type, fid) {
+            if (!hmSelection[rowIdx]) hmSelection[rowIdx] = { before: hmLastAfter || "", after: "" };
+            hmSelection[rowIdx][type] = fid;
+            // Langsung update preview dengan thumbnail yang sudah ada di cache
+            var imgEl = document.getElementById("img_" + (type === "before" ? "bf" : "af") + "_" + rowIdx);
+            if (imgEl) {
+                var cached = thumbCache[fid];
+                if (cached && cached.indexOf("ERROR:") === -1) {
+                    imgEl.src = cached;
+                }
+            }
+            if (type === "after" && fid) hmLastAfter = fid;
+            updateCount();
+        }
+
+        function updateCount() {
+            if (MODE === "dokumentasi") {
+                var keys = Object.keys(dokSelection);
+                document.getElementById("selectionCount").innerText = keys.length + " foto dipilih";
+                document.getElementById("startBtn").disabled = keys.length === 0;
+                document.getElementById("startBtn").innerText = "Buat PDF (" + keys.length + ")";
+            } else if (MODE === "hourmeter") {
+                var valid = 0;
+                for (var k in hmSelection) { if (hmSelection[k].before && hmSelection[k].after) valid++; }
+                document.getElementById("selectionCount").innerText = valid + " pasang";
+                document.getElementById("startBtn").disabled = valid === 0;
+                document.getElementById("startBtn").innerText = "Buat PDF (" + valid + ")";
+            }
+        }
+
+        function startProcessing() {
+            document.getElementById("selectionUI").style.display = "none";
+            document.getElementById("progressUI").style.display = "block";
+            if (MODE === "dokumentasi") startDok();
+            else if (MODE === "hourmeter") startHm();
+        }
+
+        function log(msg) {
+            var d = document.getElementById("logs");
+            d.style.display = "block";
+            d.innerHTML += "<div>" + msg + "</div>";
+            d.scrollTop = d.scrollHeight;
+        }
+
+        function updProg(ct, total, tx) {
+            var pct = Math.floor((ct / total) * 100);
+            var fill = document.getElementById("fill");
+            fill.style.width = pct + "%";
+            fill.innerText = pct + "%";
+            document.getElementById("statusText").innerText = tx;
+        }
+
+        // =============== DOKUMENTASI ===============
+        var dokSections = [], curSection = 0, totalPhotos = 0, chunkDocId = null, repInfo = null;
+
+        function startDok() {
+            document.getElementById("progressHeader").innerText = "Foto Dokumentasi";
+            document.getElementById("spinnerWrapper").style.display = "none";
+            document.getElementById("progressBar").style.display = "block";
+            var rowGroups = {};
+            for (var fid in dokSelection) {
+                var sel = dokSelection[fid];
+                if (!rowGroups[sel.rowIdx]) {
+                    var info = null;
+                    for (var ri = 0; ri < reportData.length; ri++) {
+                        if (reportData[ri].rowIdx === sel.rowIdx) { info = reportData[ri]; break; }
+                    }
+                    rowGroups[sel.rowIdx] = { info: info || reportData[0], photos: [] };
+                }
+                rowGroups[sel.rowIdx].photos.push({ imgId: fid, progress: sel.progress });
+            }
+            var progressOrder = { "0%": 1, "50%": 2, "100%": 3 };
+            var sectionKeys = Object.keys(rowGroups);
+            for (var sk = 0; sk < sectionKeys.length; sk++) {
+                rowGroups[sectionKeys[sk]].photos.sort(function(a, b) {
+                    return (progressOrder[a.progress] || 0) - (progressOrder[b.progress] || 0);
+                });
+            }
+            dokSections = [];
+            for (var sik = 0; sik < sectionKeys.length; sik++) dokSections.push(rowGroups[sectionKeys[sik]]);
+            curSection = 0; totalPhotos = 0;
+            for (var ti = 0; ti < dokSections.length; ti++) totalPhotos += dokSections[ti].photos.length;
+            repInfo = dokSections[0].info;
+            log(dokSections.length + " baris, " + totalPhotos + " foto");
+            updProg(0, totalPhotos, "Init...");
+            google.script.run.withSuccessHandler(function(res) {
+                if (!res.success) { log("Gagal: " + res.error); return; }
+                chunkDocId = res.docId;
+                log("Proses...");
+                processNextSection();
+            }).initDokumentasiDoc(repInfo);
+        }
+
+        function processNextSection() {
+            if (curSection >= dokSections.length) {
+                log("Simpan...");
+                updProg(totalPhotos, totalPhotos, "Simpan...");
+                google.script.run.withSuccessHandler(function(res) {
+                    if (res.success) {
+                        document.getElementById("statusText").innerHTML = "Selesai!";
+                        document.getElementById("folderLink").href = res.url;
+                        document.getElementById("finishAction").style.display = "block";
+                    } else log("Gagal: " + res.error);
+                }).finalizeAndSaveDokumentasi(chunkDocId, repInfo);
+                return;
+            }
+            var section = dokSections[curSection];
+            log("Baris " + (curSection + 1) + "/" + dokSections.length + " (" + section.photos.length + " foto)");
+            google.script.run
+                .withSuccessHandler(function(res) {
+                    if (!res.success) log("Gagal: " + res.error);
+                    curSection++;
+                    updProg(curSection, dokSections.length, "Baris " + (curSection) + "/" + dokSections.length);
+                    setTimeout(processNextSection, 500);
+                })
+                .withFailureHandler(function(e) {
+                    log("Error: " + e.message);
+                    curSection++;
+                    setTimeout(processNextSection, 3000);
+                })
+                .appendDokumentasiPhotos(chunkDocId, section.photos, section.info);
+        }
+
+        // =============== HOURMETER ===============
+        var chunkArr = [], curChunk = 0;
+
+        function startHm() {
+            document.getElementById("progressHeader").innerText = "Foto Hourmeter";
+            document.getElementById("spinnerWrapper").style.display = "none";
+            document.getElementById("progressBar").style.display = "block";
+            var validDays = [];
+            for (var k in hmSelection) { if (hmSelection[k].before && hmSelection[k].after) validDays.push(k); }
+            var firstId = parseInt(validDays[0]);
+            repInfo = null;
+            for (var i = 0; i < reportData.length; i++) { if (reportData[i].rowIdx === firstId) { repInfo = reportData[i]; break; } }
+            if (!repInfo) repInfo = reportData[0];
+            chunkArr = [];
+            for (var m = 0; m < validDays.length; m++) {
+                var vk = validDays[m], dr = null;
+                for (var n = 0; n < reportData.length; n++) { if (reportData[n].rowIdx == vk) { dr = reportData[n]; break; } }
+                chunkArr.push({ tanggal: dr ? dr.tanggal : "-", before: hmSelection[vk].before, after: hmSelection[vk].after });
+            }
+            log("Siap " + chunkArr.length + " pasang...");
+            updProg(0, chunkArr.length, "Init...");
+            google.script.run.withSuccessHandler(function(res) {
+                if (!res.success) { log("Gagal: " + res.error); return; }
+                chunkDocId = res.docId; curChunk = 0;
+                log("Proses...");
+                processNextHm();
+            }).initHourmeterDoc(repInfo);
+        }
+
+        function processNextHm() {
+            if (curChunk >= chunkArr.length) {
+                log("Simpan...");
+                updProg(chunkArr.length, chunkArr.length, "Simpan...");
+                google.script.run.withSuccessHandler(function(res) {
+                    if (res.success) {
+                        document.getElementById("statusText").innerHTML = "Selesai!";
+                        document.getElementById("folderLink").href = res.url;
+                        document.getElementById("finishAction").style.display = "block";
+                    } else log("Gagal: " + res.error);
+                }).finalizeAndSaveHourmeter(chunkDocId, repInfo);
+                return;
+            }
+            var batch = chunkArr.slice(curChunk, curChunk + 3);
+            log("Sisip " + (curChunk + 1) + " - " + (curChunk + batch.length));
+            google.script.run
+                .withSuccessHandler(function(res) {
+                    if (!res.success) { log("Gagal: " + res.error); return; }
+                    curChunk += batch.length;
+                    updProg(curChunk, chunkArr.length, "Proses " + curChunk + "/" + chunkArr.length);
+                    setTimeout(processNextHm, 500);
+                })
+                .withFailureHandler(function(e) { log("Error: " + e.message); setTimeout(processNextHm, 3000); })
+                .appendHourmeterPhotos(chunkDocId, batch);
+        }
+    </script>
+</body>
+</html>
