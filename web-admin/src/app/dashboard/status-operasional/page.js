@@ -2,6 +2,7 @@
 import { useEffect, useState, useCallback } from 'react';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/context/AuthContext';
+import dynamic from 'next/dynamic';
 
 const JOB_LABELS = { normalisasi: 'Normalisasi', embung: 'Embung', lainnya: 'Lainnya' };
 const SUB_LABELS = { normalisasi_sungai: 'Normalisasi Sungai', saluran_afvoer: 'Saluran Air/Afvoer', normalisasi_embung: 'Normalisasi Embung', pembangunan_embung: 'Pembangunan Embung' };
@@ -11,6 +12,9 @@ const STATUS_MAP = {
   maintenance: { label: 'Sedang Perbaikan', badge: 'badge-maintenance' },
 };
 const PROGRESS_STEPS = ['pelaporan', 'diterima', 'pengerjaan', 'selesai'];
+
+// Dynamic import for MapComponent (client-side only)
+const MapComponent = dynamic(() => import('@/components/MapComponent'), { ssr: false });
 
 export default function StatusOperasionalPage() {
   const { profile } = useAuth();
@@ -27,6 +31,7 @@ export default function StatusOperasionalPage() {
   // Filters
   const [filterSeksi, setFilterSeksi] = useState('semua');
   const [filterData, setFilterData] = useState('semua'); // 'semua', 'alat_ready', 'alat_maintenance', 'operator_ready'
+  const [viewMode, setViewMode] = useState('list'); // 'list' or 'map'
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -90,6 +95,61 @@ export default function StatusOperasionalPage() {
   if (filterData === 'alat_ready') displayAlat = alat.filter(a => a.status === 'ready');
   if (filterData === 'alat_maintenance') displayAlat = alat.filter(a => a.status === 'maintenance');
 
+  // Build mapItems for MapComponent
+  const mapItems = displayAssignments
+    .filter(a => a.equipment && (a.location_district || a.location_village_override))
+    .map(a => {
+      const district = a.location_district_override || a.location_district || '';
+      const village = a.location_village_override || a.location_village || '';
+      const eq = Array.isArray(a.equipment) ? a.equipment[0] : a.equipment;
+
+      // Determine if alat is at job location (has active assignment) or at office (no active assignment)
+      const isAtOffice = !a.location_district && !a.location_village;
+
+      // Get coordinates from DESA_MAP (built-in coordinate lookup)
+      const DESA_COORDS = {
+        'DANDER': { lat: -7.1333, lng: 111.8833 },
+        'SUKOWATI': { lat: -7.1417, lng: 111.8750 },
+        'MELIKAN': { lat: -7.1283, lng: 111.8917 },
+        'CACING': { lat: -7.1167, lng: 111.9000 },
+        'KAWENGAN': { lat: -7.1083, lng: 111.9083 },
+        'SUKO': { lat: -7.1250, lng: 111.8667 },
+        'NGASINAN': { lat: -7.1500, lng: 111.8583 },
+        'NGADILUMPU': { lat: -7.1583, lng: 111.8750 },
+        'KANOR': { lat: -7.1667, lng: 111.8917 },
+        'BRUMBUNG': { lat: -7.1750, lng: 111.8750 },
+        'PILANG': { lat: -7.1833, lng: 111.8583 },
+        'BANGILAN': { lat: -7.1917, lng: 111.8417 },
+        'SENGGURUH': { lat: -7.2000, lng: 111.8250 },
+        'POMAHAN': { lat: -7.1750, lng: 111.8417 },
+        'WOTMASGETH': { lat: -7.1833, lng: 111.8250 },
+      };
+
+      // Default fallback - generate random offset from center if no coordinates found
+      const coords = DESA_COORDS[district.toUpperCase()] || {
+        lat: -7.15 + (Math.random() * 0.1 - 0.05),
+        lng: 111.88 + (Math.random() * 0.1 - 0.05),
+      };
+
+      return {
+        id: eq?.id || a.id,
+        alatName: [eq?.nomor_lambung, eq?.merk_type ? `(${eq.merk_type})` : null, eq?.name].filter(Boolean).join(' ') || 'Alat Berat',
+        status: eq?.status || 'ready',
+        merk: eq?.merk_type,
+        nomorLambung: eq?.nomor_lambung,
+        desa: village,
+        kecamatan: district,
+        pekerjaan: a.job_sub_type ? SUB_LABELS[a.job_sub_type] || a.job_type : JOB_LABELS[a.job_type] || a.job_type,
+        operator: a.operator?.full_name || '—',
+        helper: a.helper_override || a.helper?.full_name || '—',
+        kondisi: `${eq?.condition_percentage || 100}%`,
+        seksi: a.created_by_role === 'seksi_normalisasi' ? 'Normalisasi' : a.created_by_role === 'seksi_embung' ? 'Embung' : '',
+        lat: coords.lat,
+        lng: coords.lng,
+        isAtOffice: isAtOffice && !coords,
+      };
+    });
+
   return (
     <>
       <div className="header">
@@ -103,10 +163,47 @@ export default function StatusOperasionalPage() {
              <option value="seksi_normalisasi">Seksi Normalisasi</option>
              <option value="seksi_embung">Seksi Embung</option>
            </select>
+           <button
+             className="btn btn-sm"
+             style={{
+               marginLeft: 12,
+               background: viewMode === 'map' ? 'var(--primary)' : 'var(--surface)',
+               color: viewMode === 'map' ? '#fff' : 'var(--text-main)',
+               border: '1px solid var(--border)',
+               display: 'flex',
+               alignItems: 'center',
+               gap: 6,
+               padding: '8px 14px',
+             }}
+             onClick={() => setViewMode(viewMode === 'list' ? 'map' : 'list')}
+           >
+             {viewMode === 'list' ? (
+               <>
+                 <svg width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                   <path strokeLinecap="round" strokeLinejoin="round" d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7" />
+                 </svg>
+                 Peta
+               </>
+             ) : (
+               <>
+                 <svg width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                   <path strokeLinecap="round" strokeLinejoin="round" d="M4 6h16M4 12h16M4 18h16" />
+                 </svg>
+                 Daftar
+               </>
+             )}
+           </button>
         </div>
       </div>
 
       <div className="page-body">
+        {/* Map View */}
+        {viewMode === 'map' && (
+          <div style={{ height: 'calc(100vh - 200px)', borderRadius: 12, overflow: 'hidden', border: '1px solid var(--border)', marginBottom: 24 }}>
+            <MapComponent mapItems={mapItems} />
+          </div>
+        )}
+
         {/* Top Summary Stats */}
         <div className="stats-grid" style={{marginBottom: 24}}>
           <div className={`stat-card ${filterData==='semua'?'active-filter':''}`} style={{cursor:'pointer', border: filterData==='semua'?'1px solid var(--primary)':''}} onClick={()=>setFilterData('semua')}>
