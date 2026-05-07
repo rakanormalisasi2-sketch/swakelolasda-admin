@@ -168,22 +168,27 @@ export default function Sidebar({ maintenanceCount = 0 }) {
     : '??';
 
   useEffect(() => {
-    if (!profile || profile.role !== 'peralatan' && profile.role !== 'superadmin') return;
+    if (!profile) return;
+    const isAllowed = profile.role === 'peralatan' || profile.role === 'superadmin';
+    if (!isAllowed) return;
 
     const fetchCounts = async () => {
       try {
         // 1. Pending Warehouse Requests
         const res = await fetch('/api/gudang?type=requests&status=pending');
-        const { data: requests } = await res.json();
+        const json = await res.json();
+        const pendingRequestsCount = json.data?.length || 0;
         
         // 2. Active Repairs (progress_status != 'selesai')
-        const { count: repairCount } = await supabase
+        const { count: repairCount, error: repairErr } = await supabase
           .from('maintenance_logs')
           .select('*', { count: 'exact', head: true })
           .neq('progress_status', 'selesai');
 
+        if (repairErr) throw repairErr;
+
         setCounts({
-          pendingRequests: requests?.length || 0,
+          pendingRequests: pendingRequestsCount,
           activeRepairs: repairCount || 0
         });
       } catch (err) {
@@ -192,9 +197,9 @@ export default function Sidebar({ maintenanceCount = 0 }) {
     };
 
     fetchCounts();
-    const interval = setInterval(fetchCounts, 30000); // 30s refresh
+    const interval = setInterval(fetchCounts, 20000); // 20s refresh
     return () => clearInterval(interval);
-  }, [profile]);
+  }, [profile?.role]);
 
   return (
     <>
@@ -242,23 +247,26 @@ export default function Sidebar({ maintenanceCount = 0 }) {
                     onClick={() => setMobileOpen(false)}
                   >
                     {ICONS[item.icon]}
-                    {item.label}
-                    {item.badgeKey && counts[item.badgeKey] > 0 && (
-                      <span className="sidebar-badge danger pulse" style={{ 
-                        marginLeft: '8px', 
-                        background: '#dc2626', 
-                        color: 'white', 
-                        borderRadius: '50%', 
-                        width: '18px', 
-                        height: '18px', 
-                        display: 'inline-flex', 
-                        alignItems: 'center', 
-                        justifyContent: 'center', 
-                        fontSize: '11px', 
-                        fontWeight: '900',
-                        boxShadow: '0 0 0 2px rgba(220, 38, 26, 0.2)'
-                      }}>!</span>
-                    )}
+                    <span style={{ display: 'flex', alignItems: 'center' }}>
+                      {item.label}
+                      {item.badgeKey && counts[item.badgeKey] > 0 && (
+                        <span className="sidebar-badge danger pulse" style={{ 
+                          marginLeft: '8px', 
+                          background: '#dc2626', 
+                          color: 'white', 
+                          borderRadius: '50%', 
+                          width: '18px', 
+                          height: '18px', 
+                          display: 'flex', 
+                          alignItems: 'center', 
+                          justifyContent: 'center', 
+                          fontSize: '11px', 
+                          fontWeight: '900',
+                          boxShadow: '0 0 0 2px rgba(220, 38, 26, 0.3)',
+                          flexShrink: 0
+                        }}>!</span>
+                      )}
+                    </span>
                     {item.badge === 'maintenance_count' && maintenanceCount > 0 && (
                       <span className="sidebar-badge">{maintenanceCount}</span>
                     )}
