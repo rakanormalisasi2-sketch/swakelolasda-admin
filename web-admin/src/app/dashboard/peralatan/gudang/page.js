@@ -186,9 +186,24 @@ export default function GudangPage() {
   };
 
   const handleDeleteItem = async (id) => {
-    if (!confirm('Hapus barang ini?')) return;
-    await fetch(`/api/gudang?type=item&id=${id}`, { method: 'DELETE' });
-    loadData();
+    if (!confirm('Hapus barang ini? Seluruh histori transaksi dan permintaan terkait barang ini akan ikut terhapus permanen.')) return;
+    setSaving(true);
+    try {
+      const res = await fetch(`/api/gudang?type=item&id=${id}`, { method: 'DELETE' });
+      const data = await res.json();
+      
+      if (res.ok) {
+        // Optimistic UI update
+        setItems(prev => prev.filter(item => item.id !== id));
+        loadData();
+      } else {
+        alert('Gagal menghapus: ' + (data.error || 'Terjadi kesalahan sistem.'));
+      }
+    } catch (e) {
+      alert('Error: ' + e.message);
+    } finally {
+      setSaving(false);
+    }
   };
 
   // ============ CATEGORY CRUD ============
