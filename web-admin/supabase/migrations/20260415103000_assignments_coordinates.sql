@@ -1,0 +1,3 @@
+ALTER TABLE assignments 
+ADD COLUMN IF NOT EXISTS latitude numeric DEFAULT NULL, 
+ADD COLUMN IF NOT EXISTS longitude numeric DEFAULT NULL;

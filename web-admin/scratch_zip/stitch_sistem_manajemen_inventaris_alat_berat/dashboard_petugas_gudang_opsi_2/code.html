@@ -1,0 +1,343 @@
+<!DOCTYPE html>
+
+<html class="light" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Dashboard Petugas Gudang (Opsi 2)</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com" rel="preconnect"/>
+<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
+<link href="https://fonts.googleapis.com/css2?family=Literata:ital,opsz,wght@0,7..72,200..900;1,7..72,200..900&amp;family=Nunito+Sans:ital,opsz,wght@0,6..12,200..1000;1,6..12,200..1000&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+          darkMode: "class",
+          theme: {
+            extend: {
+              "colors": {
+                      "primary": "#4a7c59",
+                      "error-container": "#ffdad8",
+                      "surface-container-lowest": "#ffffff",
+                      "on-error-container": "#690005",
+                      "on-tertiary-container": "#554020",
+                      "background": "#faf6f0",
+                      "error": "#b83230",
+                      "primary-fixed-dim": "#8ecf9e",
+                      "on-secondary": "#ffffff",
+                      "on-secondary-container": "#5e5548",
+                      "on-secondary-fixed": "#1e1a13",
+                      "tertiary-fixed-dim": "#dcc48e",
+                      "outline-variant": "#c4c8bc",
+                      "primary-fixed": "#c8e8d0",
+                      "tertiary": "#705c30",
+                      "on-error": "#ffffff",
+                      "surface-variant": "#e4e0d8",
+                      "on-primary-fixed-variant": "#2a6038",
+                      "surface-container": "#f0ece4",
+                      "primary-container": "#78a886",
+                      "surface": "#faf6f0",
+                      "inverse-on-surface": "#f5f0e8",
+                      "surface-container-high": "#eae6de",
+                      "inverse-primary": "#8ecf9e",
+                      "surface-dim": "#dbd7cf",
+                      "surface-bright": "#faf6f0",
+                      "on-tertiary-fixed": "#221a05",
+                      "on-primary-fixed": "#002110",
+                      "on-surface-variant": "#4a4e4a",
+                      "tertiary-container": "#c4a66a",
+                      "on-primary": "#ffffff",
+                      "secondary": "#6b6358",
+                      "on-background": "#2e3230",
+                      "surface-container-low": "#f5f1ea",
+                      "on-tertiary-fixed-variant": "#554020",
+                      "on-secondary-fixed-variant": "#4a4538",
+                      "tertiary-fixed": "#f8e0a8",
+                      "on-primary-container": "#d8f0de",
+                      "secondary-fixed-dim": "#d4ccbf",
+                      "inverse-surface": "#2e3230",
+                      "outline": "#74796e",
+                      "on-tertiary": "#ffffff",
+                      "surface-container-highest": "#e4e0d8",
+                      "secondary-fixed": "#f0e8db",
+                      "secondary-container": "#f0e8db",
+                      "on-surface": "#2e3230",
+                      "surface-tint": "#4a7c59"
+              },
+              "borderRadius": {
+                      "DEFAULT": "0.5rem",
+                      "lg": "1rem",
+                      "xl": "1.5rem",
+                      "full": "9999px"
+              },
+              "spacing": {},
+              "fontFamily": {
+                      "headline": [
+                              "Literata"
+                      ],
+                      "display": [
+                              "Literata"
+                      ],
+                      "body": [
+                              "Nunito Sans"
+                      ],
+                      "label": [
+                              "Nunito Sans"
+                      ]
+              },
+              "fontSize": {}
+      },
+          },
+        }
+      </script>
+<style>
+        body { font-family: 'Nunito Sans', sans-serif; background-color: #faf6f0; color: #2e3230; line-height: 1.6; }
+        h1, h2, h3, h4, h5, h6, .font-headline { font-family: 'Literata', serif; }
+        .material-symbols-outlined { font-variation-settings: 'FILL' 1; }
+      </style>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  </head>
+<body class="bg-background min-h-screen text-on-background pb-24 md:pb-0">
+<!-- TopAppBar -->
+<header class="bg-surface dark:bg-surface-dim text-primary dark:text-primary-fixed-dim font-headline text-headline-sm leading-relaxed docked full-width top-0 bg-surface dark:bg-surface-dim border-b border-outline-variant/30 flat no shadows flex items-center justify-between px-4 h-16 w-full max-w-md mx-auto sticky z-40 md:hidden">
+<div class="flex items-center gap-2">
+<span class="material-symbols-outlined text-primary text-2xl">warehouse</span>
+<span class="font-headline text-xl font-bold text-primary dark:text-primary-fixed-dim">Terra Warehouse</span>
+</div>
+<div>
+<img alt="User profile" class="w-8 h-8 rounded-full border-2 border-primary object-cover" data-alt="A small circular avatar placeholder image showing a generic profile portrait, integrated seamlessly into an earthy green and warm cream minimalist UI layout." src="https://lh3.googleusercontent.com/aida-public/AB6AXuDVG3vPjFWwuJxUwRuUz5mUnxOYXYQCtxnXV78N4laVkqH1HyPk1iQFx_tjIIwdfFFQX0dpsJf5U7hyIKGkMTnNOTA7cxGw6jJtJkCZUf3Np4USs12IlTgycq-A3wpfNvcLw5WmKvZdv7gTWwJERWms2ULgDy27eU0N9K3UbbwP6AmDbRkOKIb_sz4pbFzx_INzFObKhV6VUVWnO6rW2saoEQ6irfZKFSxsZc3JqelmDodYk3B6xkZPrMtfz1tyGvHY2L0GBTJzdEE"/>
+</div>
+</header>
+<!-- Web Navigation Cluster (Hidden on Mobile) -->
+<nav class="hidden md:flex flex-col w-64 bg-surface-container h-screen fixed left-0 top-0 border-r border-outline-variant/30 p-6 z-50">
+<div class="flex items-center gap-3 mb-10">
+<span class="material-symbols-outlined text-primary text-3xl">warehouse</span>
+<span class="font-headline text-2xl font-bold text-primary tracking-tight">Terra Warehouse</span>
+</div>
+<ul class="flex flex-col gap-2 flex-grow">
+<li>
+<a class="flex items-center gap-4 px-4 py-3 rounded-xl bg-primary-container text-on-primary-container font-label font-bold text-base transition-colors hover:bg-surface-container-high" href="#">
+<span class="material-symbols-outlined">dashboard</span>
+                    Dashboard
+                </a>
+</li>
+<li>
+<a class="flex items-center gap-4 px-4 py-3 rounded-xl text-on-surface-variant font-label text-base transition-colors hover:bg-surface-container-high" href="#">
+<span class="material-symbols-outlined">factory</span>
+                    Inventory
+                </a>
+</li>
+<li>
+<a class="flex items-center gap-4 px-4 py-3 rounded-xl text-on-surface-variant font-label text-base transition-colors hover:bg-surface-container-high" href="#">
+<span class="material-symbols-outlined">pending_actions</span>
+                    Requests
+                </a>
+</li>
+<li>
+<a class="flex items-center gap-4 px-4 py-3 rounded-xl text-on-surface-variant font-label text-base transition-colors hover:bg-surface-container-high" href="#">
+<span class="material-symbols-outlined">notifications</span>
+                    Alerts
+                </a>
+</li>
+</ul>
+<div class="mt-auto flex items-center gap-3 pt-6 border-t border-outline-variant/30">
+<img alt="User profile" class="w-10 h-10 rounded-full border-2 border-primary-container object-cover" data-alt="A small circular avatar placeholder image showing a generic profile portrait, integrated seamlessly into an earthy green and warm cream minimalist UI layout." src="https://lh3.googleusercontent.com/aida-public/AB6AXuAiIaQqFHPOykGUwwyjuTtnezUMnKQTIIibIFGjAOvY3NnysADc-pgjfCrCqrp9pxBXtg0GeTYmAlOakqbnEChLGKyyw6PJPQXpFvf3EWo8u0w6_o_CpoVUXS5boncCb_PlidJJs3bgDwB4i_C9geNRWqWY_v4_RS5yPrq7fPICbAtJXHl_AdWvClgcOuL57anRI1b_hskzJbIyv46Pq5d5fLtleOT1VIF2JxIp0_xGErY-9OJyZI5IJNUm2tFWZpNbjg4BbqE3wh8"/>
+<div class="flex flex-col">
+<span class="font-headline font-bold text-sm text-on-surface">Alex Mercer</span>
+<span class="font-label text-xs text-on-surface-variant">Warehouse Lead</span>
+</div>
+</div>
+</nav>
+<!-- Main Content Area -->
+<main class="md:ml-64 p-4 md:p-8 max-w-7xl mx-auto space-y-6 md:space-y-8">
+<!-- Page Header -->
+<div class="flex flex-col md:flex-row md:items-end justify-between gap-4 mb-2">
+<div>
+<h1 class="font-headline text-3xl md:text-4xl font-bold text-on-background tracking-tight mb-1">Overview</h1>
+<p class="font-label text-on-surface-variant text-base">Real-time status of Terra facilities.</p>
+</div>
+<div class="flex items-center gap-3">
+<span class="text-sm font-label text-on-surface-variant bg-surface-container px-3 py-1.5 rounded-full flex items-center gap-1.5"><span class="material-symbols-outlined text-sm text-primary">sync</span> Just updated</span>
+</div>
+</div>
+<!-- Bento Grid: Status & Capacity Widgets -->
+<div class="grid grid-cols-1 md:grid-cols-12 gap-4 md:gap-6">
+<!-- Overall Capacity Widget (Large) -->
+<div class="md:col-span-8 bg-surface-container-lowest rounded-2xl p-6 shadow-[0_4px_20px_rgba(46,50,48,0.06)] border border-outline-variant/20 flex flex-col justify-between relative overflow-hidden">
+<div class="absolute top-0 right-0 w-32 h-32 bg-primary-container/20 rounded-bl-full -mr-10 -mt-10 blur-xl pointer-events-none"></div>
+<div class="flex justify-between items-start mb-6 relative z-10">
+<div>
+<h2 class="font-headline text-xl font-bold text-on-background flex items-center gap-2">
+<span class="material-symbols-outlined text-primary">analytics</span> Warehouse Capacity
+                        </h2>
+<p class="text-sm text-on-surface-variant mt-1">Total physical storage utilization</p>
+</div>
+<span class="bg-tertiary-container text-on-tertiary-container text-xs font-bold px-2.5 py-1 rounded-full uppercase tracking-wider">Near Limit</span>
+</div>
+<div class="relative z-10">
+<div class="flex justify-between items-end mb-2">
+<span class="font-display text-4xl md:text-5xl font-light text-on-background">84<span class="text-2xl text-on-surface-variant">%</span></span>
+<span class="text-sm font-label text-on-surface-variant font-medium">12,600 / 15,000 Pallets</span>
+</div>
+<div class="w-full bg-surface-container h-3 rounded-full overflow-hidden">
+<div class="bg-primary h-full rounded-full" style="width: 84%;"></div>
+</div>
+<div class="flex justify-between mt-3 text-xs text-on-surface-variant">
+<span class="flex items-center gap-1"><span class="w-2 h-2 rounded-full bg-primary inline-block"></span> Used Space</span>
+<span class="flex items-center gap-1"><span class="w-2 h-2 rounded-full bg-surface-container inline-block"></span> Available (16%)</span>
+</div>
+</div>
+</div>
+<!-- Daily Throughput Widget (Small) -->
+<div class="md:col-span-4 bg-primary text-on-primary rounded-2xl p-6 shadow-[0_4px_20px_rgba(46,50,48,0.06)] flex flex-col justify-between relative overflow-hidden">
+<div class="absolute top-0 right-0 w-full h-full bg-gradient-to-br from-primary-container/20 to-transparent pointer-events-none"></div>
+<div class="flex justify-between items-start mb-4 relative z-10">
+<h2 class="font-headline text-lg font-bold flex items-center gap-2">
+<span class="material-symbols-outlined">local_shipping</span> Daily Throughput
+                    </h2>
+</div>
+<div class="relative z-10">
+<div class="mb-4">
+<span class="text-sm opacity-80 block mb-1">Inbound (Units)</span>
+<span class="font-display text-3xl font-bold">+1,240</span>
+</div>
+<div>
+<span class="text-sm opacity-80 block mb-1">Outbound (Units)</span>
+<span class="font-display text-3xl font-bold">-890</span>
+</div>
+</div>
+<div class="mt-4 pt-4 border-t border-on-primary/20 flex items-center gap-2 text-sm relative z-10">
+<span class="material-symbols-outlined text-sm">trending_up</span> Net +350 today
+                </div>
+</div>
+</div>
+<!-- Stock Levels by Category -->
+<div>
+<h2 class="font-headline text-2xl font-bold text-on-background mb-4">Stock Levels by Category</h2>
+<div class="grid grid-cols-1 md:grid-cols-3 gap-4 md:gap-6">
+<!-- Category 1 -->
+<div class="bg-surface-container-lowest rounded-2xl p-5 shadow-[0_4px_20px_rgba(46,50,48,0.06)] border border-outline-variant/20 flex flex-col gap-4">
+<div class="flex items-center gap-3 mb-2">
+<div class="w-10 h-10 rounded-full bg-surface-container flex items-center justify-center">
+<span class="material-symbols-outlined text-secondary">inventory_2</span>
+</div>
+<div>
+<h3 class="font-headline text-lg font-bold text-on-background">Heavy Parts</h3>
+<p class="text-xs text-on-surface-variant">Zone A &amp; B</p>
+</div>
+</div>
+<div class="space-y-3">
+<div>
+<div class="flex justify-between text-sm mb-1">
+<span class="font-medium text-on-surface">Engines</span>
+<span class="text-on-surface-variant">65%</span>
+</div>
+<div class="w-full bg-surface-container h-1.5 rounded-full overflow-hidden">
+<div class="bg-primary h-full rounded-full" style="width: 65%;"></div>
+</div>
+</div>
+<div>
+<div class="flex justify-between text-sm mb-1">
+<span class="font-medium text-on-surface">Chassis</span>
+<span class="text-on-surface-variant">82%</span>
+</div>
+<div class="w-full bg-surface-container h-1.5 rounded-full overflow-hidden">
+<div class="bg-primary h-full rounded-full" style="width: 82%;"></div>
+</div>
+</div>
+</div>
+</div>
+<!-- Category 2 (Low Stock Example) -->
+<div class="bg-surface-container-lowest rounded-2xl p-5 shadow-[0_4px_20px_rgba(46,50,48,0.06)] border border-error/30 bg-error-container/10 flex flex-col gap-4 relative overflow-hidden">
+<div class="absolute top-0 right-0 w-2 h-full bg-error"></div>
+<div class="flex items-center justify-between mb-2">
+<div class="flex items-center gap-3">
+<div class="w-10 h-10 rounded-full bg-error-container text-on-error-container flex items-center justify-center">
+<span class="material-symbols-outlined">water_drop</span>
+</div>
+<div>
+<h3 class="font-headline text-lg font-bold text-on-background">Fluids</h3>
+<p class="text-xs text-error font-medium flex items-center gap-1"><span class="material-symbols-outlined text-[14px]">warning</span> Action Required</p>
+</div>
+</div>
+</div>
+<div class="space-y-3">
+<div>
+<div class="flex justify-between text-sm mb-1">
+<span class="font-medium text-on-surface">Coolant</span>
+<span class="text-error font-bold">12%</span>
+</div>
+<div class="w-full bg-surface-container h-1.5 rounded-full overflow-hidden">
+<div class="bg-error h-full rounded-full" style="width: 12%;"></div>
+</div>
+</div>
+<div>
+<div class="flex justify-between text-sm mb-1">
+<span class="font-medium text-on-surface">Lubricants</span>
+<span class="text-on-surface-variant">45%</span>
+</div>
+<div class="w-full bg-surface-container h-1.5 rounded-full overflow-hidden">
+<div class="bg-primary h-full rounded-full" style="width: 45%;"></div>
+</div>
+</div>
+</div>
+</div>
+<!-- Category 3 -->
+<div class="bg-surface-container-lowest rounded-2xl p-5 shadow-[0_4px_20px_rgba(46,50,48,0.06)] border border-outline-variant/20 flex flex-col gap-4">
+<div class="flex items-center gap-3 mb-2">
+<div class="w-10 h-10 rounded-full bg-surface-container flex items-center justify-center">
+<span class="material-symbols-outlined text-secondary">category</span>
+</div>
+<div>
+<h3 class="font-headline text-lg font-bold text-on-background">Consumables</h3>
+<p class="text-xs text-on-surface-variant">Zone C</p>
+</div>
+</div>
+<div class="space-y-3">
+<div>
+<div class="flex justify-between text-sm mb-1">
+<span class="font-medium text-on-surface">Fasteners</span>
+<span class="text-on-surface-variant">90%</span>
+</div>
+<div class="w-full bg-surface-container h-1.5 rounded-full overflow-hidden">
+<div class="bg-primary h-full rounded-full" style="width: 90%;"></div>
+</div>
+</div>
+<div>
+<div class="flex justify-between text-sm mb-1">
+<span class="font-medium text-on-surface">Filters</span>
+<span class="text-on-surface-variant">55%</span>
+</div>
+<div class="w-full bg-surface-container h-1.5 rounded-full overflow-hidden">
+<div class="bg-primary h-full rounded-full" style="width: 55%;"></div>
+</div>
+</div>
+</div>
+</div>
+</div>
+</div>
+</main>
+<!-- BottomNavBar (Mobile Only) -->
+<nav class="md:hidden bg-surface-container dark:bg-surface-container-low text-primary dark:text-primary-fixed-dim font-label text-xs tracking-wide font-headline text-lg font-bold text-primary fixed bottom-0 w-full z-50 rounded-t-xl bg-surface-container dark:bg-surface-container-low shadow-[0_-4px_20px_rgba(46,50,48,0.06)] shadow-sm fixed bottom-0 left-0 w-full flex justify-around items-center px-2 pb-4 pt-2 max-w-md mx-auto">
+<a class="flex flex-col items-center justify-center bg-primary-container dark:bg-primary text-on-primary-container dark:text-on-primary rounded-xl px-4 py-1 hover:bg-surface-container-high dark:hover:bg-surface-container-highest transition-colors active:scale-90 transition-transform duration-200" href="#">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">dashboard</span>
+<span class="mt-1">Dashboard</span>
+</a>
+<a class="flex flex-col items-center justify-center text-on-surface-variant dark:text-on-surface-variant py-1 hover:bg-surface-container-high dark:hover:bg-surface-container-highest transition-colors active:scale-90 transition-transform duration-200" href="#">
+<span class="material-symbols-outlined">factory</span>
+<span class="mt-1">Inventory</span>
+</a>
+<a class="flex flex-col items-center justify-center text-on-surface-variant dark:text-on-surface-variant py-1 hover:bg-surface-container-high dark:hover:bg-surface-container-highest transition-colors active:scale-90 transition-transform duration-200" href="#">
+<span class="material-symbols-outlined">pending_actions</span>
+<span class="mt-1">Requests</span>
+</a>
+<a class="flex flex-col items-center justify-center text-on-surface-variant dark:text-on-surface-variant py-1 hover:bg-surface-container-high dark:hover:bg-surface-container-highest transition-colors active:scale-90 transition-transform duration-200" href="#">
+<span class="material-symbols-outlined">notifications</span>
+<span class="mt-1">Alerts</span>
+</a>
+</nav>
+</body></html>

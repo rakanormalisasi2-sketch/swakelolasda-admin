@@ -1,0 +1,102 @@
+[
+  {
+    "nama": "CV. MANDIRI KARYA KONSULTAN",
+    "tanggal": "2026-04-02",
+    "sesi": "09:00 WIB (Pre-test)",
+    "q1": "Mengunggah foto progres pekerjaan dan kendala lapangan",
+    "q2": "Koordinat GPS dan timestamp",
+    "q3": "Mengunggah dokumen PDF di menu Laporan",
+    "q4": "Menonton film",
+    "q5": "Komentar/Catatan Lapangan"
+  },
+  {
+    "nama": "CV. GRAHA H2S CONSULTANT",
+    "tanggal": "2026-04-02",
+    "sesi": "09:00 WIB (Pre-test)",
+    "q1": "Menghitung anggaran proyek",
+    "q2": "Koordinat GPS dan timestamp",
+    "q3": "Dikirim via pos",
+    "q4": "Menonton film",
+    "q5": "Status Facebook"
+  },
+  {
+    "nama": "CV. SATYATAMA KONSULTAN",
+    "tanggal": "2026-04-02",
+    "sesi": "09:00 WIB (Pre-test)",
+    "q1": "Mencatatkan absensi pekerja",
+    "q2": "Koordinat GPS dan timestamp",
+    "q3": "Lewat WhatsApp",
+    "q4": "Melaporkan progres yang langsung masuk ke Website Admin Dinas",
+    "q5": "Komentar/Catatan Lapangan"
+  },
+  {
+    "nama": "CV. DANA KONSULTAN",
+    "tanggal": "2026-04-02",
+    "sesi": "09:00 WIB (Pre-test)",
+    "q1": "Mengawasi pekerjaan secara daring",
+    "q2": "Koordinat GPS dan timestamp",
+    "q3": "Datang langsung ke kantor Dinas",
+    "q4": "Bermain game bersama",
+    "q5": "Panggilan telepon pribadi"
+  },
+  {
+    "nama": "CV. EKA KARYA CONSULTANT",
+    "tanggal": "2026-04-02",
+    "sesi": "09:00 WIB (Pre-test)",
+    "q1": "Mengunggah foto progres pekerjaan dan kendala lapangan",
+    "q2": "Tanda tangan digital bupati",
+    "q3": "Mengunggah dokumen PDF di menu Laporan",
+    "q4": "Menonton film",
+    "q5": "Status Facebook"
+  },
+  {
+    "nama": "CV. MANDIRI KARYA KONSULTAN",
+    "tanggal": "2026-04-02",
+    "sesi": "11:00 WIB (Post-test)",
+    "q1": "Mengunggah foto progres pekerjaan dan kendala lapangan",
+    "q2": "Koordinat GPS dan timestamp",
+    "q3": "Mengunggah dokumen PDF di menu Laporan",
+    "q4": "Melaporkan progres yang langsung masuk ke Website Admin Dinas",
+    "q5": "Komentar/Catatan Lapangan"
+  },
+  {
+    "nama": "CV. GRAHA H2S CONSULTANT",
+    "tanggal": "2026-04-02",
+    "sesi": "11:00 WIB (Post-test)",
+    "q1": "Mengunggah foto progres pekerjaan dan kendala lapangan",
+    "q2": "Koordinat GPS dan timestamp",
+    "q3": "Mengunggah dokumen PDF di menu Laporan",
+    "q4": "Melaporkan progres yang langsung masuk ke Website Admin Dinas",
+    "q5": "Komentar/Catatan Lapangan"
+  },
+  {
+    "nama": "CV. SATYATAMA KONSULTAN",
+    "tanggal": "2026-04-02",
+    "sesi": "11:00 WIB (Post-test)",
+    "q1": "Mengunggah foto progres pekerjaan dan kendala lapangan",
+    "q2": "Koordinat GPS dan timestamp",
+    "q3": "Mengunggah dokumen PDF di menu Laporan",
+    "q4": "Melaporkan progres yang langsung masuk ke Website Admin Dinas",
+    "q5": "Komentar/Catatan Lapangan"
+  },
+  {
+    "nama": "CV. DANA KONSULTAN",
+    "tanggal": "2026-04-02",
+    "sesi": "11:00 WIB (Post-test)",
+    "q1": "Mengunggah foto progres pekerjaan dan kendala lapangan",
+    "q2": "Koordinat GPS dan timestamp",
+    "q3": "Mengunggah dokumen PDF di menu Laporan",
+    "q4": "Melaporkan progres yang langsung masuk ke Website Admin Dinas",
+    "q5": "Komentar/Catatan Lapangan"
+  },
+  {
+    "nama": "CV. EKA KARYA CONSULTANT",
+    "tanggal": "2026-04-02",
+    "sesi": "11:00 WIB (Post-test)",
+    "q1": "Mengunggah foto progres pekerjaan dan kendala lapangan",
+    "q2": "Koordinat GPS dan timestamp",
+    "q3": "Mengunggah dokumen PDF di menu Laporan",
+    "q4": "Melaporkan progres yang langsung masuk ke Website Admin Dinas",
+    "q5": "Panggilan telepon pribadi"
+  }
+]

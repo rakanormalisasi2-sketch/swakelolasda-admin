@@ -1,0 +1,231 @@
+<!DOCTYPE html>
+
+<html lang="id"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Dashboard Petugas Gudang (Opsi 1)</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Literata:wght@400;700;800&amp;family=Nunito+Sans:wght@400;600;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "primary": "#4a7c59",
+                        "error-container": "#ffdad8",
+                        "surface-container-lowest": "#ffffff",
+                        "on-error-container": "#690005",
+                        "on-tertiary-container": "#554020",
+                        "background": "#faf6f0",
+                        "error": "#b83230",
+                        "primary-fixed-dim": "#8ecf9e",
+                        "on-secondary": "#ffffff",
+                        "on-secondary-container": "#5e5548",
+                        "on-secondary-fixed": "#1e1a13",
+                        "tertiary-fixed-dim": "#dcc48e",
+                        "outline-variant": "#c4c8bc",
+                        "primary-fixed": "#c8e8d0",
+                        "tertiary": "#705c30",
+                        "on-error": "#ffffff",
+                        "surface-variant": "#e4e0d8",
+                        "on-primary-fixed-variant": "#2a6038",
+                        "surface-container": "#f0ece4",
+                        "primary-container": "#78a886",
+                        "surface": "#faf6f0",
+                        "inverse-on-surface": "#f5f0e8",
+                        "surface-container-high": "#eae6de",
+                        "inverse-primary": "#8ecf9e",
+                        "surface-dim": "#dbd7cf",
+                        "surface-bright": "#faf6f0",
+                        "on-tertiary-fixed": "#221a05",
+                        "on-primary-fixed": "#002110",
+                        "on-surface-variant": "#4a4e4a",
+                        "tertiary-container": "#c4a66a",
+                        "on-primary": "#ffffff",
+                        "secondary": "#6b6358",
+                        "on-background": "#2e3230",
+                        "surface-container-low": "#f5f1ea",
+                        "on-tertiary-fixed-variant": "#554020",
+                        "on-secondary-fixed-variant": "#4a4538",
+                        "tertiary-fixed": "#f8e0a8",
+                        "on-primary-container": "#d8f0de",
+                        "secondary-fixed-dim": "#d4ccbf",
+                        "inverse-surface": "#2e3230",
+                        "outline": "#74796e",
+                        "on-tertiary": "#ffffff",
+                        "surface-container-highest": "#e4e0d8",
+                        "secondary-fixed": "#f0e8db",
+                        "secondary-container": "#f0e8db",
+                        "on-surface": "#2e3230",
+                        "surface-tint": "#4a7c59"
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "0.5rem",
+                        "lg": "1rem",
+                        "xl": "1.5rem",
+                        "full": "9999px"
+                    },
+                    "fontFamily": {
+                        "headline": ["Literata", "serif"],
+                        "display": ["Literata", "serif"],
+                        "body": ["Nunito Sans", "sans-serif"],
+                        "label": ["Nunito Sans", "sans-serif"]
+                    }
+                }
+            }
+        }
+    </script>
+<style>
+        body { font-family: 'Nunito Sans', sans-serif; }
+        h1, h2, h3, h4, h5, h6, .font-headline { font-family: 'Literata', serif; }
+    </style>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  </head>
+<body class="bg-background text-on-background min-h-screen pb-24 md:pb-0">
+<!-- TopAppBar -->
+<header class="bg-surface border-b border-outline-variant/30 sticky top-0 z-40 w-full">
+<div class="flex items-center justify-between px-4 h-16 w-full max-w-md mx-auto md:max-w-7xl">
+<div class="flex items-center gap-3">
+<span class="material-symbols-outlined text-primary text-2xl" data-icon="warehouse">warehouse</span>
+<span class="font-headline text-xl font-bold text-primary">Terra Warehouse</span>
+</div>
+<button class="w-10 h-10 rounded-full overflow-hidden bg-surface-variant flex items-center justify-center hover:bg-surface-container transition-colors active:scale-95 transition-transform">
+<img alt="User profile" class="w-full h-full object-cover" data-alt="A close-up portrait of a friendly warehouse worker in a softly lit, organic environment. Warm, natural tones with a hint of earthy green. The mood is approachable and professional." src="https://lh3.googleusercontent.com/aida-public/AB6AXuA2sPLkqdNUM8Zp0On_LWxbOwUVlUKR7pOn_el_gXSHkE5qkRC3j5NxVQzRNTUiGqFiSeIxEiZv4wk0LTh9LHSZsLZSzouGCJ--hhfHZY4nRX7Jviq5-BJ-CalP7R6GwhG_jLTuEiSoL1XcPthuF2mDyEmoUZTt9-zO3AcaNZjx6u62_hX56cHs-36qAyGUpgO34Q37elJ41FFqv2gIHpJT55KhPk9OlYOD9bumZiDc-3OwGsw6MJUvbFFd0Xd52OISbd54nGumrKg"/>
+</button>
+</div>
+</header>
+<main class="max-w-md mx-auto md:max-w-7xl p-4 space-y-6">
+<!-- Welcome Section -->
+<section class="pt-2 pb-4">
+<h1 class="font-headline text-3xl font-bold text-on-surface mb-2">Morning, Alex</h1>
+<p class="text-on-surface-variant font-body">Here's your warehouse overview for today.</p>
+</section>
+<!-- Quick Actions (Bento Grid Style) -->
+<section class="grid grid-cols-2 gap-4">
+<button class="bg-primary text-on-primary rounded-xl p-5 flex flex-col items-center justify-center gap-3 hover:bg-primary/90 transition-colors shadow-[0_4px_20px_rgba(46,50,48,0.06)] active:scale-95">
+<span class="material-symbols-outlined text-4xl" data-icon="qr_code_scanner" style="font-variation-settings: 'FILL' 1;">qr_code_scanner</span>
+<span class="font-headline font-bold text-lg">Scan Item</span>
+</button>
+<button class="bg-tertiary text-on-tertiary rounded-xl p-5 flex flex-col items-center justify-center gap-3 hover:bg-tertiary/90 transition-colors shadow-[0_4px_20px_rgba(46,50,48,0.06)] active:scale-95">
+<span class="material-symbols-outlined text-4xl" data-icon="fact_check" style="font-variation-settings: 'FILL' 1;">fact_check</span>
+<span class="font-headline font-bold text-lg">Approve</span>
+</button>
+</section>
+<!-- Urgent Requests Section -->
+<section class="mt-8">
+<div class="flex items-center justify-between mb-4">
+<h2 class="font-headline text-2xl font-bold text-on-surface flex items-center gap-2">
+<span class="material-symbols-outlined text-error" data-icon="warning" style="font-variation-settings: 'FILL' 1;">warning</span>
+                    Urgent Requests
+                </h2>
+<button class="text-primary font-bold text-sm hover:underline">View All</button>
+</div>
+<div class="space-y-4">
+<!-- Request Card 1 -->
+<div class="bg-surface-container rounded-xl p-5 border border-outline-variant/20 shadow-[0_4px_20px_rgba(46,50,48,0.06)]">
+<div class="flex justify-between items-start mb-3">
+<div class="flex items-center gap-2">
+<span class="bg-error-container text-on-error-container text-xs font-bold px-2 py-1 rounded-md uppercase tracking-wide">High Priority</span>
+<span class="text-on-surface-variant text-sm flex items-center gap-1">
+<span class="material-symbols-outlined text-[16px]" data-icon="schedule">schedule</span> 10m ago
+                            </span>
+</div>
+<span class="font-bold text-on-surface">REQ-892</span>
+</div>
+<h3 class="font-headline text-lg font-bold text-on-surface mb-1">Hydraulic Pump A4</h3>
+<p class="text-on-surface-variant text-sm mb-4">Requested by: Mechanic Bay 4</p>
+<div class="flex gap-2">
+<button class="flex-1 bg-primary text-on-primary rounded-lg py-2 font-bold hover:bg-primary/90 transition-colors">Prepare</button>
+<button class="px-4 py-2 bg-surface text-primary border border-outline-variant/50 rounded-lg hover:bg-surface-variant transition-colors"><span class="material-symbols-outlined" data-icon="more_horiz">more_horiz</span></button>
+</div>
+</div>
+<!-- Request Card 2 -->
+<div class="bg-surface-container rounded-xl p-5 border border-outline-variant/20 shadow-[0_4px_20px_rgba(46,50,48,0.06)]">
+<div class="flex justify-between items-start mb-3">
+<div class="flex items-center gap-2">
+<span class="bg-tertiary-container text-on-tertiary-container text-xs font-bold px-2 py-1 rounded-md uppercase tracking-wide">Medium</span>
+<span class="text-on-surface-variant text-sm flex items-center gap-1">
+<span class="material-symbols-outlined text-[16px]" data-icon="schedule">schedule</span> 45m ago
+                            </span>
+</div>
+<span class="font-bold text-on-surface">REQ-891</span>
+</div>
+<h3 class="font-headline text-lg font-bold text-on-surface mb-1">Filter Assembly X</h3>
+<p class="text-on-surface-variant text-sm mb-4">Requested by: Maint. Team B</p>
+<div class="flex gap-2">
+<button class="flex-1 bg-surface text-primary border border-primary rounded-lg py-2 font-bold hover:bg-primary-container transition-colors">Review</button>
+</div>
+</div>
+</div>
+</section>
+<!-- Inventory Snapshot -->
+<section class="mt-8 mb-6">
+<h2 class="font-headline text-2xl font-bold text-on-surface mb-4">Inventory Alerts</h2>
+<div class="bg-surface-container-low rounded-xl p-1 overflow-hidden shadow-[0_4px_20px_rgba(46,50,48,0.06)]">
+<div class="flex items-center justify-between p-4 border-b border-outline-variant/20 bg-surface-container hover:bg-surface-container-high transition-colors cursor-pointer">
+<div class="flex items-center gap-3">
+<div class="w-10 h-10 rounded-full bg-error-container text-on-error-container flex items-center justify-center">
+<span class="material-symbols-outlined" data-icon="arrow_downward" style="font-variation-settings: 'FILL' 1;">arrow_downward</span>
+</div>
+<div>
+<p class="font-bold text-on-surface">Coolant Fluid</p>
+<p class="text-sm text-on-surface-variant">Below threshold (12/50L)</p>
+</div>
+</div>
+<span class="material-symbols-outlined text-outline" data-icon="chevron_right">chevron_right</span>
+</div>
+<div class="flex items-center justify-between p-4 bg-surface-container hover:bg-surface-container-high transition-colors cursor-pointer">
+<div class="flex items-center gap-3">
+<div class="w-10 h-10 rounded-full bg-tertiary-container text-on-tertiary-container flex items-center justify-center">
+<span class="material-symbols-outlined" data-icon="inventory_2" style="font-variation-settings: 'FILL' 1;">inventory_2</span>
+</div>
+<div>
+<p class="font-bold text-on-surface">Sealant Tapes</p>
+<p class="text-sm text-on-surface-variant">Reorder suggested</p>
+</div>
+</div>
+<span class="material-symbols-outlined text-outline" data-icon="chevron_right">chevron_right</span>
+</div>
+</div>
+</section>
+</main>
+<!-- BottomNavBar (Mobile Only) -->
+<nav class="md:hidden fixed bottom-0 left-0 w-full bg-surface-container shadow-[0_-4px_20px_rgba(46,50,48,0.06)] z-50 rounded-t-xl">
+<div class="flex justify-around items-center px-2 pb-4 pt-2 max-w-md mx-auto">
+<!-- Active: Dashboard -->
+<button class="flex flex-col items-center justify-center bg-primary-container text-on-primary-container rounded-xl px-4 py-1 active:scale-90 transition-transform duration-200">
+<span class="material-symbols-outlined text-2xl" data-icon="dashboard" style="font-variation-settings: 'FILL' 1;">dashboard</span>
+<span class="font-label text-xs tracking-wide mt-1">Dashboard</span>
+</button>
+<!-- Inactive: Inventory -->
+<button class="flex flex-col items-center justify-center text-on-surface-variant py-1 hover:bg-surface-container-high rounded-xl px-4 active:scale-90 transition-transform duration-200">
+<span class="material-symbols-outlined text-2xl" data-icon="factory">factory</span>
+<span class="font-label text-xs tracking-wide mt-1">Inventory</span>
+</button>
+<!-- Inactive: Requests -->
+<button class="flex flex-col items-center justify-center text-on-surface-variant py-1 hover:bg-surface-container-high rounded-xl px-4 active:scale-90 transition-transform duration-200">
+<span class="material-symbols-outlined text-2xl" data-icon="pending_actions">pending_actions</span>
+<span class="font-label text-xs tracking-wide mt-1">Requests</span>
+</button>
+<!-- Inactive: Alerts -->
+<button class="flex flex-col items-center justify-center text-on-surface-variant py-1 hover:bg-surface-container-high rounded-xl px-4 active:scale-90 transition-transform duration-200">
+<span class="material-symbols-outlined text-2xl" data-icon="notifications">notifications</span>
+<span class="font-label text-xs tracking-wide mt-1">Alerts</span>
+</button>
+</div>
+</nav>
+<!-- Web Navigation Cluster (Hidden on Mobile) -->
+<div class="hidden md:flex fixed top-0 right-0 h-16 items-center pr-8 gap-6 z-50">
+<button class="text-primary font-bold hover:bg-surface-container px-4 py-2 rounded-lg transition-colors border-b-2 border-primary">Dashboard</button>
+<button class="text-on-surface-variant hover:bg-surface-container px-4 py-2 rounded-lg transition-colors">Inventory</button>
+<button class="text-on-surface-variant hover:bg-surface-container px-4 py-2 rounded-lg transition-colors">Requests</button>
+<button class="text-on-surface-variant hover:bg-surface-container px-4 py-2 rounded-lg transition-colors">Alerts</button>
+</div>
+</body></html>
