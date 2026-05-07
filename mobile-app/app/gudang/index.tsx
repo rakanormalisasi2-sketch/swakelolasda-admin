@@ -206,8 +206,8 @@ export default function GudangIndexScreen() {
       try {
         const manipResult = await ImageManipulator.manipulateAsync(
           adjustPhoto,
-          [{ resize: { width: 1024 } }],
-          { compress: 0.7, format: ImageManipulator.SaveFormat.JPEG }
+          [{ resize: { width: 800 } }],
+          { compress: 0.5, format: ImageManipulator.SaveFormat.JPEG }
         );
 
         const formData = new FormData();
@@ -304,8 +304,8 @@ export default function GudangIndexScreen() {
       try {
         const manipResult = await ImageManipulator.manipulateAsync(
           adjustPhoto,
-          [{ resize: { width: 1024 } }],
-          { compress: 0.7, format: ImageManipulator.SaveFormat.JPEG }
+          [{ resize: { width: 800 } }],
+          { compress: 0.5, format: ImageManipulator.SaveFormat.JPEG }
         );
 
         const formData = new FormData();

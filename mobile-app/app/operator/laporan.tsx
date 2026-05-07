@@ -95,6 +95,7 @@ export default function LaporanScreen() {
     hmAkhir: '',
     panjangPekerjaan: '',
   });
+  const [lastHmHint, setLastHmHint] = useState<string | null>(null);
   const [desaOptions, setDesaOptions] = useState<string[]>([]);
   const [kecOpen, setKecOpen] = useState(false);
   const [desaOpen, setDesaOpen] = useState(false);
@@ -157,7 +158,7 @@ export default function LaporanScreen() {
     }
   };
 
-  // Load assignment aktif operator
+  // Load assignment aktif operator + terakhir HM
   useEffect(() => {
     if (!operatorId) return;
     supabase
@@ -188,9 +189,25 @@ export default function LaporanScreen() {
             .from('section_column_configs')
             .select('*')
             .eq('role', sectionRole)
-            .neq('column_type', 'formula') // formula hanya di web, bukan input operator
+            .neq('column_type', 'formula')
             .order('position', { ascending: true });
           setCustomColumns(colConfigs || []);
+
+          // Fetch hm_akhir terakhir dari operator_logs untuk assignment ini
+          const { data: lastLog } = await supabase
+            .from('operator_logs')
+            .select('hm_akhir')
+            .eq('assignment_id', data.id)
+            .not('hm_akhir', 'is', null)
+            .order('created_at', { ascending: false })
+            .limit(1)
+            .maybeSingle();
+
+          if (lastLog?.hm_akhir) {
+            setLastHmHint(lastLog.hm_akhir.toString());
+            // Auto-fill HM Awal dengan nilai terakhir
+            setForm(f => ({ ...f, hmAwal: lastLog.hm_akhir.toString() }));
+          }
         }
       });
   }, [operatorId]);
@@ -769,6 +786,9 @@ export default function LaporanScreen() {
               placeholder="0"
               keyboardType="decimal-pad"
             />
+            {lastHmHint && (
+              <Text style={styles.hintLastHm}>Terakhir: {lastHmHint}</Text>
+            )}
           </View>
           <View style={[styles.fieldGroup, { flex: 1, marginRight: 8 }]}>
             <Text style={styles.label}>HM Akhir</Text>
@@ -960,6 +980,7 @@ const styles = StyleSheet.create({
   dropdownText: { fontSize: 14, color: '#1a202c' },
   dropdownActive: { color: S, fontWeight: '700' },
   hintChanged: { fontSize: 12, color: A, marginTop: 4, fontStyle: 'italic' },
+  hintLastHm: { fontSize: 11, color: '#2c5282', marginTop: 4, fontStyle: 'italic' },
   rowGroup: { flexDirection: 'row', marginBottom: 14 },
   jamDisplay: {
     backgroundColor: '#f7fafc',
