@@ -378,6 +378,10 @@ export async function DELETE(request) {
     if (!id) return NextResponse.json({ error: 'ID required' }, { status: 400 });
 
     if (type === 'item') {
+      // Delete related transactions and requests first to avoid foreign key constraints
+      await supabaseWarehouse.from('warehouse_transactions').delete().eq('item_id', id);
+      await supabaseWarehouse.from('warehouse_requests').delete().eq('item_id', id);
+      
       const { error } = await supabaseWarehouse.from('warehouse_items').delete().eq('id', id);
       if (error) throw error;
       return NextResponse.json({ message: 'Barang berhasil dihapus' });

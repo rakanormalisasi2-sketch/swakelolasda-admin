@@ -248,6 +248,7 @@ export default function Sidebar({ maintenanceCount = 0 }) {
                   >
                     {ICONS[item.icon]}
                     <span style={{ display: 'flex', alignItems: 'center' }}>
+                      {/* v1.0.6 - badge position fix */}
                       {item.label}
                       {item.badgeKey && counts[item.badgeKey] > 0 && (
                         <span className="sidebar-badge danger pulse" style={{ 
