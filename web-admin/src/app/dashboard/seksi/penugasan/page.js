@@ -3,7 +3,7 @@ import { useEffect, useState, useCallback } from 'react';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/context/AuthContext';
 import WILAYAH from '@/lib/wilayah';
-import { geocodeLocation } from '@/lib/geocoder';
+import { geocodeLocation, parseGoogleMapsUrl } from '@/lib/geocoder';
 
 export default function PenugasanPage() {
   const { profile } = useAuth();
@@ -21,7 +21,7 @@ export default function PenugasanPage() {
     operator_id: '', helper_id: '', equipment_id: '',
     job_type: 'normalisasi', job_sub_type: '', custom_job_description: '',
     location_district: '', location_village: '',
-    latitude: '', longitude: '',
+    latitude: '', longitude: '', mapsUrl: '',
   });
 
   // Auto-geocode when village changes
@@ -144,6 +144,7 @@ export default function PenugasanPage() {
       location_village: a.location_village || '',
       latitude: a.latitude || '',
       longitude: a.longitude || '',
+      mapsUrl: '',
     });
     setDesaList(WILAYAH[a.location_district] || []);
     setError('');
@@ -213,7 +214,7 @@ export default function PenugasanPage() {
           <div className="header-subtitle">Rekrut dan tugaskan operator ke pekerjaan lapangan</div>
         </div>
         <div className="header-right">
-          <button className="btn btn-primary" onClick={() => { setEditId(null); setOriginalEquipmentId(null); setForm({ operator_id:'', helper_id:'', equipment_id:'', job_type: defaultJobType, job_sub_type:'', custom_job_description:'', location_district:'', location_village:'', latitude:'', longitude:'' }); setError(''); setShowModal(true); }}>
+          <button className="btn btn-primary" onClick={() => { setEditId(null); setOriginalEquipmentId(null); setForm({ operator_id:'', helper_id:'', equipment_id:'', job_type: defaultJobType, job_sub_type:'', custom_job_description:'', location_district:'', location_village:'', latitude:'', longitude:'', mapsUrl: '' }); setError(''); setShowModal(true); }}>
             <svg fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24" style={{width:15,height:15}}><path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4"/></svg>
             Tugaskan Operator
           </button>
@@ -365,6 +366,33 @@ export default function PenugasanPage() {
                   </div>
                 </div>
 
+                <div className="form-group">
+                  <label className="form-label">URL / Koordinat Google Maps <span className="text-xs text-muted">(opsional)</span></label>
+                  <input
+                    type="url"
+                    className="form-control"
+                    value={form.mapsUrl}
+                    onChange={e => {
+                      const url = e.target.value;
+                      setForm(f => ({ ...f, mapsUrl: url }));
+                      const coords = parseGoogleMapsUrl(url);
+                      if (coords) {
+                        setForm(f => ({
+                          ...f,
+                          latitude: String(coords.lat),
+                          longitude: String(coords.lng),
+                        }));
+                      }
+                    }}
+                    placeholder="Paste Google Maps URL atau @-7.1565312,111.8928896"
+                  />
+                  <p className="text-xs" style={{ marginTop: 4, color: parseGoogleMapsUrl(form.mapsUrl) ? 'var(--success)' : 'var(--text-muted)' }}>
+                    {parseGoogleMapsUrl(form.mapsUrl)
+                      ? '✓ Koordinat berhasil di-parse dari URL'
+                      : 'Tempel URL Google Maps untuk auto-fill koordinat'}
+                  </p>
+                </div>
+
                 <div className="form-grid">
                   <div className="form-group">
                     <label className="form-label">Latitude <span className="text-xs text-muted">(opsional)</span></label>
@@ -382,7 +410,7 @@ export default function PenugasanPage() {
                         📡 Sedang mencari koordinat otomatis Desa {form.location_village}...
                       </span>
                     ) : (
-                      'Peta menggunakan koordinat sebaran (Database Excel). Isi Latitude/Longitude jika ingin menitikkan lokasi yang lebih akurat/spesifik.'
+                      'Peta menggunakan koordinat sebaran (Database Excel). Tempel URL Google Maps di atas, atau isi Latitude/Longitude jika ingin lokasi spesifik.'
                     )}
                   </p>
                 </div>

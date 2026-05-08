@@ -1,7 +1,7 @@
 const ExcelJS = require('exceljs');
 (async () => {
   const wb = new ExcelJS.Workbook();
-  await wb.xlsx.readFile('pc 50.xlsx');
+  await wb.xlsx.readFile('public/pc 50.xlsx');
   
   // List all sheet names exactly
   console.log('=== ALL SHEETS ===');

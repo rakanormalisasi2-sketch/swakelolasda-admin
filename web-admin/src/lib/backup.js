@@ -36,8 +36,10 @@ export async function getStorageUsage() {
     const assignmentsCount = await fetchCount('assignments');
     const equipmentCount = await fetchCount('heavy_equipment');
     const usersCount = await fetchCount('user_profiles');
-    const absensiCount = await fetchCount('absensi');
-    const progressCount = await fetchCount('progress_laporan');
+    // absensi and progress_laporan tables are currently missing in Supabase, 
+    // removing them to avoid 404 console errors until they are created.
+    const absensiCount = 0;
+    const progressCount = 0;
 
     // Estimasi ukuran (bytes) - asumsi rata-rata 1KB per record
     const ESTIMATED_BYTES_PER_RECORD = 1024;
@@ -54,9 +56,7 @@ export async function getStorageUsage() {
         assignments: assignmentsCount || 0,
         equipment: equipmentCount || 0,
         users: usersCount || 0,
-        absensi: absensiCount || 0,
-        progress: progressCount || 0,
-        total: totalRecords
+        total: (assignmentsCount || 0) + (equipmentCount || 0) + (usersCount || 0)
       },
       storage: {
         estimatedBytes: estimatedSize,
@@ -132,8 +132,6 @@ export async function exportAllData() {
       'maintenance_logs',
       'daily_reports',
       'operator_logs',
-      'absensi',
-      'progress_laporan',
       'user_work_logs'
     ];
 
@@ -384,8 +382,6 @@ export async function restoreToSupabase(backupData) {
       'maintenance_logs',
       'daily_reports',
       'operator_logs',
-      'absensi',
-      'progress_laporan',
       'user_work_logs'
     ];
 
@@ -425,8 +421,8 @@ export async function clearSupabaseData(clearUsers = false) {
     
     // Tables to clear
     const tablesToClear = clearUsers 
-      ? ['user_work_logs', 'progress_laporan', 'absensi', 'assignments', 'heavy_equipment', 'user_profiles']
-      : ['user_work_logs', 'progress_laporan', 'absensi', 'assignments', 'heavy_equipment'];
+      ? ['user_work_logs', 'assignments', 'heavy_equipment', 'user_profiles']
+      : ['user_work_logs', 'assignments', 'heavy_equipment'];
 
     const results = [];
     

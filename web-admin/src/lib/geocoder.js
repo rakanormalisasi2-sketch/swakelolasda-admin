@@ -458,6 +458,57 @@ export async function geocodeLocation(desa, kecamatan) {
   GEOCODER_CACHE[key] = { data: null, timestamp: Date.now() - CACHE_TTL_MS + 60 * 60 * 1000 };
   console.warn(`[Geocoder] ❌ ALL FAILED for: ${desa}, ${kecamatan}`);
   console.warn(`[Geocoder] 💡 Tip: Gunakan input koordinat manual jika auto gagal`);
-  
+
+  return null;
+}
+
+// ========================================
+// GOOGLE MAPS URL PARSER
+// ========================================
+/**
+ * Parse Google Maps URL or raw coordinates to extract lat/lng.
+ * Supports:
+ *   - Full URL: https://www.google.com/maps/.../@-7.1565312,111.8928896,...
+ *   - Raw @ format: @-7.1565312,111.8928896,15z
+ *   - Plain coords: -7.1565312, 111.8928896
+ *
+ * @param {string} input - URL or coordinates string
+ * @returns {{ lat: number, lng: number } | null}
+ */
+export function parseGoogleMapsUrl(input) {
+  if (!input || typeof input !== 'string') return null;
+
+  const trimmed = input.trim();
+
+  // Pattern 1: Full Google Maps URL with @ coords
+  const m1 = trimmed.match(/@(-?\d+\.?\d*),(-?\d+\.?\d*)/);
+  if (m1) {
+    const lat = parseFloat(m1[1]);
+    const lng = parseFloat(m1[2]);
+    if (lat >= -90 && lat <= 90 && lng >= -180 && lng <= 180) {
+      return { lat, lng };
+    }
+  }
+
+  // Pattern 2: Raw @ format
+  const m2 = trimmed.match(/^@(-?\d+\.?\d*),(-?\d+\.?\d*)/);
+  if (m2 && !trimmed.startsWith('http')) {
+    const lat = parseFloat(m2[1]);
+    const lng = parseFloat(m2[2]);
+    if (lat >= -90 && lat <= 90 && lng >= -180 && lng <= 180) {
+      return { lat, lng };
+    }
+  }
+
+  // Pattern 3: Plain coordinates
+  const m3 = trimmed.match(/^(-?\d+\.?\d*)[,\s]+(-?\d+\.?\d*)$/);
+  if (m3) {
+    const lat = parseFloat(m3[1]);
+    const lng = parseFloat(m3[2]);
+    if (lat >= -90 && lat <= 90 && lng >= -180 && lng <= 180) {
+      return { lat, lng };
+    }
+  }
+
   return null;
 }

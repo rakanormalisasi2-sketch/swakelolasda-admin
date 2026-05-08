@@ -31,13 +31,15 @@ Jika user memberikan URL, meminta pengujian UI, atau memberikan screenshot:
 
 1. **Menganalisis Screenshot / Desain (Vision)**:
    - Jika user memberikan screenshot (UI referensi atau error), JANGAN terburu-buru coding.
-   - Lakukan dekonstruksi visual: sebutkan warna dominan, struktur layout (flex/grid), padding/margin yang terlihat, dan elemen interaktif.
-   - Buat struktur HTML/CSS di pikiranmu berdasarkan screenshot tersebut sebelum menyentuh file lokal.
+   - **Protokol Dekonstruksi Visual**: Sebutkan warna dominan (HEX/HSL), struktur layout (Flexbox/Grid), spacing (padding/margin), dan elemen interaktif.
+   - **Visual-to-Code Mapping**: Identifikasi komponen React yang relevan (misal: "Elemen ini masuk ke `CardComponent.js`").
+   - Bandingkan desain dengan standar premium (Glassmorphism, Shadows) dan usulkan peningkatan estetika.
 2. **Berinteraksi dengan Remote Website / Browser**:
-   - (Asumsi menggunakan MCP Browser/Puppeteer): Jika ditugaskan mengecek website, navigasikan ke URL, ambil screenshot atau DOM tree, dan baca dengan seksama.
-   - Pastikan untuk memeriksa respon jaringan (Network tab) atau Console error jika melakukan debugging web.
+   - (Gunakan MCP Browser/Playwright jika tersedia): Selalu ambil screenshot setelah navigasi untuk memverifikasi keadaan visual halaman.
+   - Gunakan `page.evaluate` untuk mengekstrak data dari DOM jika scraping atau pengujian fungsional diperlukan.
+   - Periksa Console log dan Network tab untuk mendeteksi kegagalan API secara visual.
 3. **Web Search**:
-   - Jika menghadapi API baru, library versi terbaru, atau error yang sangat spesifik, LAKUKAN SEARCHING terlebih dahulu daripada menggunakan *hallucinated knowledge*.
+   - Jika menghadapi API baru, library versi terbaru, atau error spesifik, LAKUKAN SEARCHING terlebih dahulu. Prioritaskan dokumentasi resmi (Next.js, Supabase, Tailwind).
 
 ---
 
@@ -129,12 +131,22 @@ UI yang dibuat harus langsung WOW saat pertama dilihat. Minimum acceptable quali
 
 ---
 
-## ⚙️ STANDAR CODING & KEAMANAN
+## ⚙️ STANDAR CODING, SEO & KEAMANAN
 
-1. **Jangan hapus komentar/docstring** yang sudah ada kecuali diminta.
-2. **Error handling wajib** — tidak boleh silent catch.
-3. **TypeScript strict** — hindari penggunaan `any`.
-4. **JANGAN AUTO-RUN COMMAND DESTRUKTIF**: Jangan pernah menjalankan `rm -rf`, `DROP TABLE`, atau mengubah credentials server tanpa bertanya 2 kali ke user.
+1. **SEO & Performance**:
+   - Gunakan **Semantic HTML** (header, nav, main, footer, section, article).
+   - Pastikan hanya ada satu `<h1>` per halaman.
+   - Implementasikan meta tags (title, description) secara dinamis menggunakan Metadata API Next.js.
+   - Optimasi gambar dengan `next/image`.
+2. **Database Context (Supabase Mapping)**:
+   - **DB1 (ratmptlcrjifuplokask)**: Primary DB (Auth, Assignments, Equipment, Reports).
+   - **DB2 (rpggkbkmowdbxtgfgbop)**: Secondary DB (BBM Fuel Management, Fitur Baru).
+   - Selalu periksa RLS (Row Level Security) sebelum melakukan query.
+3. **Keamanan**:
+   - Jangan hapus komentar/docstring yang sudah ada.
+   - Error handling wajib (Try/Catch dengan user-friendly feedback).
+   - TypeScript strict mode (hindari `any`).
+   - JANGAN AUTO-RUN COMMAND DESTRUKTIF (rm -rf, DROP TABLE, update credentials) tanpa izin eksplisit.
 
 ---
 
