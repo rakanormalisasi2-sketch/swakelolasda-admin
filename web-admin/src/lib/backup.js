@@ -21,25 +21,23 @@ const GOOGLE_SHEETS_STORAGE_KEYS = ['sheets_normalisasi', 'sheets_embung', 'shee
 export async function getStorageUsage() {
   try {
     // Get database size approximation from assignments count
-    const { count: assignmentsCount } = await supabase
-      .from('assignments')
-      .select('*', { count: 'exact', head: true });
-    
-    const { count: equipmentCount } = await supabase
-      .from('heavy_equipment')
-      .select('*', { count: 'exact', head: true });
-    
-    const { count: usersCount } = await supabase
-      .from('user_profiles')
-      .select('*', { count: 'exact', head: true });
-    
-    const { count: absensiCount } = await supabase
-      .from('absensi')
-      .select('*', { count: 'exact', head: true });
-    
-    const { count: progressCount } = await supabase
-      .from('progress_laporan')
-      .select('*', { count: 'exact', head: true });
+    const fetchCount = async (table) => {
+      try {
+        const { count, error } = await supabase
+          .from(table)
+          .select('*', { count: 'exact', head: true });
+        if (error) return 0;
+        return count || 0;
+      } catch {
+        return 0;
+      }
+    };
+
+    const assignmentsCount = await fetchCount('assignments');
+    const equipmentCount = await fetchCount('heavy_equipment');
+    const usersCount = await fetchCount('user_profiles');
+    const absensiCount = await fetchCount('absensi');
+    const progressCount = await fetchCount('progress_laporan');
 
     // Estimasi ukuran (bytes) - asumsi rata-rata 1KB per record
     const ESTIMATED_BYTES_PER_RECORD = 1024;
@@ -106,15 +104,22 @@ export async function exportAllData() {
 
     // Helper to fetch and add table to exportData
     const exportTable = async (tableName) => {
-      const { data, error } = await supabase.from(tableName).select('*');
-      if (error) {
-        console.warn(`[Backup] Error exporting ${tableName}:`, error);
-        exportData.tables[tableName] = { data: [], count: 0, error: error.message };
+      try {
+        const { data, error } = await supabase.from(tableName).select('*');
+        if (error) {
+          // If table doesn't exist (404/42P01), treat as empty instead of failing the whole backup
+          console.warn(`[Backup] Table ${tableName} could not be exported (may not exist):`, error.message);
+          exportData.tables[tableName] = { data: [], count: 0, skipped: true };
+          return 0;
+        }
+        exportData.tables[tableName] = { data: data || [], count: data?.length || 0 };
+        console.log(`[Backup] ${tableName}:`, data?.length || 0);
+        return data?.length || 0;
+      } catch (err) {
+        console.warn(`[Backup] Unexpected error exporting ${tableName}:`, err);
+        exportData.tables[tableName] = { data: [], count: 0, error: err.message };
         return 0;
       }
-      exportData.tables[tableName] = { data: data || [], count: data?.length || 0 };
-      console.log(`[Backup] ${tableName}:`, data?.length || 0);
-      return data?.length || 0;
     };
 
     // List of tables to export

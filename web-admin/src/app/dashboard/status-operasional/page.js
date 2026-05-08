@@ -3,6 +3,7 @@ import { useEffect, useState, useCallback } from 'react';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/context/AuthContext';
 import dynamic from 'next/dynamic';
+// geocodeLocation imported dynamically below to avoid TDZ/circular dep in Turbopack
 
 const JOB_LABELS = { normalisasi: 'Normalisasi', embung: 'Embung', lainnya: 'Lainnya' };
 const SUB_LABELS = { normalisasi_sungai: 'Normalisasi Sungai', saluran_afvoer: 'Saluran Air/Afvoer', normalisasi_embung: 'Normalisasi Embung', pembangunan_embung: 'Pembangunan Embung' };
@@ -12,6 +13,7 @@ const STATUS_MAP = {
   maintenance: { label: 'Sedang Perbaikan', badge: 'badge-maintenance' },
 };
 const PROGRESS_STEPS = ['pelaporan', 'diterima', 'pengerjaan', 'selesai'];
+const KANTOR_COORDS = { lat: -7.165991597493862, lng: 111.89056781736653 };
 
 // Dynamic import for MapComponent (client-side only)
 const MapComponent = dynamic(() => import('@/components/MapComponent'), { ssr: false });
@@ -32,11 +34,12 @@ export default function StatusOperasionalPage() {
   const [filterSeksi, setFilterSeksi] = useState('semua');
   const [filterData, setFilterData] = useState('semua'); // 'semua', 'alat_ready', 'alat_maintenance', 'operator_ready'
   const [viewMode, setViewMode] = useState('list'); // 'list' or 'map'
+  const [mapItemsState, setMapItemsState] = useState([]);
+  const [mapItemsLoading, setMapItemsLoading] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      // Build query - filter berdasarkan role yang login
       let asgnQuery = supabase.from('assignments').select(`
           *,
           operator:user_profiles!assignments_operator_id_fkey(full_name),
@@ -55,7 +58,6 @@ export default function StatusOperasionalPage() {
       setOperators(opsRes.data || []);
       setAlat(alatRes.data || []);
       
-      // Group logs
       const logsMap = {};
       (logsRes.data || []).forEach(l => {
         if (!logsMap[l.equipment_id]) logsMap[l.equipment_id] = [];
@@ -67,69 +69,68 @@ export default function StatusOperasionalPage() {
     } finally {
       setLoading(false);
     }
-  }, [profile]);
+  }, []);
 
-  useEffect(() => { load(); }, [load]);
+  // Data Derivations (useMemo for stability and to avoid TDZ)
+  const displayAssignments = useMemo(() => {
+    if (filterSeksi === 'semua') return assignments;
+    return assignments.filter(a => a.created_by_role === filterSeksi);
+  }, [assignments, filterSeksi]);
 
-  const endAssignment = async (id) => {
-    if(!confirm('Selesaikan penugasan ini? Operator dan Alat Berat akan kembali tersedia.')) return;
-    await supabase.from('assignments').update({ status: 'finished', end_date: new Date().toISOString() }).eq('id', id);
-    load();
-  };
+  const displayAlat = useMemo(() => {
+    if (filterData === 'alat_ready') return alat.filter(a => a.status === 'ready');
+    if (filterData === 'alat_maintenance') return alat.filter(a => a.status === 'maintenance');
+    return alat;
+  }, [alat, filterData]);
 
-  // Computations
-  const assignedOpIds = new Set([
-    ...assignments.map(a => a.operator_id),
-    ...assignments.map(a => a.helper_id).filter(Boolean),
-  ]);
-  const freeOperators = operators.filter(o => !assignedOpIds.has(o.id));
-  const maintenanceCount = alat.filter(a => a.status === 'maintenance').length;
-  const readyAlatCount = alat.filter(a => a.status === 'ready').length;
+  const assignedOpIds = useMemo(() => {
+    const ids = new Set([
+      ...assignments.map(a => a.operator_id),
+      ...assignments.map(a => a.helper_id).filter(Boolean),
+    ]);
+    return ids;
+  }, [assignments]);
 
-  let displayAssignments = assignments;
-  if (filterSeksi !== 'semua') {
-    displayAssignments = assignments.filter(a => a.created_by_role === filterSeksi);
-  }
+  const freeOperators = useMemo(() => {
+    return operators.filter(o => !assignedOpIds.has(o.id));
+  }, [operators, assignedOpIds]);
 
-  let displayAlat = alat;
-  if (filterData === 'alat_ready') displayAlat = alat.filter(a => a.status === 'ready');
-  if (filterData === 'alat_maintenance') displayAlat = alat.filter(a => a.status === 'maintenance');
+  const maintenanceCount = useMemo(() => alat.filter(a => a.status === 'maintenance').length, [alat]);
+  const readyAlatCount = useMemo(() => alat.filter(a => a.status === 'ready').length, [alat]);
 
-  // Build mapItems for MapComponent
-  const mapItems = displayAssignments
-    .filter(a => a.equipment && (a.location_district || a.location_village_override))
-    .map(a => {
+  // Build mapItems when assignments change
+  const buildMapItemsForStatus = useCallback(async (assignmentList) => {
+    if (assignmentList.length === 0) {
+      setMapItemsState([]);
+      return;
+    }
+    setMapItemsLoading(true);
+    const geocodeCache = {};
+    const { geocodeLocation } = await import('@/lib/geocoder');
+
+    const items = await Promise.all(assignmentList.map(async (a) => {
       const district = a.location_district_override || a.location_district || '';
       const village = a.location_village_override || a.location_village || '';
       const eq = Array.isArray(a.equipment) ? a.equipment[0] : a.equipment;
 
-      // Determine if alat is at job location (has active assignment) or at office (no active assignment)
-      const isAtOffice = !a.location_district && !a.location_village;
+      let lat = null, lng = null;
+      if (a.latitude && a.longitude) {
+        lat = parseFloat(a.latitude);
+        lng = parseFloat(a.longitude);
+      }
 
-      // Get coordinates from DESA_MAP (built-in coordinate lookup)
-      const DESA_COORDS = {
-        'DANDER': { lat: -7.1333, lng: 111.8833 },
-        'SUKOWATI': { lat: -7.1417, lng: 111.8750 },
-        'MELIKAN': { lat: -7.1283, lng: 111.8917 },
-        'CACING': { lat: -7.1167, lng: 111.9000 },
-        'KAWENGAN': { lat: -7.1083, lng: 111.9083 },
-        'SUKO': { lat: -7.1250, lng: 111.8667 },
-        'NGASINAN': { lat: -7.1500, lng: 111.8583 },
-        'NGADILUMPU': { lat: -7.1583, lng: 111.8750 },
-        'KANOR': { lat: -7.1667, lng: 111.8917 },
-        'BRUMBUNG': { lat: -7.1750, lng: 111.8750 },
-        'PILANG': { lat: -7.1833, lng: 111.8583 },
-        'BANGILAN': { lat: -7.1917, lng: 111.8417 },
-        'SENGGURUH': { lat: -7.2000, lng: 111.8250 },
-        'POMAHAN': { lat: -7.1750, lng: 111.8417 },
-        'WOTMASGETH': { lat: -7.1833, lng: 111.8250 },
-      };
-
-      // Default fallback - generate random offset from center if no coordinates found
-      const coords = DESA_COORDS[district.toUpperCase()] || {
-        lat: -7.15 + (Math.random() * 0.1 - 0.05),
-        lng: 111.88 + (Math.random() * 0.1 - 0.05),
-      };
+      if ((lat === null || lng === null) && village && district) {
+        const cacheKey = `${village}|${district}`;
+        if (geocodeCache[cacheKey] !== undefined) {
+          const result = geocodeCache[cacheKey];
+          if (result) { lat = result.lat; lng = result.lng; }
+        } else {
+          geocodeCache[cacheKey] = undefined;
+          const result = await geocodeLocation(village, district);
+          geocodeCache[cacheKey] = result;
+          if (result) { lat = result.lat; lng = result.lng; }
+        }
+      }
 
       return {
         id: eq?.id || a.id,
@@ -144,11 +145,32 @@ export default function StatusOperasionalPage() {
         helper: a.helper_override || a.helper?.full_name || '—',
         kondisi: `${eq?.condition_percentage || 100}%`,
         seksi: a.created_by_role === 'seksi_normalisasi' ? 'Normalisasi' : a.created_by_role === 'seksi_embung' ? 'Embung' : '',
-        lat: coords.lat,
-        lng: coords.lng,
-        isAtOffice: isAtOffice && !coords,
+        lat: lat ?? KANTOR_COORDS.lat,
+        lng: lng ?? KANTOR_COORDS.lng,
+        isAtOffice: lat === null,
       };
-    });
+    }));
+
+    setMapItemsState(items);
+    setMapItemsLoading(false);
+  }, []);
+
+  useEffect(() => { load(); }, [load]);
+
+  useEffect(() => {
+    if (viewMode === 'map' && displayAssignments.length > 0) {
+      buildMapItemsForStatus(displayAssignments);
+    }
+  }, [viewMode, displayAssignments, buildMapItemsForStatus]);
+
+  const endAssignment = async (id) => {
+    if(!confirm('Selesaikan penugasan ini? Operator dan Alat Berat akan kembali tersedia.')) return;
+    await supabase.from('assignments').update({ status: 'finished', end_date: new Date().toISOString() }).eq('id', id);
+    load();
+  };
+
+  // Build mapItems for MapComponent (uses geocodeLocation like homepage)
+  // mapItems is now built via buildMapItemsForStatus hook above
 
   return (
     <>
@@ -200,7 +222,13 @@ export default function StatusOperasionalPage() {
         {/* Map View */}
         {viewMode === 'map' && (
           <div style={{ height: 'calc(100vh - 200px)', borderRadius: 12, overflow: 'hidden', border: '1px solid var(--border)', marginBottom: 24 }}>
-            <MapComponent mapItems={mapItems} />
+            {mapItemsLoading ? (
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', color: 'var(--text-muted)' }}>
+                Memuat peta & geocoding...
+              </div>
+            ) : (
+              <MapComponent mapItems={mapItemsState} />
+            )}
           </div>
         )}
 

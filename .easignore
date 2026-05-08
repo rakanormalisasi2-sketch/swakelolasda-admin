@@ -1,0 +1,22 @@
+# EAS Build ignore file
+# Located at git root: c:\Users\dinas\OneDrive\Desktop\kode\.easignore
+
+# Ignore other projects in the monorepo
+web-admin/
+docs/
+temp/
+
+# Ignore local files and logs
+*.log
+*.png
+*.jpg
+*.jpeg
+*.xlsx
+*.py
+*.sql
+
+# Standard ignores (though .gitignore usually handles these, .easignore overrides it)
+node_modules/
+.expo/
+dist/
+build/
