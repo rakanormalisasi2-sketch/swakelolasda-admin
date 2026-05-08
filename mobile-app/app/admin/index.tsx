@@ -26,7 +26,7 @@ export default function AdminPasswordScreen() {
           router.replace('/admin/menu');
           return;
         } else if (session.role === 'gudang') {
-          router.replace('/gudang/index');
+          router.replace('/gudang');
           return;
         }
       }
@@ -67,7 +67,7 @@ export default function AdminPasswordScreen() {
           role: 'gudang',
           loggedInAt: new Date().toISOString(),
         }));
-        router.replace('/gudang/index');
+        router.replace('/gudang');
       } else {
         Alert.alert('Akses Ditolak', 'Password tidak dikenali. Silakan hubungi Superadmin.');
         setPassword('');
