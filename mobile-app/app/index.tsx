@@ -62,7 +62,7 @@ export default function SplashScreen() {
             <View style={styles.logoCircleSmall}>
               {/* Gambar Logo dari aset lokal pengguna */}
               <Image 
-                source={require('../assets/images/logo.png')} 
+                source={require('../assets/images/logo.jpg')} 
                 style={{ width: 45, height: 45, resizeMode: 'contain' }}
                 defaultSource={{ uri: 'https://via.placeholder.com/45/1e3a5f/FFFFFF?text=Logo' }} 
               />
@@ -106,7 +106,7 @@ export default function SplashScreen() {
             <View style={styles.logoCircleBig}>
               {/* Gambar Logo Start */}
               <Image 
-                source={require('../assets/images/logo.png')} 
+                source={require('../assets/images/logo.jpg')} 
                 style={{ width: 150, height: 150, resizeMode: 'contain', borderRadius: 75 }} 
               />
             </View>
