@@ -66,6 +66,14 @@ export default function LaporanPelaksanaanPage() {
   const [bbmMap, setBbmMap] = useState({}); // Kumpulan data BBM dari DB2
   const [tahunLaporan, setTahunLaporan] = useState(new Date().getFullYear().toString());
 
+  // Manual Entry & Upload states
+  const [addManualOpen, setAddManualOpen] = useState(false); // Modal tambah baris manual
+  const [allAssignments, setAllAssignments] = useState([]); // Semua assignment (active + finished) untuk picker
+  const [uploadModalOpen, setUploadModalOpen] = useState(false);
+  const [uploadFile, setUploadFile] = useState(null);
+  const [uploadAssignmentId, setUploadAssignmentId] = useState('');
+  const [uploadStatus, setUploadStatus] = useState(null); // { type: 'success'|'error', message, details }
+  const [uploading, setUploading] = useState(false);
   
   // Modals Data & Flow
   const [filterTab, setFilterTab] = useState('semua');
@@ -109,13 +117,19 @@ export default function LaporanPelaksanaanPage() {
         .order('position', { ascending: true });
       setCustomColumns(colConfigs || []);
 
+      // Fetch ALL assignments (active + finished) for picker and for data
       const { data: assignments } = await supabase
         .from('assignments')
-        .select('id, status')
+        .select('id, status, job_type, job_sub_type, location_district, location_village, operator_id, equipment_id, custom_job_description, helper_override, helper:user_profiles!assignments_helper_id_fkey(full_name), op:user_profiles!assignments_operator_id_fkey(full_name), eq:heavy_equipment(name, merk_type, nomor_lambung)')
         .eq('created_by_role', profile.role);
+      setAllAssignments(assignments || []);
 
       const assignmentIds = assignments?.map(a => a.id) || [];
 
+      // Fetch logs: assignment-based + manual rows
+      let allLogs = [];
+
+      // 1) Logs terkait assignment
       if (assignmentIds.length > 0) {
         const { data: logsData } = await supabase
           .from('operator_logs')
@@ -130,51 +144,68 @@ export default function LaporanPelaksanaanPage() {
           .lte('tanggal', `${tahunLaporan}-12-31`)
           .order('assignment_id', { ascending: true })
           .order('tanggal', { ascending: true });
+        if (logsData) allLogs = [...logsData];
+      }
 
-        if (logsData && logsData.length > 0) {
-          logsData.sort((a, b) => {
-             const opA = a.override_operator || a.operator?.full_name || '';
-             const alA = a.override_alat || a.equipment?.name || '';
-             const kA = a.override_kecamatan || a.assignment?.location_district || '';
-             const dA = a.override_desa || a.assignment?.location_village || '';
+      // 2) Manual rows (is_manual=true, created_by_role=current role)
+      try {
+        const { data: manualLogs } = await supabase
+          .from('operator_logs')
+          .select(`
+            *,
+            assignment:assignments(id, status, job_type, job_sub_type, location_district, location_village, helper_override, helper:user_profiles!assignments_helper_id_fkey(full_name)),
+            operator:user_profiles!operator_logs_operator_id_fkey(full_name),
+            equipment:heavy_equipment(name, merk_type, nomor_lambung)
+          `)
+          .eq('is_manual', true)
+          .eq('created_by_role', profile.role)
+          .gte('tanggal', `${tahunLaporan}-01-01`)
+          .lte('tanggal', `${tahunLaporan}-12-31`);
+        if (manualLogs) {
+          // Deduplicate (manual rows with assignment_id may already be in allLogs)
+          const existingIds = new Set(allLogs.map(l => l.id));
+          manualLogs.forEach(ml => { if (!existingIds.has(ml.id)) allLogs.push(ml); });
+        }
+      } catch (e) {
+        console.warn('is_manual column may not exist yet:', e);
+      }
 
-             const opB = b.override_operator || b.operator?.full_name || '';
-             const alB = b.override_alat || b.equipment?.name || '';
-             const kB = b.override_kecamatan || b.assignment?.location_district || '';
-             const dB = b.override_desa || b.assignment?.location_village || '';
+      // Sort
+      if (allLogs.length > 0) {
+        allLogs.sort((a, b) => {
+           const opA = a.override_operator || a.operator?.full_name || '';
+           const alA = a.override_alat || a.equipment?.name || '';
+           const kA = a.override_kecamatan || a.assignment?.location_district || '';
+           const dA = a.override_desa || a.assignment?.location_village || '';
+           const opB = b.override_operator || b.operator?.full_name || '';
+           const alB = b.override_alat || b.equipment?.name || '';
+           const kB = b.override_kecamatan || b.assignment?.location_district || '';
+           const dB = b.override_desa || b.assignment?.location_village || '';
+           const groupA = `${opA} ${alA} ${kA} ${dA}`;
+           const groupB = `${opB} ${alB} ${kB} ${dB}`;
+           if (groupA < groupB) return -1;
+           if (groupA > groupB) return 1;
+           return new Date(a.tanggal).getTime() - new Date(b.tanggal).getTime();
+        });
+      }
+      setLogs(allLogs);
 
-             const groupA = `${opA} ${alA} ${kA} ${dA}`;
-             const groupB = `${opB} ${alB} ${kB} ${dB}`;
-             
-             if (groupA < groupB) return -1;
-             if (groupA > groupB) return 1;
-             return new Date(a.tanggal).getTime() - new Date(b.tanggal).getTime();
+      // Fetch BBM data dari DB2 (API)
+      try {
+        const resBbm = await fetch(`/api/bbm/pemakaian?seksi=${profile.role}`);
+        if (resBbm.ok) {
+          const resultBbm = await resBbm.json();
+          const map = {};
+          (resultBbm.data || []).forEach(b => {
+            const tglStr = b.tanggal_kirim.split('T')[0];
+            const key = `${b.assignment_id}|${tglStr}`;
+            if (!map[key]) map[key] = [];
+            map[key].push(b);
           });
+          setBbmMap(map);
         }
-        setLogs(logsData || []);
-
-        // Fetch BBM data dari DB2 (API)
-        try {
-          const resBbm = await fetch(`/api/bbm/pemakaian?seksi=${profile.role}`);
-          if (resBbm.ok) {
-            const resultBbm = await resBbm.json();
-            const map = {};
-            (resultBbm.data || []).forEach(b => {
-              // Simpan berdasarkan assignment_id dan tanggal_kirim (format YYYY-MM-DD)
-              const tglStr = b.tanggal_kirim.split('T')[0];
-              const key = `${b.assignment_id}|${tglStr}`;
-              if (!map[key]) map[key] = [];
-              map[key].push(b);
-            });
-            setBbmMap(map);
-          }
-        } catch (e) {
-             console.warn('BBM API belum tersedia:', e);
-        }
-
-      } else {
-        setLogs([]);
-        setBbmMap({});
+      } catch (e) {
+        console.warn('BBM API belum tersedia:', e);
       }
     } catch (err) {
       console.error('Error loading reports data:', err);
@@ -324,8 +355,79 @@ export default function LaporanPelaksanaanPage() {
   };
 
 
+  // ============ MANUAL ROW & UPLOAD/DOWNLOAD ============
+  const handleAddManualRow = async (assignmentId = null) => {
+    setSaving(true);
+    const today = new Date().toISOString().split('T')[0];
+    const insertData = {
+      tanggal: today,
+      is_manual: true,
+      created_by_role: profile.role,
+      reported_at: new Date().toISOString(),
+      assignment_id: assignmentId || null,
+    };
+    const { error } = await supabase.from('operator_logs').insert(insertData);
+    setSaving(false);
+    if (error) {
+      alert('Gagal menambah baris: ' + error.message);
+    } else {
+      setAddManualOpen(false);
+      loadData();
+    }
+  };
 
-  // ============ MODAL SELECTION LOGIC ============
+  const handleDownloadTemplate = async () => {
+    try {
+      const res = await fetch('/api/laporan/template');
+      if (!res.ok) throw new Error('Gagal unduh template');
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'Template_Laporan_Pelaksanaan.xlsx';
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+    } catch (err) {
+      alert('Gagal mengunduh template: ' + err.message);
+    }
+  };
+
+  const handleUploadExcel = async () => {
+    if (!uploadFile) return alert('Pilih file Excel terlebih dahulu.');
+    setUploading(true);
+    setUploadStatus(null);
+    try {
+      const formData = new FormData();
+      formData.append('file', uploadFile);
+      formData.append('role', profile.role);
+      if (uploadAssignmentId) formData.append('assignment_id', uploadAssignmentId);
+      const res = await fetch('/api/laporan/upload', { method: 'POST', body: formData });
+      const result = await res.json();
+      if (res.ok && result.success) {
+        setUploadStatus({ type: 'success', message: result.message, details: result.warnings });
+        setUploadFile(null);
+        loadData();
+      } else {
+        setUploadStatus({ type: 'error', message: result.error || 'Gagal upload', details: result.details });
+      }
+    } catch (err) {
+      setUploadStatus({ type: 'error', message: 'Error: ' + err.message });
+    }
+    setUploading(false);
+  };
+
+  // Helper: format label assignment untuk picker
+  const formatAssignmentLabel = (a) => {
+    const opName = a.op?.full_name || '-';
+    const eqName = a.eq ? [a.eq.nomor_lambung, a.eq.name].filter(Boolean).join(' ') : '-';
+    const status = a.status === 'active' ? '🟢' : '✅';
+    return `${status} ${opName} | ${eqName} | ${a.location_district} - ${a.location_village}`;
+  };
+
+
+
   const openPrintModal = (type) => {
     setPrintSelectedIds([]);
     setCustomPrintPekerjaan('');
@@ -949,6 +1051,9 @@ export default function LaporanPelaksanaanPage() {
                🗑️ Hapus Terpilih ({batchDeleteIds.length})
              </button>
            )}
+           <button className="btn btn-outline" style={{borderColor:'#059669', color:'#059669', fontWeight:'bold'}} onClick={() => setAddManualOpen(true)}>➕ Tambah Baris</button>
+           <button className="btn btn-outline" style={{borderColor:'#0891b2', color:'#0891b2'}} onClick={handleDownloadTemplate}>📥 Download Template</button>
+           <button className="btn btn-outline" style={{borderColor:'#7c3aed', color:'#7c3aed'}} onClick={() => { setUploadModalOpen(true); setUploadStatus(null); setUploadFile(null); setUploadAssignmentId(''); }}>📤 Upload Excel</button>
            <button className="btn btn-outline" onClick={() => openPrintModal('harian')}>📄 Cetak Harian</button>
            <button className="btn btn-outline" onClick={() => openPrintModal('mingguan')}>📘 Cetak Mingguan</button>
            <button className="btn btn-outline" onClick={openDokumentasi}>📷 Buat Dokumentasi</button>
@@ -1036,14 +1141,17 @@ export default function LaporanPelaksanaanPage() {
                            const openInputStyle = { width:'100%', border:'1px dashed #bbb', background:'#fff', padding:'4px', fontSize:12, borderRadius:4 };
 
                            return (
-                             <tr key={log.id} style={{background: '#fff', color:'#000'}}>
+                             <tr key={log.id} style={{background: log.is_manual ? '#fffbeb' : '#fff', color:'#000'}}>
                                <td style={{padding:'6px 12px', border:'1px solid rgba(0,0,0,0.1)', textAlign:'center', width:30}}>
                                   <input type="checkbox" checked={batchDeleteIds.includes(log.id)} onChange={() => toggleBatchDelete(log.id)} onClick={e => e.stopPropagation()} />
                                </td>
                                <td style={{padding:'6px 12px', border:'1px solid rgba(0,0,0,0.1)', textAlign:'center'}}>
                                   <button onClick={() => handleDeleteRow(log.id)} style={{background:'#dc3545', color:'white', border:'none', padding:'4px 8px', borderRadius:4, cursor:'pointer', fontSize:10}}>Hapus</button>
                                </td>
-                               <td style={{padding:'6px 12px', border:'1px solid rgba(0,0,0,0.1)'}}>{new Date(log.reported_at).toLocaleString('id-ID')}</td>
+                               <td style={{padding:'6px 12px', border:'1px solid rgba(0,0,0,0.1)'}}>
+                                  {new Date(log.reported_at).toLocaleString('id-ID')}
+                                  {log.is_manual && <span style={{display:'block', fontSize:9, background:'#f59e0b', color:'#fff', padding:'1px 6px', borderRadius:10, marginTop:2, textAlign:'center', fontWeight:'bold'}}>🔧 Manual</span>}
+                               </td>
                                
                                <td style={{padding:'2px 6px', border:'1px solid rgba(0,0,0,0.1)'}}>
                                   <input type="date" style={inputStyle} value={log.tanggal || ''} 
@@ -1311,6 +1419,119 @@ export default function LaporanPelaksanaanPage() {
           onClose={() => setKolomManagerOpen(false)}
           saving={savingKolom}
         />
+      )}
+
+      {/* ================= MODAL TAMBAH BARIS MANUAL ================= */}
+      {addManualOpen && (
+        <div style={{position:'fixed', top:0, left:0, right:0, bottom:0, background:'rgba(0,0,0,0.6)', zIndex:999, display:'flex', alignItems:'center', justifyContent:'center'}}>
+          <div style={{background:'#fff', width:'550px', borderRadius:12, boxShadow:'0 10px 25px rgba(0,0,0,0.4)', overflow:'hidden'}}>
+            <div style={{padding:20, background:'#059669', color:'#fff', display:'flex', justifyContent:'space-between', alignItems:'center'}}>
+              <h3 style={{margin:0}}>➕ Tambah Baris Manual</h3>
+              <button onClick={() => setAddManualOpen(false)} style={{background:'transparent', border:'none', color:'#fff', cursor:'pointer', fontSize:20}}>✖</button>
+            </div>
+            <div style={{padding:24}}>
+              <p style={{color:'#555', marginTop:0, fontSize:14}}>
+                Tambahkan baris kosong ke tabel laporan. Baris akan ditandai sebagai <strong>🔧 Manual</strong> dan bisa diedit inline.
+              </p>
+              
+              <div style={{marginBottom:16}}>
+                <label style={{fontWeight:'bold', display:'block', marginBottom:6, fontSize:13}}>Tautkan ke Penugasan (Opsional):</label>
+                <select style={{width:'100%', padding:'10px 12px', border:'1px solid #d1d5db', borderRadius:8, fontSize:13, background:'#f9fafb'}}
+                  onChange={e => {}} id="manual-assignment-picker" defaultValue="">
+                  <option value="">— Tanpa Penugasan (Baris Bebas) —</option>
+                  <optgroup label="🟢 Penugasan Aktif">
+                    {allAssignments.filter(a => a.status === 'active').map(a => (
+                      <option key={a.id} value={a.id}>{formatAssignmentLabel(a)}</option>
+                    ))}
+                  </optgroup>
+                  <optgroup label="✅ Penugasan Selesai (Histori)">
+                    {allAssignments.filter(a => a.status === 'finished' || a.status === 'selesai').map(a => (
+                      <option key={a.id} value={a.id}>{formatAssignmentLabel(a)}</option>
+                    ))}
+                  </optgroup>
+                </select>
+                <p style={{fontSize:11, color:'#6b7280', marginTop:4}}>Pilih penugasan jika baris ini terkait pekerjaan yang sudah ada. Kosongkan untuk data historis tanpa penugasan.</p>
+              </div>
+              
+              <div style={{display:'flex', gap:10, justifyContent:'flex-end'}}>
+                <button onClick={() => setAddManualOpen(false)} style={{padding:'10px 20px', border:'1px solid #d1d5db', borderRadius:8, cursor:'pointer', background:'#fff', fontSize:13}}>Batal</button>
+                <button onClick={() => {
+                  const sel = document.getElementById('manual-assignment-picker');
+                  handleAddManualRow(sel?.value || null);
+                }} style={{padding:'10px 24px', background:'#059669', color:'#fff', border:'none', borderRadius:8, cursor:'pointer', fontWeight:'bold', fontSize:13}}>
+                  {saving ? '⏳ Menyimpan...' : '➕ Tambah Baris'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ================= MODAL UPLOAD EXCEL ================= */}
+      {uploadModalOpen && (
+        <div style={{position:'fixed', top:0, left:0, right:0, bottom:0, background:'rgba(0,0,0,0.6)', zIndex:999, display:'flex', alignItems:'center', justifyContent:'center'}}>
+          <div style={{background:'#fff', width:'600px', borderRadius:12, boxShadow:'0 10px 25px rgba(0,0,0,0.4)', overflow:'hidden'}}>
+            <div style={{padding:20, background:'#7c3aed', color:'#fff', display:'flex', justifyContent:'space-between', alignItems:'center'}}>
+              <h3 style={{margin:0}}>📤 Upload Data Excel</h3>
+              <button onClick={() => setUploadModalOpen(false)} style={{background:'transparent', border:'none', color:'#fff', cursor:'pointer', fontSize:20}}>✖</button>
+            </div>
+            <div style={{padding:24}}>
+              <p style={{color:'#555', marginTop:0, fontSize:14}}>
+                Upload file <strong>.xlsx</strong> yang sudah diisi sesuai template untuk input data massal.
+              </p>
+              
+              <div style={{marginBottom:16, padding:16, background:'#f0fdf4', border:'1px solid #86efac', borderRadius:8}}>
+                <p style={{margin:0, fontSize:13, color:'#166534'}}>💡 <strong>Belum punya template?</strong> <button onClick={handleDownloadTemplate} style={{color:'#059669', textDecoration:'underline', border:'none', background:'none', cursor:'pointer', fontWeight:'bold', fontSize:13}}>Download Template di sini</button></p>
+              </div>
+
+              <div style={{marginBottom:16}}>
+                <label style={{fontWeight:'bold', display:'block', marginBottom:6, fontSize:13}}>Pilih File Excel:</label>
+                <input type="file" accept=".xlsx,.xls" onChange={e => setUploadFile(e.target.files[0])} 
+                  style={{width:'100%', padding:'10px', border:'2px dashed #d1d5db', borderRadius:8, fontSize:13, background:'#f9fafb'}} />
+              </div>
+
+              <div style={{marginBottom:16}}>
+                <label style={{fontWeight:'bold', display:'block', marginBottom:6, fontSize:13}}>Tautkan ke Penugasan (Opsional):</label>
+                <select style={{width:'100%', padding:'10px 12px', border:'1px solid #d1d5db', borderRadius:8, fontSize:13, background:'#f9fafb'}}
+                  value={uploadAssignmentId} onChange={e => setUploadAssignmentId(e.target.value)}>
+                  <option value="">— Tanpa Penugasan (Data Historis) —</option>
+                  <optgroup label="🟢 Penugasan Aktif">
+                    {allAssignments.filter(a => a.status === 'active').map(a => (
+                      <option key={a.id} value={a.id}>{formatAssignmentLabel(a)}</option>
+                    ))}
+                  </optgroup>
+                  <optgroup label="✅ Penugasan Selesai (Histori)">
+                    {allAssignments.filter(a => a.status === 'finished' || a.status === 'selesai').map(a => (
+                      <option key={a.id} value={a.id}>{formatAssignmentLabel(a)}</option>
+                    ))}
+                  </optgroup>
+                </select>
+              </div>
+
+              {uploadStatus && (
+                <div style={{marginBottom:16, padding:14, borderRadius:8, fontSize:13,
+                  background: uploadStatus.type === 'success' ? '#f0fdf4' : '#fef2f2',
+                  border: uploadStatus.type === 'success' ? '1px solid #86efac' : '1px solid #fca5a5',
+                  color: uploadStatus.type === 'success' ? '#166534' : '#991b1b'}}>
+                  <strong>{uploadStatus.type === 'success' ? '✅' : '❌'} {uploadStatus.message}</strong>
+                  {uploadStatus.details && uploadStatus.details.length > 0 && (
+                    <ul style={{margin:'8px 0 0', paddingLeft:20, fontSize:12}}>
+                      {uploadStatus.details.map((d, i) => <li key={i}>{d}</li>)}
+                    </ul>
+                  )}
+                </div>
+              )}
+              
+              <div style={{display:'flex', gap:10, justifyContent:'flex-end'}}>
+                <button onClick={() => setUploadModalOpen(false)} style={{padding:'10px 20px', border:'1px solid #d1d5db', borderRadius:8, cursor:'pointer', background:'#fff', fontSize:13}}>Tutup</button>
+                <button onClick={handleUploadExcel} disabled={uploading || !uploadFile}
+                  style={{padding:'10px 24px', background: uploading || !uploadFile ? '#9ca3af' : '#7c3aed', color:'#fff', border:'none', borderRadius:8, cursor: uploading || !uploadFile ? 'not-allowed' : 'pointer', fontWeight:'bold', fontSize:13}}>
+                  {uploading ? '⏳ Mengupload...' : '📤 Upload & Import'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
       )}
     </>
   );
