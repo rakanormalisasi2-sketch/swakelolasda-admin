@@ -426,6 +426,48 @@ export default function LaporanPelaksanaanPage() {
     return `${status} ${opName} | ${eqName} | ${a.location_district} - ${a.location_village}`;
   };
 
+  // Format label singkat untuk inline dropdown
+  const formatAssignmentShort = (a) => {
+    const opName = a.op?.full_name || '-';
+    const loc = `${a.location_district}-${a.location_village}`;
+    const icon = a.status === 'active' ? '🟢' : '✅';
+    return `${icon} ${opName} | ${loc}`;
+  };
+
+  // Switch assignment per baris
+  const handleSwitchAssignment = async (logId, newAssignmentId) => {
+    setSaving(true);
+    const val = newAssignmentId || null;
+    const { error } = await supabase.from('operator_logs').update({ assignment_id: val }).eq('id', logId);
+    if (error) {
+      alert('Gagal mengubah penugasan: ' + error.message);
+    } else {
+      loadData(); // Refresh untuk update grouping
+    }
+    setSaving(false);
+  };
+
+  // Switch assignment per grup (semua baris dalam grup)
+  const handleSwitchGroupAssignment = async (groupLogs, newAssignmentId) => {
+    const count = groupLogs.length;
+    const label = newAssignmentId
+      ? allAssignments.find(a => a.id === newAssignmentId)
+        ? formatAssignmentShort(allAssignments.find(a => a.id === newAssignmentId))
+        : newAssignmentId
+      : 'Tanpa Penugasan';
+    if (!confirm(`Pindahkan ${count} baris ke penugasan:\n${label}\n\nLanjutkan?`)) return;
+    setSaving(true);
+    const ids = groupLogs.map(l => l.id);
+    const val = newAssignmentId || null;
+    const { error } = await supabase.from('operator_logs').update({ assignment_id: val }).in('id', ids);
+    if (error) {
+      alert('Gagal mengubah penugasan grup: ' + error.message);
+    } else {
+      loadData();
+    }
+    setSaving(false);
+  };
+
 
 
   const openPrintModal = (type) => {
@@ -1131,13 +1173,28 @@ export default function LaporanPelaksanaanPage() {
                            <td colSpan={17 + customColumns.length} style={{background:'#e2e8f0', color:'#1e3a5f', padding:'10px 15px', fontWeight:'bold', border:'1px solid #ccc', fontSize:14}}>
                              <input type="checkbox" style={{marginRight: 8}} onChange={() => toggleBatchDeleteAll(mainTableGroups[gId].map(l => l.id))}
                                checked={mainTableGroups[gId].every(l => batchDeleteIds.includes(l.id))} onClick={e => e.stopPropagation()} />
-                             🗂️ {gId}
-                           </td>
-                        </tr>
+                              🗂️ {gId}
+                              {/* Tombol switch penugasan seluruh grup */}
+                              {mainTableGroups[gId].some(l => l.is_manual || !l.assignment_id) && (
+                                <select style={{marginLeft:12, padding:'4px 8px', fontSize:11, borderRadius:4, border:'1px solid #94a3b8', background:'#fff', cursor:'pointer', maxWidth:280}}
+                                  defaultValue=""
+                                  onChange={e => { if(e.target.value !== '') { handleSwitchGroupAssignment(mainTableGroups[gId], e.target.value === '__none__' ? null : e.target.value); e.target.value=''; } }}>
+                                  <option value="" disabled>🔗 Pindah Penugasan Grup...</option>
+                                  <option value="__none__">— Tanpa Penugasan —</option>
+                                  {allAssignments.filter(a => a.status === 'active').map(a => (
+                                    <option key={a.id} value={a.id}>{formatAssignmentShort(a)}</option>
+                                  ))}
+                                  {allAssignments.filter(a => a.status !== 'active').map(a => (
+                                    <option key={a.id} value={a.id}>{formatAssignmentShort(a)}</option>
+                                  ))}
+                                </select>
+                              )}
+                            </td>
+                         </tr>
                         {mainTableGroups[gId].map(log => {
                            const helper = log.assignment?.helper_override || log.assignment?.helper?.full_name || '';
                            const inputStyle = { width:'100%', border:'1px dashed transparent', background:'transparent', padding:'4px', fontSize:12 };
-                           const isSelesai = log.assignment?.status?.toLowerCase() === 'selesai' || log.assignment?.status?.toLowerCase() === 'finished';
+                           const isSelesai = true; // Semua baris selalu editable untuk koreksi
                            const openInputStyle = { width:'100%', border:'1px dashed #bbb', background:'#fff', padding:'4px', fontSize:12, borderRadius:4 };
 
                            return (
@@ -1145,8 +1202,19 @@ export default function LaporanPelaksanaanPage() {
                                <td style={{padding:'6px 12px', border:'1px solid rgba(0,0,0,0.1)', textAlign:'center', width:30}}>
                                   <input type="checkbox" checked={batchDeleteIds.includes(log.id)} onChange={() => toggleBatchDelete(log.id)} onClick={e => e.stopPropagation()} />
                                </td>
-                               <td style={{padding:'6px 12px', border:'1px solid rgba(0,0,0,0.1)', textAlign:'center'}}>
-                                  <button onClick={() => handleDeleteRow(log.id)} style={{background:'#dc3545', color:'white', border:'none', padding:'4px 8px', borderRadius:4, cursor:'pointer', fontSize:10}}>Hapus</button>
+                               <td style={{padding:'4px 6px', border:'1px solid rgba(0,0,0,0.1)', textAlign:'center', minWidth:90}}>
+                                  <button onClick={() => handleDeleteRow(log.id)} style={{background:'#dc3545', color:'white', border:'none', padding:'3px 6px', borderRadius:4, cursor:'pointer', fontSize:10, marginBottom:3, display:'block', width:'100%'}}>Hapus</button>
+                                  <select style={{width:'100%', fontSize:9, padding:'2px', borderRadius:3, border:'1px solid #d1d5db', background: log.assignment_id ? '#f0fdf4' : '#fef3c7', cursor:'pointer'}}
+                                    value={log.assignment_id || ''}
+                                    onChange={e => handleSwitchAssignment(log.id, e.target.value === '' ? null : e.target.value)}>
+                                    <option value="">— Bebas —</option>
+                                    {allAssignments.filter(a => a.status === 'active').map(a => (
+                                      <option key={a.id} value={a.id}>{formatAssignmentShort(a)}</option>
+                                    ))}
+                                    {allAssignments.filter(a => a.status !== 'active').map(a => (
+                                      <option key={a.id} value={a.id}>{formatAssignmentShort(a)}</option>
+                                    ))}
+                                  </select>
                                </td>
                                <td style={{padding:'6px 12px', border:'1px solid rgba(0,0,0,0.1)'}}>
                                   {new Date(log.reported_at).toLocaleString('id-ID')}
