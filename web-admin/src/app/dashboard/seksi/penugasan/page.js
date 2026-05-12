@@ -87,7 +87,7 @@ export default function PenugasanPage() {
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const [{ data: ops }, { data: alatData }, { data: asgn }, { data: histAsgn }, { data: allActiveAsgn }] = await Promise.all([
+      const [{ data: ops }, { data: alatData }, { data: asgn }, { data: histAsgn }] = await Promise.all([
         supabase.from('user_profiles').select('*').eq('role', 'operator').order('full_name'),
         supabase.from('heavy_equipment').select('*').order('name'),
         supabase.from('assignments').select(`
