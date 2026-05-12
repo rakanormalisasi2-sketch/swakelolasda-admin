@@ -95,7 +95,7 @@ export default function PenugasanPage() {
           operator:user_profiles!assignments_operator_id_fkey(full_name),
           helper:user_profiles!assignments_helper_id_fkey(full_name),
           equipment:heavy_equipment(name, merk_type, nomor_lambung, status)
-        `).eq('status', 'active').eq('created_by_role', profile?.role).order('created_at', { ascending: false }),
+        `).eq('status', 'active').eq('created_by_role', profile?.role).order('start_date', { ascending: false }),
         supabase.from('assignments').select(`
           *,
           operator:user_profiles!assignments_operator_id_fkey(full_name),
