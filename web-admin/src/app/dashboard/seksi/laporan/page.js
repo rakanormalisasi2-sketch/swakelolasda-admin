@@ -3,6 +3,7 @@ import React from 'react';
 import { useEffect, useState, useCallback, Fragment } from 'react';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/context/AuthContext';
+import WILAYAH from '@/lib/wilayah';
 import { MASTER_EXCAVATOR_SPECS, calculateFuelPerHour } from '@/utils/calcRapMath';
 import KolomManager from './KolomManager';
 import DokumentasiModal from './DokumentasiModal';
@@ -59,6 +60,8 @@ export default function LaporanPelaksanaanPage() {
   const [logs, setLogs] = useState([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [operators, setOperators] = useState([]);
+  const [alat, setAlat] = useState([]);
   const [pdfConfig, setPdfConfig] = useState(null);
   const [customColumns, setCustomColumns] = useState([]);
   const [kolomManagerOpen, setKolomManagerOpen] = useState(false);
@@ -116,6 +119,14 @@ export default function LaporanPelaksanaanPage() {
         .eq('role', profile.role)
         .order('position', { ascending: true });
       setCustomColumns(colConfigs || []);
+
+      // Fetch Operators & Alat for dropdown overrides
+      const [{ data: ops }, { data: alatData }] = await Promise.all([
+        supabase.from('user_profiles').select('*').eq('role', 'operator').order('full_name'),
+        supabase.from('heavy_equipment').select('*').order('name'),
+      ]);
+      setOperators(ops || []);
+      setAlat(alatData || []);
 
       // Fetch ALL assignments (active + finished) for picker and for data
       const { data: assignments } = await supabase
@@ -359,13 +370,33 @@ export default function LaporanPelaksanaanPage() {
   const handleAddManualRow = async (assignmentId = null) => {
     setSaving(true);
     const today = new Date().toISOString().split('T')[0];
+    
+    let overrides = {};
+    if (assignmentId) {
+      const assignment = allAssignments.find(a => a.id === assignmentId);
+      if (assignment) {
+        const opName = assignment.op?.full_name || '-';
+        const eqName = assignment.eq ? [assignment.eq.nomor_lambung, assignment.eq.merk_type ? `(${assignment.eq.merk_type})` : null, assignment.eq.name].filter(Boolean).join(' ') : '-';
+        overrides = {
+          override_operator: opName,
+          operator_name: opName,
+          override_alat: eqName,
+          jenis_alat: eqName,
+          override_kecamatan: assignment.location_district || '',
+          override_desa: assignment.location_village || ''
+        };
+      }
+    }
+
     const insertData = {
       tanggal: today,
       is_manual: true,
       created_by_role: profile.role,
       reported_at: new Date().toISOString(),
       assignment_id: assignmentId || null,
+      ...overrides
     };
+    
     const { error } = await supabase.from('operator_logs').insert(insertData);
     setSaving(false);
     if (error) {
@@ -1244,9 +1275,12 @@ export default function LaporanPelaksanaanPage() {
                                {/* OVERRIDE FIELDS — urutan: Operator, Helper, Kecamatan, Desa, Alat */}
                                <td style={{padding:'2px 6px', border:'1px solid rgba(0,0,0,0.1)', fontWeight:'500'}}>
                                   {isSelesai ? (
-                                    <input type="text" style={openInputStyle} value={log.override_operator || log.operator?.full_name || log.operator_name || ''}
-                                         onChange={e => handleInlineEdit(log.id, 'override_operator', e.target.value)}
-                                         onBlur={e => handleBlurSave(log.id, 'override_operator', e.target.value)} />
+                                    <select style={openInputStyle} value={log.override_operator || log.operator?.full_name || log.operator_name || ''}
+                                         onChange={e => { handleInlineEdit(log.id, 'override_operator', e.target.value); handleBlurSave(log.id, 'override_operator', e.target.value); }}>
+                                      <option value="">— Ketik Manual / Pilih —</option>
+                                      {operators.map(o => <option key={o.id} value={o.full_name}>{o.full_name}</option>)}
+                                      {log.override_operator && !operators.find(o => o.full_name === log.override_operator) && <option value={log.override_operator}>{log.override_operator}</option>}
+                                    </select>
                                   ) : ( log.override_operator || log.operator?.full_name || log.operator_name || '-' )}
                                </td>
 
@@ -1255,26 +1289,38 @@ export default function LaporanPelaksanaanPage() {
 
                                <td style={{padding:'2px 6px', border:'1px solid rgba(0,0,0,0.1)'}}>
                                   {isSelesai ? (
-                                    <input type="text" style={openInputStyle} value={log.override_kecamatan || log.assignment?.location_district || ''}
-                                         onChange={e => handleInlineEdit(log.id, 'override_kecamatan', e.target.value)}
-                                         onBlur={e => handleBlurSave(log.id, 'override_kecamatan', e.target.value)} />
+                                    <select style={openInputStyle} value={log.override_kecamatan || log.assignment?.location_district || ''}
+                                         onChange={e => { handleInlineEdit(log.id, 'override_kecamatan', e.target.value); handleInlineEdit(log.id, 'override_desa', ''); handleBlurSave(log.id, 'override_kecamatan', e.target.value); handleBlurSave(log.id, 'override_desa', ''); }}>
+                                      <option value="">— Pilih Kecamatan —</option>
+                                      {Object.keys(WILAYAH).map(k => <option key={k} value={k}>{k}</option>)}
+                                      {log.override_kecamatan && !WILAYAH[log.override_kecamatan] && <option value={log.override_kecamatan}>{log.override_kecamatan}</option>}
+                                    </select>
                                   ) : ( log.override_kecamatan || log.assignment?.location_district || '-' )}
                                </td>
                                <td style={{padding:'2px 6px', border:'1px solid rgba(0,0,0,0.1)'}}>
                                   {isSelesai ? (
-                                    <input type="text" style={openInputStyle} value={log.override_desa || log.assignment?.location_village || ''}
-                                         onChange={e => handleInlineEdit(log.id, 'override_desa', e.target.value)}
-                                         onBlur={e => handleBlurSave(log.id, 'override_desa', e.target.value)} />
+                                    <select style={openInputStyle} value={log.override_desa || log.assignment?.location_village || ''}
+                                         onChange={e => { handleInlineEdit(log.id, 'override_desa', e.target.value); handleBlurSave(log.id, 'override_desa', e.target.value); }}>
+                                      <option value="">— Pilih Desa —</option>
+                                      {(WILAYAH[log.override_kecamatan || log.assignment?.location_district] || []).map(d => <option key={d} value={d}>{d}</option>)}
+                                      {log.override_desa && !(WILAYAH[log.override_kecamatan || log.assignment?.location_district] || []).includes(log.override_desa) && <option value={log.override_desa}>{log.override_desa}</option>}
+                                    </select>
                                   ) : ( log.override_desa || log.assignment?.location_village || '-' )}
                                </td>
                                <td style={{padding:'2px 6px', border:'1px solid rgba(0,0,0,0.1)'}}>
                                   {isSelesai ? (
-                                    <input type="text" style={openInputStyle}
+                                    <select style={openInputStyle}
                                          value={log.override_alat != null ? log.override_alat : (
                                            log.equipment ? [log.equipment.nomor_lambung, log.equipment.merk_type ? `(${log.equipment.merk_type})` : null, log.equipment.name].filter(Boolean).join(' ') : (log.jenis_alat || '')
                                          )}
-                                         onChange={e => handleInlineEdit(log.id, 'override_alat', e.target.value)}
-                                         onBlur={e => handleBlurSave(log.id, 'override_alat', e.target.value)} />
+                                         onChange={e => { handleInlineEdit(log.id, 'override_alat', e.target.value); handleBlurSave(log.id, 'override_alat', e.target.value); }}>
+                                      <option value="">— Ketik Manual / Pilih —</option>
+                                      {alat.map(a => {
+                                        const labelDetail = [a.nomor_lambung, a.merk_type ? `(${a.merk_type})` : null, a.name].filter(Boolean).join(' ');
+                                        return <option key={a.id} value={labelDetail}>{labelDetail}</option>;
+                                      })}
+                                      {log.override_alat && !alat.find(a => [a.nomor_lambung, a.merk_type ? `(${a.merk_type})` : null, a.name].filter(Boolean).join(' ') === log.override_alat) && <option value={log.override_alat}>{log.override_alat}</option>}
+                                    </select>
                                   ) : ( log.override_alat || (
                                     log.equipment ? (
                                       <span>

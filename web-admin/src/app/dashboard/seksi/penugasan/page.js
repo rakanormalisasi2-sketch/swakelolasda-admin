@@ -10,6 +10,7 @@ export default function PenugasanPage() {
   const [operators, setOperators] = useState([]);
   const [alat, setAlat] = useState([]);
   const [assignments, setAssignments] = useState([]);
+  const [historyAssignments, setHistoryAssignments] = useState([]);
   const [busyIdsAll, setBusyIdsAll] = useState(new Set()); // semua seksi
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
@@ -86,7 +87,7 @@ export default function PenugasanPage() {
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const [{ data: ops }, { data: alatData }, { data: asgn }, { data: allActiveAsgn }] = await Promise.all([
+      const [{ data: ops }, { data: alatData }, { data: asgn }, { data: histAsgn }, { data: allActiveAsgn }] = await Promise.all([
         supabase.from('user_profiles').select('*').eq('role', 'operator').order('full_name'),
         supabase.from('heavy_equipment').select('*').order('name'),
         supabase.from('assignments').select(`
@@ -94,13 +95,20 @@ export default function PenugasanPage() {
           operator:user_profiles!assignments_operator_id_fkey(full_name),
           helper:user_profiles!assignments_helper_id_fkey(full_name),
           equipment:heavy_equipment(name, merk_type, nomor_lambung, status)
-        `).eq('status', 'active').eq('created_by_role', profile?.role),
+        `).eq('status', 'active').eq('created_by_role', profile?.role).order('created_at', { ascending: false }),
+        supabase.from('assignments').select(`
+          *,
+          operator:user_profiles!assignments_operator_id_fkey(full_name),
+          helper:user_profiles!assignments_helper_id_fkey(full_name),
+          equipment:heavy_equipment(name, merk_type, nomor_lambung, status)
+        `).in('status', ['finished', 'selesai']).eq('created_by_role', profile?.role).order('end_date', { ascending: false }).limit(50),
         // Ambil SEMUA assignment aktif (lintas seksi) hanya untuk cek busyIds
         supabase.from('assignments').select('operator_id, helper_id').eq('status', 'active'),
       ]);
       setOperators(ops || []);
       setAlat(alatData || []);
       setAssignments(asgn || []);
+      setHistoryAssignments(histAsgn || []);
       // busyIds dihitung dari semua seksi agar tidak bisa assign operator yang sudah aktif di seksi lain
       const allBusy = new Set([
         ...(allActiveAsgn || []).map(a => a.operator_id),
@@ -195,6 +203,22 @@ export default function PenugasanPage() {
     load();
   };
 
+  const deleteAssignment = async (a) => {
+    if (!confirm(`YAKIN HAPUS penugasan ${a.operator?.full_name}? \n\nPerhatian: Data Laporan Pelaksanaan yang terkait dengan penugasan ini TIDAK akan ikut terhapus, namun tidak akan tertaut lagi ke penugasan ini.`)) return;
+    setSaving(true);
+    // Kembalikan status alat ke ready jika assignment masih aktif
+    if (a.status === 'active' && a.equipment_id) {
+      await supabase.from('heavy_equipment').update({ status: 'ready' }).eq('id', a.equipment_id);
+    }
+    const { error } = await supabase.from('assignments').delete().eq('id', a.id);
+    if (error) {
+      alert('Gagal menghapus penugasan: ' + error.message);
+    } else {
+      load();
+    }
+    setSaving(false);
+  };
+
   const JOB_LABELS = { normalisasi: 'Normalisasi', embung: 'Embung', lainnya: 'Lainnya' };
   const SUB_LABELS = {
     normalisasi_sungai: 'Normalisasi Sungai',
@@ -260,6 +284,7 @@ export default function PenugasanPage() {
                         <div style={{display:'flex', gap:6}}>
                           <button className="btn btn-sm btn-outline" style={{padding:'4px 8px'}} onClick={() => handleEdit(a)}>Ubah</button>
                           <button className="btn btn-sm btn-success" style={{padding:'4px 8px'}} onClick={() => finishAssignment(a)}>Selesaikan</button>
+                          <button className="btn btn-sm" style={{padding:'4px 8px', background:'#fee2e2', color:'#ef4444', border:'1px solid #fca5a5'}} onClick={() => deleteAssignment(a)}>Hapus</button>
                         </div>
                       </td>
                     </tr>
@@ -269,6 +294,50 @@ export default function PenugasanPage() {
             )}
           </div>
         </div>
+
+        {/* Histori Penugasan */}
+        <div className="card" style={{marginTop: 24}}>
+          <div className="card-header" style={{background: '#f8fafc', borderBottom: '1px solid #e2e8f0'}}>
+            <span className="card-title" style={{color: '#64748b'}}>Histori Penugasan Selesai (Terakhir 50)</span>
+          </div>
+          <div className="table-wrapper">
+            {loading ? (
+              <div style={{padding:40,textAlign:'center',color:'var(--text-muted)'}}>Memuat...</div>
+            ) : historyAssignments.length === 0 ? (
+              <div className="empty-state" style={{padding: '30px 20px'}}><p>Belum ada histori penugasan yang selesai.</p></div>
+            ) : (
+              <table>
+                <thead><tr><th>Operator</th><th>Helper</th><th>Alat Berat</th><th>Pekerjaan</th><th>Lokasi</th><th>Selesai Pada</th><th>Aksi</th></tr></thead>
+                <tbody>
+                  {historyAssignments.map(a => (
+                    <tr key={a.id} style={{background: '#fafafa', color: '#666'}}>
+                      <td className="font-semibold">{a.operator?.full_name||'—'}</td>
+                      <td className="text-muted">{a.helper?.full_name||'—'}</td>
+                      <td>
+                        {a.equipment ? (
+                          <div>
+                            <div className="font-semibold">{a.equipment.nomor_lambung || '—'}</div>
+                            <div className="text-xs text-muted">{[a.equipment.merk_type, a.equipment.name].filter(Boolean).join(' · ')}</div>
+                          </div>
+                        ) : '—'}
+                      </td>
+                      <td>
+                        <span className="badge badge-neutral">{JOB_LABELS[a.job_type]||a.job_type}</span>
+                        {a.job_sub_type && <div className="text-xs" style={{marginTop:3}}>{SUB_LABELS[a.job_sub_type]||a.job_sub_type}</div>}
+                      </td>
+                      <td>{a.location_village}, Kec. {a.location_district}</td>
+                      <td className="text-sm text-muted">{a.end_date ? new Date(a.end_date).toLocaleDateString('id-ID',{day:'2-digit',month:'short',year:'numeric'}) : '—'}</td>
+                      <td>
+                        <button className="btn btn-sm" style={{padding:'4px 8px', background:'#fee2e2', color:'#ef4444', border:'1px solid #fca5a5'}} onClick={() => deleteAssignment(a)}>Hapus</button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
+          </div>
+        </div>
+
       </div>
 
       {showModal && (
