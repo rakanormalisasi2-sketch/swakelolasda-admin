@@ -101,20 +101,38 @@ export default function PenugasanPage() {
           operator:user_profiles!assignments_operator_id_fkey(full_name),
           helper:user_profiles!assignments_helper_id_fkey(full_name),
           equipment:heavy_equipment(name, merk_type, nomor_lambung, status)
-        `).in('status', ['finished', 'selesai']).eq('created_by_role', profile?.role).order('end_date', { ascending: false }).limit(50),
-        // Ambil SEMUA assignment aktif (lintas seksi) hanya untuk cek busyIds
-        supabase.from('assignments').select('operator_id, helper_id').eq('status', 'active'),
+        `).in('status', ['finished', 'selesai']).eq('created_by_role', profile?.role).order('end_date', { ascending: false }).limit(50)
       ]);
       setOperators(ops || []);
       setAlat(alatData || []);
       setAssignments(asgn || []);
       setHistoryAssignments(histAsgn || []);
+      // Self-healing: Fix created_by_role if it was accidentally changed to superadmin
+      if (profile?.role === 'superadmin' || profile?.role === 'seksi_normalisasi' || profile?.role === 'seksi_embung') {
+         // Background fix for lost data
+         supabase.from('assignments').update({ created_by_role: 'seksi_normalisasi' }).eq('job_type', 'normalisasi').neq('created_by_role', 'seksi_normalisasi').then(() => {});
+         supabase.from('assignments').update({ created_by_role: 'seksi_embung' }).eq('job_type', 'embung').neq('created_by_role', 'seksi_embung').then(() => {});
+      }
+
+      // Ambil SEMUA assignment aktif (lintas seksi) hanya untuk cek busyIds dan stuck equipments
+      const { data: allActiveAsgnRaw } = await supabase.from('assignments').select('operator_id, helper_id, equipment_id').eq('status', 'active');
+      const allActiveAsgn = allActiveAsgnRaw || [];
+
       // busyIds dihitung dari semua seksi agar tidak bisa assign operator yang sudah aktif di seksi lain
       const allBusy = new Set([
-        ...(allActiveAsgn || []).map(a => a.operator_id),
-        ...(allActiveAsgn || []).map(a => a.helper_id).filter(Boolean),
+        ...allActiveAsgn.map(a => a.operator_id),
+        ...allActiveAsgn.map(a => a.helper_id).filter(Boolean),
       ]);
       setBusyIdsAll(allBusy);
+
+      // Self-healing: Fix stuck equipment that are 'operating' but not in any active assignment
+      const activeEqIds = new Set(allActiveAsgn.map(a => a.equipment_id).filter(Boolean));
+      const stuckEqs = (alatData || []).filter(a => a.status === 'operating' && !activeEqIds.has(a.id));
+      if (stuckEqs.length > 0) {
+        console.log('Auto-fixing stuck equipments:', stuckEqs);
+        await Promise.all(stuckEqs.map(eq => supabase.from('heavy_equipment').update({ status: 'ready' }).eq('id', eq.id)));
+        setAlat(prev => prev.map(a => stuckEqs.find(s => s.id === a.id) ? { ...a, status: 'ready' } : a));
+      }
     } catch (err) {
       console.error('Error loading penugasan data:', err);
     } finally {
@@ -180,7 +198,9 @@ export default function PenugasanPage() {
     };
 
     if (editId) {
-       const { error: asgnErr } = await supabase.from('assignments').update(dataToSave).eq('id', editId);
+       const updateData = { ...dataToSave };
+       delete updateData.created_by_role; // Prevent overwriting created_by_role on edit
+       const { error: asgnErr } = await supabase.from('assignments').update(updateData).eq('id', editId);
        if (asgnErr) { setError(asgnErr.message); setSaving(false); return; }
        if (originalEquipmentId && originalEquipmentId !== form.equipment_id) {
           // Revert old eq to ready, set new eq to operating
