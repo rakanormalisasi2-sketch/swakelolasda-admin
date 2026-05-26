@@ -11,52 +11,28 @@ export default function PenugasanPage() {
   const [alat, setAlat] = useState([]);
   const [assignments, setAssignments] = useState([]);
   const [historyAssignments, setHistoryAssignments] = useState([]);
+  const [schedules, setSchedules] = useState([]); // from Tab 3 Schedule
+  
   const [busyIdsAll, setBusyIdsAll] = useState(new Set()); // semua seksi
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
   const [saving, setSaving] = useState(false);
-  const [geocoding, setGeocoding] = useState(false); // Status pencarian koordinat
+  const [geocoding, setGeocoding] = useState(false);
   const [error, setError] = useState('');
   const [desaList, setDesaList] = useState([]);
   const [form, setForm] = useState({
+    schedule_id: '',
     operator_id: '', helper_id: '', equipment_id: '',
     job_type: 'normalisasi', job_sub_type: '', custom_job_description: '',
     location_district: '', location_village: '',
     latitude: '', longitude: '', mapsUrl: '',
   });
 
-  // Auto-geocode when village changes
-  useEffect(() => {
-    async function autoGeocode() {
-      // Hanya jalankan jika desa & kec ada, tapi kordinat MASIH KOSONG
-      if (form.location_village && form.location_district && !form.latitude && !form.longitude) {
-        setGeocoding(true);
-        try {
-          console.log(`[Penugasan] Auto-geocoding: ${form.location_village}, ${form.location_district}`);
-          const result = await geocodeLocation(form.location_village, form.location_district);
-          if (result && result.lat != null && result.lng != null) {
-            setForm(f => ({
-              ...f,
-              latitude: String(result.lat),
-              longitude: String(result.lng)
-            }));
-          }
-        } catch (err) {
-          console.error('[Penugasan] Geocoding error:', err);
-        } finally {
-          setGeocoding(false);
-        }
-      }
-    }
-    autoGeocode();
-  }, [form.location_village, form.location_district]);
   const [editId, setEditId] = useState(null);
   const [originalEquipmentId, setOriginalEquipmentId] = useState(null);
 
-  // Job options berbasis role seksi
   const isNormalisasi = profile?.role === 'seksi_normalisasi';
 
-  // Opsi utama: Seksi Normalisasi hanya lihat Normalisasi+Lainnya, Seksi Embung hanya Embung+Lainnya
   const JOB_TYPE_OPTIONS = isNormalisasi
     ? [
         { value: 'normalisasi', label: 'Normalisasi' },
@@ -67,9 +43,6 @@ export default function PenugasanPage() {
         { value: 'lainnya', label: 'Lainnya' },
       ];
 
-  // Sub-pekerjaan sesuai permintaan user:
-  // Normalisasi → Normalisasi Sungai | Normalisasi Saluran/Irigasi
-  // Embung → Rehabilitasi Embung | Pembangunan Embung
   const JOB_SUB_OPTIONS = {
     normalisasi: [
       { value: 'normalisasi_sungai', label: 'Normalisasi Sungai' },
@@ -81,13 +54,14 @@ export default function PenugasanPage() {
     ],
   };
 
-  // Default job_type berdasarkan role
   const defaultJobType = isNormalisasi ? 'normalisasi' : 'embung';
 
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const [{ data: ops }, { data: alatData }, { data: asgn }, { data: histAsgn }] = await Promise.all([
+      const currentYear = new Date().getFullYear();
+      
+      const [{ data: ops }, { data: alatData }, { data: asgn }, { data: histAsgn }, schedRes] = await Promise.all([
         supabase.from('user_profiles').select('*').eq('role', 'operator').order('full_name'),
         supabase.from('heavy_equipment').select('*').order('name'),
         supabase.from('assignments').select(`
@@ -101,35 +75,30 @@ export default function PenugasanPage() {
           operator:user_profiles!assignments_operator_id_fkey(full_name),
           helper:user_profiles!assignments_helper_id_fkey(full_name),
           equipment:heavy_equipment(name, merk_type, nomor_lambung, status)
-        `).in('status', ['finished', 'selesai']).eq('created_by_role', profile?.role).order('end_date', { ascending: false }).limit(50)
+        `).in('status', ['finished', 'selesai']).eq('created_by_role', profile?.role).order('end_date', { ascending: false }).limit(50),
+        fetch(`/api/proposal/schedule?tahun=${currentYear}&role=${profile?.role}`)
       ]);
+      
+      const schedData = await schedRes.json();
+      setSchedules(schedData.filter(s => s.status === 'estimasi_rencana') || []);
+
       setOperators(ops || []);
       setAlat(alatData || []);
       setAssignments(asgn || []);
       setHistoryAssignments(histAsgn || []);
-      // Self-healing: Fix created_by_role if it was accidentally changed to superadmin
-      if (profile?.role === 'superadmin' || profile?.role === 'seksi_normalisasi' || profile?.role === 'seksi_embung') {
-         // Background fix for lost data
-         supabase.from('assignments').update({ created_by_role: 'seksi_normalisasi' }).eq('job_type', 'normalisasi').neq('created_by_role', 'seksi_normalisasi').then(() => {});
-         supabase.from('assignments').update({ created_by_role: 'seksi_embung' }).eq('job_type', 'embung').neq('created_by_role', 'seksi_embung').then(() => {});
-      }
 
-      // Ambil SEMUA assignment aktif (lintas seksi) hanya untuk cek busyIds dan stuck equipments
       const { data: allActiveAsgnRaw } = await supabase.from('assignments').select('operator_id, helper_id, equipment_id').eq('status', 'active');
       const allActiveAsgn = allActiveAsgnRaw || [];
 
-      // busyIds dihitung dari semua seksi agar tidak bisa assign operator yang sudah aktif di seksi lain
       const allBusy = new Set([
         ...allActiveAsgn.map(a => a.operator_id),
         ...allActiveAsgn.map(a => a.helper_id).filter(Boolean),
       ]);
       setBusyIdsAll(allBusy);
 
-      // Self-healing: Fix stuck equipment that are 'operating' but not in any active assignment
       const activeEqIds = new Set(allActiveAsgn.map(a => a.equipment_id).filter(Boolean));
       const stuckEqs = (alatData || []).filter(a => a.status === 'operating' && !activeEqIds.has(a.id));
       if (stuckEqs.length > 0) {
-        console.log('Auto-fixing stuck equipments:', stuckEqs);
         await Promise.all(stuckEqs.map(eq => supabase.from('heavy_equipment').update({ status: 'ready' }).eq('id', eq.id)));
         setAlat(prev => prev.map(a => stuckEqs.find(s => s.id === a.id) ? { ...a, status: 'ready' } : a));
       }
@@ -142,12 +111,30 @@ export default function PenugasanPage() {
 
   useEffect(() => { load(); }, [load]);
 
-  // busyIds dari seksi sendiri (untuk edit mode — tetap include operator saat ini)
+  // Auto-geocode when village changes
+  useEffect(() => {
+    async function autoGeocode() {
+      if (form.location_village && form.location_district && !form.latitude && !form.longitude) {
+        setGeocoding(true);
+        try {
+          const result = await geocodeLocation(form.location_village, form.location_district);
+          if (result && result.lat != null && result.lng != null) {
+            setForm(f => ({ ...f, latitude: String(result.lat), longitude: String(result.lng) }));
+          }
+        } catch (err) {
+          console.error('[Penugasan] Geocoding error:', err);
+        } finally {
+          setGeocoding(false);
+        }
+      }
+    }
+    autoGeocode();
+  }, [form.location_village, form.location_district]);
+
   const busyIds = new Set([
     ...assignments.map(a => a.operator_id),
     ...assignments.map(a => a.helper_id).filter(Boolean),
   ]);
-  // busyIdsAll: lintas seksi (untuk filter dropdown)
   const freeOperators = operators.filter(o => !busyIdsAll.has(o.id));
   const availableAlat = alat.filter(a => a.status === 'ready');
 
@@ -155,11 +142,31 @@ export default function PenugasanPage() {
     setForm(f => ({ ...f, location_district: kec, location_village: '' }));
     setDesaList(WILAYAH[kec] || []);
   };
+  
+  const handleScheduleSelect = (schedId) => {
+    const s = schedules.find(x => x.id === schedId);
+    if (s) {
+      setForm(f => ({
+        ...f,
+        schedule_id: schedId,
+        location_district: s.kecamatan || '',
+        location_village: s.nama_desa || '',
+        equipment_id: s.equipment_id || '',
+        job_type: s.proposal?.usulan_desa === 'embung' ? 'embung' : 'normalisasi',
+        job_sub_type: s.proposal?.usulan_desa === 'embung' ? 'rehabilitasi_embung' : 'normalisasi_sungai',
+        custom_job_description: s.proposal?.nama_usulan || ''
+      }));
+      setDesaList(WILAYAH[s.kecamatan] || []);
+    } else {
+      setForm(f => ({ ...f, schedule_id: '' }));
+    }
+  };
 
   const handleEdit = (a) => {
     setEditId(a.id);
     setOriginalEquipmentId(a.equipment_id);
     setForm({
+      schedule_id: '',
       operator_id: a.operator_id || '',
       helper_id: a.helper_id || '',
       equipment_id: a.equipment_id || '',
@@ -188,7 +195,7 @@ export default function PenugasanPage() {
       equipment_id: form.equipment_id,
       job_type: form.job_type,
       job_sub_type: form.job_sub_type || null,
-      custom_job_description: form.job_type === 'lainnya' ? form.custom_job_description : null,
+      custom_job_description: form.job_type === 'lainnya' || form.schedule_id ? form.custom_job_description : null,
       location_district: form.location_district,
       location_village: form.location_village,
       latitude: form.latitude ? parseFloat(form.latitude) : null,
@@ -199,37 +206,69 @@ export default function PenugasanPage() {
 
     if (editId) {
        const updateData = { ...dataToSave };
-       delete updateData.created_by_role; // Prevent overwriting created_by_role on edit
+       delete updateData.created_by_role;
        const { error: asgnErr } = await supabase.from('assignments').update(updateData).eq('id', editId);
        if (asgnErr) { setError(asgnErr.message); setSaving(false); return; }
        if (originalEquipmentId && originalEquipmentId !== form.equipment_id) {
-          // Revert old eq to ready, set new eq to operating
           await supabase.from('heavy_equipment').update({ status: 'ready' }).eq('id', originalEquipmentId);
           await supabase.from('heavy_equipment').update({ status: 'operating' }).eq('id', form.equipment_id);
        }
     } else {
-       const { error: asgnErr } = await supabase.from('assignments').insert(dataToSave);
+       const { data: inserted, error: asgnErr } = await supabase.from('assignments').insert(dataToSave).select().single();
        if (asgnErr) { setError(asgnErr.message); setSaving(false); return; }
        await supabase.from('heavy_equipment').update({ status: 'operating' }).eq('id', form.equipment_id);
+       
+       // If it came from a schedule, link it
+       if (form.schedule_id) {
+          await fetch('/api/proposal/schedule', {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              id: form.schedule_id,
+              assignment_id: inserted.id,
+              status: 'sedang_berjalan'
+            })
+          });
+       }
     }
     
     setSaving(false); setShowModal(false); load();
   };
 
   const finishAssignment = async (a) => {
-    if (!confirm(`Selesaikan penugasan ${a.operator?.full_name}?`)) return;
+    if (!confirm(`Selesaikan penugasan ${a.operator?.full_name}? Durasi real akan dikalkulasi otomatis.`)) return;
+    
+    // Call the new finish endpoint for assignments linked to schedules
+    try {
+      const res = await fetch('/api/proposal/schedule/finish', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ assignment_id: a.id })
+      });
+      // the endpoint updates work_schedules status to selesai and calculates dates
+    } catch (e) {
+      console.error(e);
+    }
+    
+    // Also update assignment and equipment in supabase
     await supabase.from('assignments').update({ status: 'finished', end_date: new Date().toISOString() }).eq('id', a.id);
     await supabase.from('heavy_equipment').update({ status: 'ready' }).eq('id', a.equipment_id);
     load();
   };
 
   const deleteAssignment = async (a) => {
-    if (!confirm(`YAKIN HAPUS penugasan ${a.operator?.full_name}? \n\nPerhatian: Data Laporan Pelaksanaan yang terkait dengan penugasan ini TIDAK akan ikut terhapus, namun tidak akan tertaut lagi ke penugasan ini.`)) return;
+    if (!confirm(`YAKIN HAPUS penugasan ${a.operator?.full_name}?`)) return;
     setSaving(true);
-    // Kembalikan status alat ke ready jika assignment masih aktif
     if (a.status === 'active' && a.equipment_id) {
       await supabase.from('heavy_equipment').update({ status: 'ready' }).eq('id', a.equipment_id);
     }
+    // Set schedule back to estimasi_rencana if linked
+    try {
+      await supabase.from('work_schedules')
+        .update({ status: 'estimasi_rencana', assignment_id: null })
+        .eq('assignment_id', a.id);
+    } catch(e) {}
+    
     const { error } = await supabase.from('assignments').delete().eq('id', a.id);
     if (error) {
       alert('Gagal menghapus penugasan: ' + error.message);
@@ -245,7 +284,6 @@ export default function PenugasanPage() {
     normalisasi_saluran_irigasi: 'Normalisasi Saluran / Irigasi',
     rehabilitasi_embung: 'Rehabilitasi Embung',
     pembangunan_embung: 'Pembangunan Embung',
-    // backward compat lama
     saluran_afvoer: 'Saluran Air / Afvoer',
     normalisasi_embung: 'Normalisasi Embung',
   };
@@ -258,7 +296,7 @@ export default function PenugasanPage() {
           <div className="header-subtitle">Rekrut dan tugaskan operator ke pekerjaan lapangan</div>
         </div>
         <div className="header-right">
-          <button className="btn btn-primary" onClick={() => { setEditId(null); setOriginalEquipmentId(null); setForm({ operator_id:'', helper_id:'', equipment_id:'', job_type: defaultJobType, job_sub_type:'', custom_job_description:'', location_district:'', location_village:'', latitude:'', longitude:'', mapsUrl: '' }); setError(''); setShowModal(true); }}>
+          <button className="btn btn-primary" onClick={() => { setEditId(null); setOriginalEquipmentId(null); setForm({ schedule_id:'', operator_id:'', helper_id:'', equipment_id:'', job_type: defaultJobType, job_sub_type:'', custom_job_description:'', location_district:'', location_village:'', latitude:'', longitude:'', mapsUrl: '' }); setError(''); setShowModal(true); }}>
             <svg fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24" style={{width:15,height:15}}><path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4"/></svg>
             Tugaskan Operator
           </button>
@@ -373,12 +411,26 @@ export default function PenugasanPage() {
               <div className="modal-body">
                 {error && <div className="alert alert-danger"><svg fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24" style={{width:16,height:16}}><path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01"/></svg>{error}</div>}
 
+                {!editId && schedules.length > 0 && (
+                   <div className="form-group" style={{ background: '#f8fafc', padding: 12, borderRadius: 8, border: '1px solid #e2e8f0' }}>
+                     <label className="form-label" style={{ color: '#0f172a' }}>Pilih dari Perencanaan Schedule (Opsional)</label>
+                     <select className="form-control" value={form.schedule_id} onChange={e => handleScheduleSelect(e.target.value)}>
+                       <option value="">— Input Manual —</option>
+                       {schedules.map(s => (
+                         <option key={s.id} value={s.id}>
+                           {s.nama_desa}, {s.kecamatan} - {s.proposal?.nama_usulan || 'Pekerjaan'}
+                         </option>
+                       ))}
+                     </select>
+                     {form.schedule_id && <p className="text-xs" style={{marginTop:6, color:'var(--success)'}}>✓ Lokasi dan Alat Berat otomatis terisi dari jadwal perencanaan.</p>}
+                   </div>
+                )}
+
                 <div className="form-grid">
                   <div className="form-group">
                     <label className="form-label">Operator * <span className="text-xs text-muted">({freeOperators.length} tersedia)</span></label>
                     <select className="form-control" required value={form.operator_id} onChange={e=>setForm({...form,operator_id:e.target.value})}>
                       <option value="">— Pilih Operator —</option>
-                      {/* For edit mode, we must include the current operator even if busy */}
                       {operators.filter(o => !busyIdsAll.has(o.id) || o.id === form.operator_id).map(o=><option key={o.id} value={o.id}>{o.full_name}</option>)}
                     </select>
                   </div>
@@ -431,12 +483,12 @@ export default function PenugasanPage() {
                   )}
                 </div>
 
-                {form.job_type === 'lainnya' && (
+                {form.job_type === 'lainnya' || form.schedule_id ? (
                   <div className="form-group">
-                    <label className="form-label">Keterangan Pekerjaan *</label>
-                    <input className="form-control" required value={form.custom_job_description} onChange={e=>setForm({...form,custom_job_description:e.target.value})} placeholder="Tuliskan jenis pekerjaan secara spesifik..." />
+                    <label className="form-label">Keterangan Pekerjaan {form.job_type==='lainnya'?'*':''}</label>
+                    <input className="form-control" required={form.job_type==='lainnya'} value={form.custom_job_description} onChange={e=>setForm({...form,custom_job_description:e.target.value})} placeholder={form.schedule_id ? "Nama Usulan dari Schedule..." : "Tuliskan jenis pekerjaan secara spesifik..."} />
                   </div>
-                )}
+                ) : null}
 
                 <div className="form-grid">
                   <div className="form-group">

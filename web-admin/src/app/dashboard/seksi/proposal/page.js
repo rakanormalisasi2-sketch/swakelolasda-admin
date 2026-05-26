@@ -1,70 +1,70 @@
 'use client';
-import { useEffect, useState } from 'react';
-import { supabase } from '@/lib/supabase';
+import { useState } from 'react';
 import { useAuth } from '@/context/AuthContext';
+import TabRekapitulasi from './components/TabRekapitulasi';
+import TabPrioritas from './components/TabPrioritas';
+import TabSchedule from './components/TabSchedule';
+
+const TABS = [
+  { key: 'rekap', label: 'Rekapitulasi Proposal', icon: '📋' },
+  { key: 'prioritas', label: 'Rencana Prioritas', icon: '📊' },
+  { key: 'schedule', label: 'Schedule Pekerjaan', icon: '📅' },
+];
 
 export default function ProposalPage() {
   const { profile } = useAuth();
-  const [sheetId, setSheetId] = useState('');
-  const [loading, setLoading] = useState(true);
+  const [activeTab, setActiveTab] = useState('rekap');
+  const [tahun, setTahun] = useState(new Date().getFullYear());
 
-  const settingKey = profile?.role === 'seksi_embung'
-    ? 'google_proposal_embung_id'
-    : 'google_proposal_normalisasi_id';
-
-  useEffect(() => {
-    async function load() {
-      const { data } = await supabase
-        .from('app_settings')
-        .select('config_value')
-        .eq('config_key', settingKey)
-        .single();
-      setSheetId(data?.config_value || '');
-      setLoading(false);
-    }
-    if (profile) load();
-  }, [profile, settingKey]);
-
-  const embedUrl = sheetId && sheetId !== 'KOSONG'
-    ? `https://docs.google.com/spreadsheets/d/${sheetId}/htmlview?widget=true&headers=false`
-    : null;
+  const currentYear = new Date().getFullYear();
+  const years = Array.from({ length: 7 }, (_, i) => currentYear - 2 + i);
 
   return (
     <>
-      <div className="header">
+      <div className="header" style={{ flexWrap: 'wrap', gap: 12 }}>
         <div>
           <div className="header-title">Perencanaan Proposal Masuk</div>
           <div className="header-subtitle">
-            {profile?.role === 'seksi_embung' ? 'Seksi Embung' : 'Seksi Normalisasi'}
+            {profile?.role === 'seksi_embung' ? 'Seksi Embung' : 'Seksi Normalisasi'} — Tahun Anggaran {tahun}
+          </div>
+        </div>
+        <div className="header-right">
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <label style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-secondary)' }}>TAHUN</label>
+            <select
+              value={tahun}
+              onChange={e => setTahun(Number(e.target.value))}
+              className="form-control"
+              style={{ width: 100, padding: '6px 10px', fontWeight: 600 }}
+            >
+              {years.map(y => <option key={y} value={y}>{y}</option>)}
+            </select>
           </div>
         </div>
       </div>
 
       <div className="page-body">
-        {loading ? (
-          <div style={{ textAlign: 'center', padding: 60, color: 'var(--text-muted)' }}>Memuat...</div>
-        ) : !embedUrl ? (
-          <div className="card">
-            <div className="card-body" style={{ textAlign: 'center', padding: 60 }}>
-              <svg fill="none" stroke="currentColor" strokeWidth={1.5} viewBox="0 0 24 24" style={{ width: 48, height: 48, margin: '0 auto 16px', color: 'var(--text-muted)' }}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
-              </svg>
-              <h3 style={{ marginBottom: 8, fontSize: 16 }}>Spreadsheet Belum Dikonfigurasi</h3>
-              <p style={{ color: 'var(--text-secondary)', fontSize: 13.5, maxWidth: 400, margin: '0 auto' }}>
-                Hubungi <strong>Superadmin</strong> untuk mengisi ID Google Spreadsheet Proposal pada halaman Pengaturan Sistem.
-              </p>
-            </div>
-          </div>
-        ) : (
-          <div className="card" style={{ overflow: 'hidden', padding: 0, height: 'calc(100vh - 130px)', minHeight: 500 }}>
-            <iframe
-              src={embedUrl}
-              style={{ width: '100%', height: '100%', border: 'none', display: 'block' }}
-              title="Spreadsheet Proposal"
-              allowFullScreen
-            />
-          </div>
-        )}
+        {/* Tab Navigation */}
+        <div className="tabs" style={{ marginBottom: 0, borderBottom: '2px solid var(--border)', background: 'var(--bg-card)', borderRadius: '10px 10px 0 0', padding: '0 8px' }}>
+          {TABS.map(tab => (
+            <button
+              key={tab.key}
+              className={`tab-btn ${activeTab === tab.key ? 'active' : ''}`}
+              onClick={() => setActiveTab(tab.key)}
+              style={{ padding: '12px 20px', display: 'flex', alignItems: 'center', gap: 6 }}
+            >
+              <span style={{ fontSize: 15 }}>{tab.icon}</span>
+              {tab.label}
+            </button>
+          ))}
+        </div>
+
+        {/* Tab Content */}
+        <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderTop: 'none', borderRadius: '0 0 10px 10px', minHeight: 400 }}>
+          {activeTab === 'rekap' && <TabRekapitulasi tahun={tahun} role={profile?.role} />}
+          {activeTab === 'prioritas' && <TabPrioritas tahun={tahun} role={profile?.role} />}
+          {activeTab === 'schedule' && <TabSchedule tahun={tahun} role={profile?.role} />}
+        </div>
       </div>
     </>
   );

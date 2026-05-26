@@ -1478,3 +1478,155 @@ tbody tr:hover { background: var(--bg-base); }
     gap: 8px;
   }
 }
+
+/* ============================================
+   PROPOSAL PLANNING (TabRekap, TabPrioritas, TabSchedule)
+   ============================================ */
+
+/* Priority Badges */
+.badge-priority-A { background: var(--danger); color: white; border: 1px solid #b91c1c; }
+.badge-priority-B { background: var(--warning); color: white; border: 1px solid #b45309; }
+.badge-priority-C { background: #3b82f6; color: white; border: 1px solid #1d4ed8; }
+.badge-priority-D { background: var(--success); color: white; border: 1px solid #15803d; }
+
+/* Timeline / Gantt Chart */
+.timeline-wrapper {
+  overflow-x: auto;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--bg-card);
+}
+
+.timeline-table {
+  width: max-content;
+  min-width: 100%;
+  border-collapse: collapse;
+}
+
+.timeline-table th {
+  position: sticky;
+  top: 0;
+  background: var(--bg-base);
+  z-index: 10;
+  border-right: 1px solid var(--border);
+  border-bottom: 1px solid var(--border);
+  padding: 8px 4px;
+  text-align: center;
+}
+
+.timeline-table th.sticky-col {
+  left: 0;
+  z-index: 20;
+  background: var(--bg-base);
+}
+
+.timeline-table td {
+  border-right: 1px solid var(--border);
+  border-bottom: 1px solid var(--border);
+  padding: 4px;
+  height: 40px;
+}
+
+.timeline-table td.sticky-col {
+  position: sticky;
+  left: 0;
+  z-index: 5;
+  background: var(--bg-card);
+  font-weight: 500;
+  min-width: 250px;
+  max-width: 300px;
+  padding: 8px 12px;
+}
+
+.month-header {
+  font-weight: 700;
+  font-size: 12px;
+  color: var(--text-primary);
+  background: rgba(26, 86, 219, 0.05);
+  border-bottom: 1px solid var(--border);
+}
+
+.week-col {
+  min-width: 32px;
+  max-width: 32px;
+  text-align: center;
+  font-size: 10px;
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.week-col:hover {
+  background: rgba(0,0,0,0.02);
+}
+
+.timeline-cell {
+  position: relative;
+  text-align: center;
+}
+
+.timeline-bar {
+  position: absolute;
+  top: 6px;
+  bottom: 6px;
+  left: 0;
+  right: 0;
+  border-radius: 4px;
+  background: var(--primary);
+  opacity: 0.8;
+  cursor: pointer;
+  transition: opacity 0.2s;
+  z-index: 2;
+}
+
+.timeline-bar:hover {
+  opacity: 1;
+}
+
+.timeline-bar.status-selesai { background: var(--success); }
+.timeline-bar.status-berjalan { background: var(--warning); }
+.timeline-bar.status-rencana { background: var(--primary); }
+
+.timeline-bar.start-cap { border-top-left-radius: 12px; border-bottom-left-radius: 12px; }
+.timeline-bar.end-cap { border-top-right-radius: 12px; border-bottom-right-radius: 12px; }
+
+/* Custom Legend */
+.schedule-legend {
+  display: flex;
+  gap: 16px;
+  padding: 12px;
+  background: var(--bg-base);
+  border-radius: var(--radius-sm);
+  margin-bottom: 16px;
+}
+
+.legend-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.legend-color {
+  width: 16px;
+  height: 16px;
+  border-radius: 4px;
+}
+.legend-color.selesai { background: var(--success); }
+.legend-color.berjalan { background: var(--warning); }
+.legend-color.rencana { background: var(--primary); }
+
+/* Table Input Styling */
+.table-input {
+  width: 100%;
+  padding: 6px 8px;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  background: transparent;
+  font-size: 13px;
+  transition: all 0.2s;
+}
+.table-input:hover { border-color: var(--border); background: rgba(0,0,0,0.02); }
+.table-input:focus { border-color: var(--primary); background: #fff; outline: none; box-shadow: 0 0 0 2px rgba(26,86,219,0.1); }
+.row-surveyed { border-left: 3px solid var(--success); background: rgba(22, 163, 74, 0.02); }
