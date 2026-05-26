@@ -31,6 +31,7 @@ export async function GET(request) {
       .select('*, proposal_scores(*), work_schedules(status)')
       .lte('tahun', tahun)
       .eq('sudah_survey', true)
+      .or('is_rejected_priority.eq.false,is_rejected_priority.is.null')
       .order('nomor_urut', { ascending: true })
       .order('created_at', { ascending: true });
       

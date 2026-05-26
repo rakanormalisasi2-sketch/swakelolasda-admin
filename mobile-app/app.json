@@ -52,9 +52,7 @@
       }
     },
     "owner": "bibinambarwati",
-    "runtimeVersion": {
-      "policy": "appVersion"
-    },
+    "runtimeVersion": "1.0.0",
     "updates": {
       "url": "https://u.expo.dev/dd436894-6819-4821-a8f3-b23200048e68"
     }

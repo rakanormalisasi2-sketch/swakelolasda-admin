@@ -44,30 +44,30 @@ export default function AdminPasswordScreen() {
     try {
       const passInput = password.trim();
 
-      // Ambil password terbaru dari server (DB2)
       const { data: settings, error } = await supabaseWarehouse
         .from('app_settings')
         .select('config_key, config_value')
-        .in('config_key', ['apk_password_mekanik', 'apk_password_gudang']);
+        .in('config_key', ['apk_password_mekanik', 'apk_password_gudang', 'apk_password_normalisasi', 'apk_password_embung']);
 
       if (error) throw error;
 
       const passMekanik = settings?.find(s => s.config_key === 'apk_password_mekanik')?.config_value || 'mekanik2024';
       const passGudang = settings?.find(s => s.config_key === 'apk_password_gudang')?.config_value || 'gudang2024';
+      const passNormalisasi = settings?.find(s => s.config_key === 'apk_password_normalisasi')?.config_value || 'normalisasi';
+      const passEmbung = settings?.find(s => s.config_key === 'apk_password_embung')?.config_value || 'embung';
 
-      // Validasi
       if (passInput === passMekanik) {
-        await AsyncStorage.setItem('apk_session', JSON.stringify({
-          role: 'mekanik',
-          loggedInAt: new Date().toISOString(),
-        }));
+        await AsyncStorage.setItem('apk_session', JSON.stringify({ role: 'mekanik', loggedInAt: new Date().toISOString() }));
         router.replace('/admin/menu');
       } else if (passInput === passGudang) {
-        await AsyncStorage.setItem('apk_session', JSON.stringify({
-          role: 'gudang',
-          loggedInAt: new Date().toISOString(),
-        }));
+        await AsyncStorage.setItem('apk_session', JSON.stringify({ role: 'gudang', loggedInAt: new Date().toISOString() }));
         router.replace('/gudang');
+      } else if (passInput === passNormalisasi) {
+        await AsyncStorage.setItem('apk_session', JSON.stringify({ role: 'seksi_normalisasi', loggedInAt: new Date().toISOString() }));
+        router.replace('/proposal');
+      } else if (passInput === passEmbung) {
+        await AsyncStorage.setItem('apk_session', JSON.stringify({ role: 'seksi_embung', loggedInAt: new Date().toISOString() }));
+        router.replace('/proposal');
       } else {
         Alert.alert('Akses Ditolak', 'Password tidak dikenali. Silakan hubungi Superadmin.');
         setPassword('');

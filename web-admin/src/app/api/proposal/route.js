@@ -92,6 +92,11 @@ export async function PUT(request) {
       .single();
 
     if (error) throw error;
+    
+    if (updates.is_rejected_priority === true) {
+      await supabaseAdmin.from('work_schedules').delete().eq('proposal_id', id);
+    }
+
     return NextResponse.json(data);
   } catch (error) {
     return NextResponse.json({ error: error.message }, { status: 500 });

@@ -6,14 +6,30 @@ web-admin/
 docs/
 temp/
 
-# Ignore local files and logs
-*.log
-*.png
-*.jpg
-*.jpeg
-*.xlsx
-*.py
+# Ignore root-level assets and logs (but keep mobile-app assets)
+/*.log
+/*.png
+/*.jpg
+/*.jpeg
+/*.xlsx
+/*.py
+/*.sql
+/*.png
+/*.jpg
+/*.jpeg
+/*.pdf
+/*.docx
+/*.doc
+/*.zip
+/*.rar
+
+# Database backups and temp files
+db2_bbm/
 *.sql
+*.xlsx
+*.xlsx
+*.xlsx
+*.xlsx
 
 # Standard ignores (though .gitignore usually handles these, .easignore overrides it)
 node_modules/

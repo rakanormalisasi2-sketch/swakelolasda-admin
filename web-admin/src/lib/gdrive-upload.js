@@ -150,3 +150,84 @@ export async function uploadWarehousePhotoToDrive({ transactionType, categoryNam
 
   return `https://drive.google.com/thumbnail?id=${fileId}&sz=w800`;
 }
+
+export async function uploadRekapDocToDrive({ sectionRole, submenuName, proposalName, fileBuffer, mimeType, filename }) {
+  const { data: sectionData, error: dbErr } = await supabaseAdmin
+    .from('section_settings')
+    .select('google_refresh_token, google_root_folder_id')
+    .eq('role', sectionRole)
+    .single();
+
+  if (dbErr || !sectionData?.google_refresh_token) {
+    throw new Error('Google Drive belum terhubung.');
+  }
+
+  const oauth2Client = getOAuth2Client(sectionData.google_refresh_token);
+  const drive = google.drive({ version: 'v3', auth: oauth2Client });
+  const root = sectionData.google_root_folder_id;
+
+  const safeSubmenu = (submenuName || 'Perencanaan Proposal').replace(/[\\/:*?"<>|]/g, '_');
+  const submenuId = await getOrCreateFolder(drive, safeSubmenu, root);
+  const rekapId = await getOrCreateFolder(drive, 'Rekapitulasi Proposal', submenuId);
+  const docId = await getOrCreateFolder(drive, 'Dokumen Proposal', rekapId);
+  const safeProposal = (proposalName || 'Tanpa Nama').replace(/[\\/:*?"<>|]/g, '_');
+  const proposalFolderId = await getOrCreateFolder(drive, safeProposal, docId);
+
+  const stream = Readable.from(fileBuffer);
+  const fileRes = await drive.files.create({
+    requestBody: { name: filename, parents: [proposalFolderId] },
+    media: { mimeType, body: stream },
+    fields: 'id, webViewLink',
+  });
+
+  await drive.permissions.create({
+    fileId: fileRes.data.id,
+    requestBody: { role: 'reader', type: 'anyone' },
+  });
+
+  return fileRes.data.webViewLink; // Return full link for PDF
+}
+
+export async function uploadSurveyDocToDrive({ sectionRole, submenuName, kecamatan, desa, proposalName, fileBuffer, mimeType, filename }) {
+  const { data: sectionData, error: dbErr } = await supabaseAdmin
+    .from('section_settings')
+    .select('google_refresh_token, google_root_folder_id')
+    .eq('role', sectionRole)
+    .single();
+
+  if (dbErr || !sectionData?.google_refresh_token) {
+    throw new Error('Google Drive belum terhubung.');
+  }
+
+  const oauth2Client = getOAuth2Client(sectionData.google_refresh_token);
+  const drive = google.drive({ version: 'v3', auth: oauth2Client });
+  const root = sectionData.google_root_folder_id;
+
+  const safeSubmenu = (submenuName || 'Perencanaan Proposal').replace(/[\\/:*?"<>|]/g, '_');
+  const submenuId = await getOrCreateFolder(drive, safeSubmenu, root);
+  const surveyId = await getOrCreateFolder(drive, 'Data Survei', submenuId);
+  
+  const safeKecDesa = `${kecamatan || 'Kec'}.${desa || 'Desa'}`.replace(/[\\/:*?"<>|]/g, '_');
+  const kecDesaId = await getOrCreateFolder(drive, safeKecDesa, surveyId);
+  
+  const safeProposal = (proposalName || 'Tanpa Nama').replace(/[\\/:*?"<>|]/g, '_');
+  const proposalFolderId = await getOrCreateFolder(drive, safeProposal, kecDesaId);
+
+  const stream = Readable.from(fileBuffer);
+  const fileRes = await drive.files.create({
+    requestBody: { name: filename, parents: [proposalFolderId] },
+    media: { mimeType, body: stream },
+    fields: 'id, webViewLink',
+  });
+
+  await drive.permissions.create({
+    fileId: fileRes.data.id,
+    requestBody: { role: 'reader', type: 'anyone' },
+  });
+
+  // If it's an image, return thumbnail link, otherwise webViewLink
+  if (mimeType.startsWith('image/')) {
+    return `https://drive.google.com/thumbnail?id=${fileRes.data.id}&sz=w800`;
+  }
+  return fileRes.data.webViewLink;
+}

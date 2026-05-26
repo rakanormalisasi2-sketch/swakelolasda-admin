@@ -263,13 +263,50 @@ export default function TabSchedule({ tahun, role }) {
        }
     }
 
-    if (!item.minggu_mulai || !item.minggu_selesai) return 'transparent';
+    // Determine real start/end weeks
+    let realStartW = item.minggu_mulai;
+    let realEndW = item.minggu_selesai;
 
-    if (w >= item.minggu_mulai && w <= item.minggu_selesai) {
-      if (item.status === 'selesai') return '#cbd5e1'; // Abu-abu
-      if (item.status === 'sedang_berjalan') return '#fde047'; // Kuning
-      return '#fdba74'; // Orange (estimasi)
+    if (item.status === 'sedang_berjalan' || item.status === 'selesai') {
+      // Find week for tanggal_mulai_real
+      if (item.tanggal_mulai_real) {
+        const dStart = new Date(item.tanggal_mulai_real);
+        const matchStart = calendarWeeks.find(cw => dStart >= cw.startDate && dStart <= cw.endDate);
+        if (matchStart) realStartW = matchStart.weekNum;
+      }
+
+      if (item.status === 'selesai' && item.tanggal_selesai_real) {
+        const dEnd = new Date(item.tanggal_selesai_real);
+        const matchEnd = calendarWeeks.find(cw => dEnd >= cw.startDate && dEnd <= cw.endDate);
+        if (matchEnd) realEndW = matchEnd.weekNum;
+      } else if (item.status === 'sedang_berjalan') {
+        // extends up to current date
+        const dNow = new Date();
+        // If current year is different, cap it or extend it? 
+        // We'll just find the week for today
+        const matchNow = calendarWeeks.find(cw => dNow >= cw.startDate && dNow <= cw.endDate);
+        if (matchNow) {
+           realEndW = matchNow.weekNum;
+        } else if (dNow.getFullYear() > y) {
+           realEndW = 53; // cap at end of year
+        } else {
+           realEndW = 1;
+        }
+      }
     }
+
+    // Is it in the real block?
+    const isReal = (w >= realStartW && w <= realEndW) && (item.status === 'sedang_berjalan' || item.status === 'selesai');
+    // Is it in the planned block?
+    const isPlan = (w >= item.minggu_mulai && w <= item.minggu_selesai);
+
+    if (isReal) {
+      return item.status === 'selesai' ? '#cbd5e1' : '#fde047'; // Abu-abu or Kuning
+    } else if (isPlan) {
+      // Planned but not yet executed (or it didn't overlap actual)
+      return '#fdba74'; // Orange
+    }
+
     return 'transparent';
   };
 
@@ -286,7 +323,13 @@ export default function TabSchedule({ tahun, role }) {
       currentMonth = d.getMonth();
       weekInMonth = 1;
     }
-    calendarWeeks.push({ weekNum, month: currentMonth, weekInMonth });
+    
+    const startDate = new Date(d);
+    const endDate = new Date(d);
+    endDate.setDate(endDate.getDate() + 6);
+    endDate.setHours(23, 59, 59, 999);
+    
+    calendarWeeks.push({ weekNum, month: currentMonth, weekInMonth, startDate, endDate });
     d.setDate(d.getDate() + 7);
     weekNum++;
     weekInMonth++;

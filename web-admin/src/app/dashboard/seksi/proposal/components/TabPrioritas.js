@@ -38,6 +38,30 @@ export default function TabPrioritas({ tahun, role }) {
 
   useEffect(() => { fetchData(); }, [fetchData]);
 
+  const handleReject = async (id) => {
+    if (!confirm('Tolak proposal ini? Proposal akan disembunyikan dari Rencana Prioritas & Schedule dihapus, tapi tetap ada di Rekapitulasi.')) return;
+    try {
+      await fetch('/api/proposal', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id, is_rejected_priority: true })
+      });
+      fetchData();
+    } catch (e) {
+      alert('Gagal menolak proposal');
+    }
+  };
+
+  const handleDelete = async (id) => {
+    if (!confirm('Hapus permanen proposal ini? Data akan hilang dari SEMUA tab.')) return;
+    try {
+      await fetch(`/api/proposal?id=${id}`, { method: 'DELETE' });
+      fetchData();
+    } catch (e) {
+      alert('Gagal menghapus proposal');
+    }
+  };
+
   const updateScore = async (proposalId, criteriaObj, selectedOptionIdx) => {
     setSavingId(proposalId);
     
@@ -177,6 +201,7 @@ export default function TabPrioritas({ tahun, role }) {
                 <th style={{ ...thStyle, width: 40 }}>No</th>
                 <th style={{ ...thStyle, width: 60 }}>No.Urut</th>
                 <th style={{ ...thStyle, width: 220, textAlign: 'left' }}>Nama Usulan</th>
+                <th style={{ ...thStyle, width: 90 }}>Tgl Proposal</th>
                 <th style={{ ...thStyle, width: 100 }}>Desa</th>
                 {criteria.map(c => (
                   <th key={c.id} style={{ ...thStyle, width: 150 }}>
@@ -199,9 +224,13 @@ export default function TabPrioritas({ tahun, role }) {
                     {row.tahun < tahun && (
                       <div style={{ fontSize: 10, color: '#d97706', marginTop: 4, display: 'flex', alignItems: 'center', gap: 4 }}>
                         <svg width="12" height="12" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
-                        Carry forward dari {row.tahun} (Usulan: {row.tanggal_usulan ? row.tanggal_usulan.split('T')[0] : '-'})
+                        Carry forward dari {row.tahun}
                       </div>
                     )}
+                  </td>
+                  <td style={{ ...tdStyle, textAlign: 'center', fontSize: 11 }}>
+                    {row.tanggal_usulan ? row.tanggal_usulan.split('T')[0] : '-'}
+                    <div style={{ fontWeight: 'bold', marginTop: 2 }}>{row.tahun}</div>
                   </td>
                   <td style={{ ...tdStyle, textAlign: 'center' }}>{row.desa}</td>
                   
@@ -261,13 +290,22 @@ export default function TabPrioritas({ tahun, role }) {
                   </td>
                   
                   <td style={{ ...tdStyle, textAlign: 'center' }}>
-                    <button 
-                      className="btn btn-sm btn-outline" 
-                      style={{ fontSize: 10, padding: '4px 8px' }}
-                      onClick={() => alert('Proposal ini otomatis terdaftar di Tab Schedule pada bagian "Belum Dialokasikan Alat". Silakan buka Tab Schedule untuk mengatur alat berat dan jadwalnya.')}
-                    >
-                      Atur di Schedule
-                    </button>
+                    <div style={{ display: 'flex', gap: 4, justifyContent: 'center' }}>
+                      <button 
+                        title="Tolak (Sembunyikan dari Prioritas & Schedule)"
+                        onClick={() => handleReject(row.id)}
+                        style={{ padding: 4, background: '#fee2e2', color: '#dc2626', border: '1px solid #fca5a5', borderRadius: 4, cursor: 'pointer' }}
+                      >
+                        <svg width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
+                      </button>
+                      <button 
+                        title="Hapus Permanen"
+                        onClick={() => handleDelete(row.id)}
+                        style={{ padding: 4, background: '#fef2f2', color: '#991b1b', border: '1px solid #f87171', borderRadius: 4, cursor: 'pointer' }}
+                      >
+                        <svg width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                      </button>
+                    </div>
                   </td>
                 </tr>
               ))}

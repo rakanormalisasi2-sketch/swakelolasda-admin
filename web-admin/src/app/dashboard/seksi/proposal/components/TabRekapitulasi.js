@@ -1,6 +1,7 @@
 'use client';
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import WILAYAH from '@/lib/wilayah';
+import * as XLSX from 'xlsx';
 
 export default function TabRekapitulasi({ tahun, role }) {
   const [data, setData] = useState([]);
@@ -9,6 +10,7 @@ export default function TabRekapitulasi({ tahun, role }) {
   const [filter, setFilter] = useState('semua');
   const [search, setSearch] = useState('');
   const [batchIds, setBatchIds] = useState([]);
+  const fileInputRef = useRef(null);
 
   const fetchData = useCallback(async () => {
     setLoading(true);
@@ -116,6 +118,88 @@ export default function TabRekapitulasi({ tahun, role }) {
   const totalSurvey = data.filter(d => d.sudah_survey).length;
   const totalBelum = data.length - totalSurvey;
 
+  const handleDownloadTemplate = () => {
+    const wsData = [
+      ['nama_usulan', 'tanggal_usulan', 'desa', 'kecamatan', 'kabupaten', 'panjang_lokasi', 'usulan_desa', 'tahun_pelaksanaan', 'keterangan', 'link_proposal'],
+      ['Contoh Proposal', '2026-05-20', 'Sukorejo', 'Bojonegoro', 'Bojonegoro', '100m', role === 'seksi_embung' ? 'embung' : 'normalisasi', tahun, 'Keterangan tambahan', '']
+    ];
+    const ws = XLSX.utils.aoa_to_sheet(wsData);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Template');
+    XLSX.writeFile(wb, `Template_Proposal_${tahun}.xlsx`);
+  };
+
+  const handleUploadExcel = (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    setSaving(true);
+    const reader = new FileReader();
+    reader.onload = async (evt) => {
+      try {
+        const bstr = evt.target.result;
+        const wb = XLSX.read(bstr, { type: 'binary' });
+        const wsname = wb.SheetNames[0];
+        const ws = wb.Sheets[wsname];
+        const dataJson = XLSX.utils.sheet_to_json(ws);
+
+        if (dataJson.length === 0) {
+          alert('Excel kosong');
+          setSaving(false);
+          return;
+        }
+
+        const formattedData = dataJson.map(row => {
+          // Attempt to parse Excel serial date or string date
+          let tgl = null;
+          if (row.tanggal_usulan) {
+            if (typeof row.tanggal_usulan === 'number') {
+              const excelEpoch = new Date(1899, 11, 30);
+              tgl = new Date(excelEpoch.getTime() + row.tanggal_usulan * 86400000).toISOString();
+            } else {
+              tgl = new Date(row.tanggal_usulan).toISOString();
+            }
+          }
+
+          return {
+            tahun,
+            created_by_role: role,
+            nama_usulan: row.nama_usulan || 'Tanpa Nama',
+            tanggal_usulan: tgl,
+            desa: row.desa || '',
+            kecamatan: row.kecamatan || '',
+            kabupaten: row.kabupaten || 'Bojonegoro',
+            panjang_lokasi: String(row.panjang_lokasi || ''),
+            usulan_desa: row.usulan_desa || (role === 'seksi_embung' ? 'embung' : 'normalisasi'),
+            tahun_pelaksanaan: parseInt(row.tahun_pelaksanaan) || null,
+            keterangan: String(row.keterangan || ''),
+            link_proposal: String(row.link_proposal || '')
+          };
+        });
+
+        const res = await fetch('/api/proposal/upload', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(formattedData)
+        });
+
+        if (res.ok) {
+          alert(`Berhasil upload ${dataJson.length} proposal!`);
+          fetchData();
+        } else {
+          alert('Gagal upload data');
+        }
+      } catch (err) {
+        console.error(err);
+        alert('Format file tidak didukung / error memproses');
+      } finally {
+        setSaving(false);
+        e.target.value = ''; // reset file input
+      }
+    };
+    reader.readAsBinaryString(file);
+  };
+
   const thStyle = { padding: '10px 8px', border: '1px solid #dde2eb', background: '#f0f4ff', color: '#1e3a5f', fontSize: 11, fontWeight: 700, textAlign: 'center', whiteSpace: 'nowrap', position: 'sticky', top: 0, zIndex: 5 };
   const tdStyle = { padding: 0, border: '1px solid #e5e9f0', fontSize: 12 };
   const inputStyle = { width: '100%', padding: '8px 6px', border: 'none', background: 'transparent', outline: 'none', fontSize: 12 };
@@ -124,14 +208,32 @@ export default function TabRekapitulasi({ tahun, role }) {
     <div style={{ padding: 20 }}>
       {/* Toolbar */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 12, marginBottom: 16 }}>
-        <div style={{ display: 'flex', gap: 8 }}>
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
           <button onClick={addRow} disabled={saving} className="btn btn-success" style={{ fontSize: 13 }}>
             <svg fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24" style={{ width: 14, height: 14 }}><path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" /></svg>
-            Tambah Proposal
+            Tambah
           </button>
+          
+          <button onClick={handleDownloadTemplate} disabled={saving} className="btn btn-outline" style={{ fontSize: 13 }}>
+            <svg fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24" style={{ width: 14, height: 14 }}><path strokeLinecap="round" strokeLinejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg>
+            Template
+          </button>
+
+          <input 
+            type="file" 
+            accept=".xlsx, .xls" 
+            style={{ display: 'none' }} 
+            ref={fileInputRef}
+            onChange={handleUploadExcel} 
+          />
+          <button onClick={() => fileInputRef.current.click()} disabled={saving} className="btn btn-outline" style={{ fontSize: 13 }}>
+            <svg fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24" style={{ width: 14, height: 14 }}><path strokeLinecap="round" strokeLinejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" /></svg>
+            Upload
+          </button>
+
           {batchIds.length > 0 && (
             <button onClick={deleteBatch} disabled={saving} className="btn btn-danger" style={{ fontSize: 13 }}>
-              Hapus Terpilih ({batchIds.length})
+              Hapus ({batchIds.length})
             </button>
           )}
         </div>
