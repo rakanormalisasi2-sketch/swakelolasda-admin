@@ -191,7 +191,15 @@ export default function TabPrioritas({ tahun, role }) {
                 <tr key={row.id} style={{ background: i % 2 === 0 ? '#fff' : '#fafbfd' }}>
                   <td style={{ ...tdStyle, textAlign: 'center', color: '#64748b' }}>{i + 1}</td>
                   <td style={{ ...tdStyle, textAlign: 'center', fontWeight: 'bold' }}>{row.nomor_urut || '-'}</td>
-                  <td style={{ ...tdStyle, fontWeight: 500 }}>{row.nama_usulan}</td>
+                  <td style={{ ...tdStyle, fontWeight: 500 }}>
+                    <div>{row.nama_usulan}</div>
+                    {row.tahun < tahun && (
+                      <div style={{ fontSize: 10, color: '#d97706', marginTop: 4, display: 'flex', alignItems: 'center', gap: 4 }}>
+                        <svg width="12" height="12" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                        Carry forward dari {row.tahun} (Usulan: {row.tanggal_usulan ? row.tanggal_usulan.split('T')[0] : '-'})
+                      </div>
+                    )}
+                  </td>
                   <td style={{ ...tdStyle, textAlign: 'center' }}>{row.desa}</td>
                   
                   {criteria.map(c => {

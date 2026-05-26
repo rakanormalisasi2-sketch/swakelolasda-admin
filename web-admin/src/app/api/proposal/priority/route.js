@@ -23,11 +23,11 @@ export async function GET(request) {
     const { data: criteria, error: critErr } = await critQuery;
     if (critErr) throw critErr;
 
-    // 2. Get proposals
+    // 2. Get proposals (fetch up to current year, to support carry-forward of unfinished work)
     let propQuery = supabaseAdmin
       .from('proposals')
-      .select('*, proposal_scores(*)')
-      .eq('tahun', tahun)
+      .select('*, proposal_scores(*), work_schedules(status)')
+      .lte('tahun', tahun)
       .eq('sudah_survey', true)
       .order('nomor_urut', { ascending: true })
       .order('created_at', { ascending: true });
@@ -36,8 +36,19 @@ export async function GET(request) {
       propQuery = propQuery.eq('created_by_role', role);
     }
 
-    const { data: proposals, error: propErr } = await propQuery;
+    const { data: rawProposals, error: propErr } = await propQuery;
     if (propErr) throw propErr;
+
+    // Filter carry-forward: 
+    // If proposal is from a previous year, it must NOT have any work_schedule with status 'selesai'
+    const currentTahun = parseInt(tahun);
+    const proposals = (rawProposals || []).filter(p => {
+      if (p.tahun < currentTahun) {
+        const isSelesai = p.work_schedules && p.work_schedules.some(ws => ws.status === 'selesai');
+        if (isSelesai) return false;
+      }
+      return true;
+    });
 
     // 3. Process each proposal to calculate presentase based on current active criteria
     const result = (proposals || []).map(p => {

@@ -18,15 +18,50 @@ export default function TabSchedule({ tahun, role }) {
   const fetchData = useCallback(async () => {
     setLoading(true);
     try {
-      // Fetch schedules
       const res = await fetch(`/api/proposal/schedule?tahun=${tahun}&role=${role}`);
       const json = await res.json();
       
-      // We also need all heavy equipments to group by
-      const eqRes = await fetch(`/api/heavy-equipment`); // Assuming this exists or we can extract from data
+      const eqRes = await fetch(`/api/heavy-equipment`);
       const eqJson = await eqRes.json();
       
-      setData(json || []);
+      // Fetch priority proposals to find unassigned ones
+      const prioRes = await fetch(`/api/proposal/priority?tahun=${tahun}&role=${role}`);
+      const prioJson = await prioRes.json();
+      
+      const priorityProposals = (prioJson.proposals || []).filter(p => p.prioritas);
+      
+      const schedules = (json || []).map(s => {
+        if (s.proposal_id) {
+          const matchedProp = priorityProposals.find(p => p.id === s.proposal_id);
+          if (matchedProp) {
+            s.proposal = {
+              ...s.proposal,
+              prioritas: matchedProp.prioritas,
+              presentase_total: matchedProp.presentase_total
+            };
+          } else if (s.proposal) {
+            // Just ensure it doesn't render an array as a string
+            s.proposal.prioritas = null;
+          }
+        }
+        return s;
+      });
+      
+      // Find unassigned
+      const unassigned = priorityProposals.filter(p => !schedules.some(s => s.proposal_id === p.id));
+      const unassignedSchedules = unassigned.map(p => ({
+        id: `temp-${p.id}`,
+        isTemp: true,
+        tahun,
+        proposal_id: p.id,
+        equipment_id: null,
+        nama_desa: p.desa,
+        kecamatan: p.kecamatan,
+        proposal: p,
+        status: 'estimasi_rencana'
+      }));
+      
+      setData([...schedules, ...unassignedSchedules]);
       setEquipments(eqJson || []);
     } catch (e) {
       console.error('Fetch error:', e);
@@ -55,19 +90,126 @@ export default function TabSchedule({ tahun, role }) {
     }
 
     try {
-      await fetch('/api/proposal/schedule', {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ 
-          id, 
-          minggu_mulai: Math.min(startWeek, endWeek) + 1,
-          minggu_selesai: Math.max(startWeek, endWeek) + 1,
-          durasi_rencana_minggu: Math.abs(endWeek - startWeek) + 1
-        }),
-      });
+      if (id.startsWith('temp-')) {
+        // Find temp item
+        const item = data.find(d => d.id === id);
+        const res = await fetch('/api/proposal/schedule', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ 
+            tahun: item.tahun,
+            proposal_id: item.proposal_id,
+            nama_desa: item.nama_desa || '',
+            kecamatan: item.kecamatan || '',
+            minggu_mulai: Math.min(startWeek, endWeek) + 1,
+            minggu_selesai: Math.max(startWeek, endWeek) + 1,
+            durasi_rencana_minggu: Math.abs(endWeek - startWeek) + 1,
+            created_by_role: role
+          }),
+        });
+        const saved = await res.json();
+        if (saved && saved.id) {
+           setData(prev => prev.map(d => d.id === id ? { ...d, ...saved, isTemp: false, proposal: item.proposal } : d));
+        }
+      } else {
+        await fetch('/api/proposal/schedule', {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ 
+            id, 
+            minggu_mulai: Math.min(startWeek, endWeek) + 1,
+            minggu_selesai: Math.max(startWeek, endWeek) + 1,
+            durasi_rencana_minggu: Math.abs(endWeek - startWeek) + 1
+          }),
+        });
+      }
     } catch (e) {
       alert('Gagal update jadwal');
       fetchData(); // revert
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const updateEquipment = async (id, newEqId) => {
+    setSaving(true);
+    try {
+      if (id.startsWith('temp-')) {
+        const item = data.find(d => d.id === id);
+        const res = await fetch('/api/proposal/schedule', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ 
+            tahun: item.tahun,
+            proposal_id: item.proposal_id,
+            equipment_id: newEqId || null,
+            nama_desa: item.nama_desa || '',
+            kecamatan: item.kecamatan || '',
+            created_by_role: role
+          }),
+        });
+        const saved = await res.json();
+        if (saved && saved.id) {
+           setData(prev => prev.map(d => d.id === id ? { ...d, ...saved, isTemp: false, proposal: item.proposal } : d));
+        }
+      } else {
+        setData(prev => prev.map(d => d.id === id ? { ...d, equipment_id: newEqId || null } : d));
+        await fetch('/api/proposal/schedule', {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ id, equipment_id: newEqId || null }),
+        });
+      }
+    } catch (e) {
+      alert('Gagal ubah alat berat');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const addManualRow = async () => {
+    setSaving(true);
+    try {
+      const res = await fetch('/api/proposal/schedule', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          tahun,
+          nama_desa: 'Desa Manual',
+          kecamatan: '',
+          status: 'estimasi_rencana',
+          created_by_role: role
+        }),
+      });
+      const saved = await res.json();
+      if (saved && saved.id) {
+        setData(prev => [...prev, saved]);
+      }
+    } catch (e) {
+      alert('Gagal tambah baris');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const deleteRow = async (id) => {
+    if (!confirm('Hapus baris ini dari jadwal?')) return;
+    if (id.startsWith('temp-')) {
+      // Just visually hide or do nothing since it's auto-generated from proposal, 
+      // but user wants to "reject" it? Actually unassigned proposals shouldn't be deleteable from here, 
+      // they have to remove the priority score. We'll just alert.
+      alert('Ini adalah usulan otomatis dari Tab Prioritas. Untuk menghilangkannya, hapus nilai prioritas di Tab Prioritas.');
+      return;
+    }
+    
+    setSaving(true);
+    try {
+      await fetch(`/api/proposal/schedule?id=${id}`, { method: 'DELETE' });
+      setData(prev => prev.filter(d => d.id !== id));
+      // Re-fetch to bring back to "Unassigned" if it was linked to a proposal
+      fetchData();
+    } catch (e) {
+      alert('Gagal menghapus jadwal');
     } finally {
       setSaving(false);
     }
@@ -105,12 +247,20 @@ export default function TabSchedule({ tahun, role }) {
   };
 
   // Grouping
-  const groupedData = equipments.map(eq => {
+  let groupedData = equipments.map(eq => {
     return {
       equipment: eq,
       items: data.filter(d => d.equipment_id === eq.id)
     };
   }).filter(g => g.items.length > 0);
+  
+  const unassignedItems = data.filter(d => !d.equipment_id);
+  if (unassignedItems.length > 0) {
+    groupedData.push({
+      equipment: { id: 'unassigned', merk_type: 'Belum Dialokasikan Alat', nomor_lambung: '-' },
+      items: unassignedItems
+    });
+  }
 
   const getCellColor = (item, weekIdx) => {
     // weekIdx is 0 to 47. DB stores 1 to 48
@@ -150,7 +300,7 @@ export default function TabSchedule({ tahun, role }) {
           <span><strong>Selesai</strong> (Real)</span>
         </div>
         <div style={{ marginLeft: 'auto' }}>
-          <button className="btn btn-primary btn-sm">+ Tambah Pekerjaan</button>
+          <button onClick={addManualRow} disabled={saving} className="btn btn-primary btn-sm">+ Tambah Pekerjaan Manual</button>
         </div>
       </div>
 
@@ -194,8 +344,36 @@ export default function TabSchedule({ tahun, role }) {
                   {group.items.map((item, idx) => (
                     <tr key={item.id} style={{ background: idx % 2 === 0 ? '#fff' : '#f8fafc' }}>
                       <td style={{ position: 'sticky', left: 0, zIndex: 5, background: idx % 2 === 0 ? '#fff' : '#f8fafc', border: '1px solid #e2e8f0', padding: '6px 12px', fontSize: 12 }}>
-                        <div style={{ fontWeight: 'bold' }}>{item.nama_desa}, {item.kecamatan}</div>
-                        {item.proposal?.nama_usulan && <div style={{ fontSize: 10, color: '#64748b' }}>{item.proposal.nama_usulan}</div>}
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                          <div>
+                            <div style={{ fontWeight: 'bold' }}>{item.nama_desa}, {item.kecamatan}</div>
+                            {item.proposal?.nama_usulan && (
+                              <div style={{ fontSize: 10, color: '#64748b', marginTop: 2 }}>
+                                {item.proposal.nama_usulan}
+                                {item.proposal.prioritas && (
+                                  <span style={{ marginLeft: 6, display: 'inline-block', padding: '1px 6px', borderRadius: 4, background: '#dcfce7', color: '#16a34a', fontWeight: 'bold' }}>
+                                    {item.proposal.prioritas} ({item.proposal.presentase_total || item.proposal.prioritas?.skor || '-'}%)
+                                  </span>
+                                )}
+                              </div>
+                            )}
+                          </div>
+                          <button onClick={() => deleteRow(item.id)} style={{ background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer', padding: 2 }}>&times;</button>
+                        </div>
+                        
+                        <div style={{ marginTop: 6 }}>
+                          <select 
+                            className="form-control" 
+                            style={{ fontSize: 10, padding: '2px 4px', width: '100%' }}
+                            value={item.equipment_id || ''}
+                            onChange={(e) => updateEquipment(item.id, e.target.value)}
+                          >
+                            <option value="">-- Pilih Alat --</option>
+                            {equipments.map(eq => (
+                              <option key={eq.id} value={eq.id}>{eq.merk_type} ({eq.nomor_lambung})</option>
+                            ))}
+                          </select>
+                        </div>
                       </td>
                       
                       {Array.from({ length: 48 }).map((_, wIdx) => {

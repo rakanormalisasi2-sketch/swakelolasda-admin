@@ -181,7 +181,6 @@ export default function TabRekapitulasi({ tahun, role }) {
                 <th style={{ ...thStyle, width: 110 }}>Kabupaten</th>
                 <th style={{ ...thStyle, width: 90 }}>Panjang</th>
                 <th style={{ ...thStyle, width: 100 }}>Usulan</th>
-                <th style={{ ...thStyle, width: 100 }}>Realisasi</th>
                 <th style={{ ...thStyle, width: 70 }}>Tahun</th>
                 <th style={{ ...thStyle, width: 140 }}>Keterangan</th>
                 <th style={{ ...thStyle, width: 100 }}>Link</th>
@@ -212,7 +211,14 @@ export default function TabRekapitulasi({ tahun, role }) {
                     <input type="date" value={row.tanggal_usulan ? row.tanggal_usulan.split('T')[0] : ''} onChange={e => updateCell(row.id, 'tanggal_usulan', e.target.value)} style={{ ...inputStyle, textAlign: 'center' }} />
                   </td>
                   <td style={tdStyle}>
-                    <input value={row.desa || ''} onChange={e => updateCell(row.id, 'desa', e.target.value)} style={inputStyle} />
+                    {row.kecamatan && WILAYAH[row.kecamatan] ? (
+                      <select value={row.desa || ''} onChange={e => updateCell(row.id, 'desa', e.target.value)} style={{ ...inputStyle, cursor: 'pointer' }}>
+                        <option value="">— Pilih Desa —</option>
+                        {WILAYAH[row.kecamatan].map(d => <option key={d} value={d}>{d}</option>)}
+                      </select>
+                    ) : (
+                      <input value={row.desa || ''} onChange={e => updateCell(row.id, 'desa', e.target.value)} style={inputStyle} placeholder="Pilih Kec. dulu" />
+                    )}
                   </td>
                   <td style={tdStyle}>
                     <select value={row.kecamatan || ''} onChange={e => updateCell(row.id, 'kecamatan', e.target.value)} style={{ ...inputStyle, cursor: 'pointer' }}>
@@ -228,9 +234,6 @@ export default function TabRekapitulasi({ tahun, role }) {
                   </td>
                   <td style={tdStyle}>
                     <input value={row.usulan_desa || ''} onChange={e => updateCell(row.id, 'usulan_desa', e.target.value)} style={inputStyle} />
-                  </td>
-                  <td style={tdStyle}>
-                    <input value={row.realisasi_pekerjaan || ''} onChange={e => updateCell(row.id, 'realisasi_pekerjaan', e.target.value)} style={inputStyle} />
                   </td>
                   <td style={tdStyle}>
                     <input type="number" value={row.tahun_pelaksanaan || ''} onChange={e => updateCell(row.id, 'tahun_pelaksanaan', parseInt(e.target.value) || null)} style={{ ...inputStyle, textAlign: 'center' }} />
