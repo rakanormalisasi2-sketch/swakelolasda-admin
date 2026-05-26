@@ -15,6 +15,7 @@ export default function TabSchedule({ tahun, role }) {
   // State for dragging/selecting weeks
   const [isDragging, setIsDragging] = useState(false);
   const [dragStartInfo, setDragStartInfo] = useState(null); // { scheduleId, weekIdx }
+  const [dragCurrentWeek, setDragCurrentWeek] = useState(null); // weekIdx while dragging
   
   const [showManualModal, setShowManualModal] = useState(false);
 
@@ -206,11 +207,12 @@ export default function TabSchedule({ tahun, role }) {
     
     setIsDragging(true);
     setDragStartInfo({ scheduleId, weekIdx });
+    setDragCurrentWeek(weekIdx);
   };
 
   const handleMouseEnter = (scheduleId, weekIdx) => {
     if (isDragging && dragStartInfo && dragStartInfo.scheduleId === scheduleId) {
-      // Just visually update the range during drag (handled by render)
+      setDragCurrentWeek(weekIdx);
     }
   };
 
@@ -220,6 +222,7 @@ export default function TabSchedule({ tahun, role }) {
     }
     setIsDragging(false);
     setDragStartInfo(null);
+    setDragCurrentWeek(null);
   };
   
   // Also stop drag if mouse leaves the table
@@ -227,6 +230,7 @@ export default function TabSchedule({ tahun, role }) {
     if (isDragging) {
       setIsDragging(false);
       setDragStartInfo(null);
+      setDragCurrentWeek(null);
     }
   };
 
@@ -247,14 +251,16 @@ export default function TabSchedule({ tahun, role }) {
   }
 
   const getCellColor = (item, weekIdx) => {
-    // weekIdx is 0 to 47. DB stores 1 to 48
+    // weekIdx is 0-indexed. DB stores 1-indexed (w)
     const w = weekIdx + 1;
     
     // If it's the item currently being dragged
     if (isDragging && dragStartInfo && dragStartInfo.scheduleId === item.id) {
-       const minW = Math.min(dragStartInfo.weekIdx, weekIdx) + 1;
-       const maxW = Math.max(dragStartInfo.weekIdx, weekIdx) + 1;
-       if (w >= minW && w <= maxW) return '#fed7aa'; // Dragging preview
+       if (dragCurrentWeek !== null) {
+         const minW = Math.min(dragStartInfo.weekIdx, dragCurrentWeek) + 1;
+         const maxW = Math.max(dragStartInfo.weekIdx, dragCurrentWeek) + 1;
+         if (w >= minW && w <= maxW) return '#fed7aa'; // Dragging preview
+       }
     }
 
     if (!item.minggu_mulai || !item.minggu_selesai) return 'transparent';
@@ -266,6 +272,32 @@ export default function TabSchedule({ tahun, role }) {
     }
     return 'transparent';
   };
+
+  // Dynamic Weeks Calculation
+  const y = parseInt(tahun) || new Date().getFullYear();
+  const calendarWeeks = [];
+  let d = new Date(y, 0, 1);
+  let weekNum = 1;
+  let currentMonth = 0;
+  let weekInMonth = 1;
+  
+  while (d.getFullYear() === y) {
+    if (d.getMonth() !== currentMonth) {
+      currentMonth = d.getMonth();
+      weekInMonth = 1;
+    }
+    calendarWeeks.push({ weekNum, month: currentMonth, weekInMonth });
+    d.setDate(d.getDate() + 7);
+    weekNum++;
+    weekInMonth++;
+  }
+
+  const monthsData = MONTHS.map((name, index) => {
+    return {
+      name,
+      weeks: calendarWeeks.filter(w => w.month === index)
+    };
+  }).filter(m => m.weeks.length > 0);
 
   return (
     <div style={{ padding: 20 }}>
@@ -299,17 +331,17 @@ export default function TabSchedule({ tahun, role }) {
                 <th rowSpan={2} style={{ position: 'sticky', left: 0, zIndex: 10, background: '#f1f5f9', width: 250, border: '1px solid #cbd5e1', padding: '8px 12px', textAlign: 'left' }}>
                   Lokasi / Usulan
                 </th>
-                {MONTHS.map(m => (
-                  <th key={m} colSpan={4} style={{ border: '1px solid #cbd5e1', background: '#f1f5f9', padding: '6px 0', textAlign: 'center', fontSize: 12 }}>
-                    {m}
+                {monthsData.map(m => (
+                  <th key={m.name} colSpan={m.weeks.length} style={{ border: '1px solid #cbd5e1', background: '#f1f5f9', padding: '6px 0', textAlign: 'center', fontSize: 12 }}>
+                    {m.name}
                   </th>
                 ))}
               </tr>
               {/* Minggu Row */}
               <tr>
-                {Array.from({ length: 48 }).map((_, i) => (
-                  <th key={i} style={{ border: '1px solid #cbd5e1', background: '#f8fafc', padding: '4px 0', textAlign: 'center', fontSize: 10, width: 24, minWidth: 24 }}>
-                    {(i % 4) + 1}
+                {calendarWeeks.map((w, i) => (
+                  <th key={i} style={{ border: '1px solid #cbd5e1', background: '#f8fafc', padding: '4px 0', textAlign: 'center', fontSize: 10, width: 24, minWidth: 24 }} title={`Minggu ${w.weekNum}`}>
+                    {w.weekInMonth}
                   </th>
                 ))}
               </tr>
@@ -360,7 +392,7 @@ export default function TabSchedule({ tahun, role }) {
                         </div>
                       </td>
                       
-                      {Array.from({ length: 48 }).map((_, wIdx) => {
+                      {calendarWeeks.map((w, wIdx) => {
                          const bg = getCellColor(item, wIdx);
                          const isFilled = bg !== 'transparent';
                          
@@ -371,12 +403,12 @@ export default function TabSchedule({ tahun, role }) {
                                border: '1px solid #e2e8f0', 
                                background: bg,
                                cursor: (item.status === 'estimasi_rencana' || !isFilled) ? 'pointer' : 'not-allowed',
-                               borderRight: ((wIdx + 1) % 4 === 0) ? '2px solid #cbd5e1' : '1px solid #e2e8f0'
+                               borderRight: (w.weekInMonth === monthsData[w.month].weeks.length) ? '2px solid #cbd5e1' : '1px solid #e2e8f0'
                              }}
                              onMouseDown={() => handleMouseDown(item.id, wIdx)}
                              onMouseEnter={() => handleMouseEnter(item.id, wIdx)}
                              onMouseUp={() => handleMouseUp(item.id, wIdx)}
-                             title={`Minggu ${(wIdx % 4) + 1} ${MONTHS[Math.floor(wIdx/4)]}`}
+                             title={`Minggu ke-${w.weekInMonth} ${monthsData[w.month].name} (Minggu Total ${w.weekNum})`}
                            >
                            </td>
                          );
