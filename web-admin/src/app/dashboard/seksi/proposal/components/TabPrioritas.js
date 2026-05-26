@@ -66,16 +66,19 @@ export default function TabPrioritas({ tahun, role }) {
 
         // Recalc
         let presentase = 0;
+        let filledCount = 0;
         criteria.forEach(c => {
           const s = p.scores[c.id];
           if (s && s.skor != null) {
             presentase += (s.skor / c.skor_maksimal) * (c.bobot / 100);
+            filledCount++;
           }
         });
         
         const rounded = Math.round(presentase * 100 * 100) / 100;
-        p.presentase_total = rounded;
-        p.prioritas = rounded > 75 ? 'A' : rounded > 50 ? 'B' : rounded > 25 ? 'C' : 'D';
+        p.presentase_total = filledCount > 0 ? rounded : null;
+        p.prioritas = filledCount === criteria.length ? 
+          (rounded > 75 ? 'A' : rounded > 50 ? 'B' : rounded > 25 ? 'C' : 'D') : null;
         
         newData[pIdx] = p;
         

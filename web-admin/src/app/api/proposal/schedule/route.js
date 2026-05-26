@@ -13,7 +13,7 @@ export async function GET(request) {
       .from('work_schedules')
       .select(`
         *,
-        equipment:heavy_equipment (id, name, merk_type, nomor_lambung),
+        equipment:equipments (id, nama_alat),
         proposal:proposals (id, nama_usulan, nomor_urut, prioritas:proposal_scores(criteria_id, skor)),
         assignment:assignments (id, status, operator_id)
       `)

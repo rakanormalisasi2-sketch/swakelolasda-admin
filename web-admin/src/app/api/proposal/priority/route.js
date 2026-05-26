@@ -53,6 +53,7 @@ export async function GET(request) {
     // 3. Process each proposal to calculate presentase based on current active criteria
     const result = (proposals || []).map(p => {
       let presentase = 0;
+      let filledCount = 0;
       
       const scoresByCriteria = {};
       if (p.proposal_scores) {
@@ -65,17 +66,21 @@ export async function GET(request) {
         const s = scoresByCriteria[c.id];
         if (s && s.skor != null) {
           presentase += (s.skor / c.skor_maksimal) * (c.bobot / 100);
+          filledCount++;
         }
       });
 
       presentase = presentase * 100;
       const rounded = Math.round(presentase * 100) / 100;
-      const prioritas = rounded > 75 ? 'A' : rounded > 50 ? 'B' : rounded > 25 ? 'C' : 'D';
+      
+      // Require all criteria to be filled to get a priority grade
+      const prioritas = filledCount === criteria.length ? 
+        (rounded > 75 ? 'A' : rounded > 50 ? 'B' : rounded > 25 ? 'C' : 'D') : null;
 
       return {
         ...p,
         scores: scoresByCriteria,
-        presentase_total: rounded,
+        presentase_total: filledCount > 0 ? rounded : null,
         prioritas
       };
     });

@@ -22,10 +22,18 @@ export default function TabSchedule({ tahun, role }) {
     setLoading(true);
     try {
       const res = await fetch(`/api/proposal/schedule?tahun=${tahun}&role=${role}`);
-      const json = await res.json();
+      const rawJson = await res.json();
+      const json = Array.isArray(rawJson) ? rawJson : [];
       
-      const eqRes = await fetch(`/api/heavy-equipment`);
-      const eqJson = await eqRes.json();
+      const eqRes = await fetch(`/api/alat`);
+      const eqRaw = await eqRes.json();
+      const eqJson = Array.isArray(eqRaw) ? eqRaw : [];
+      
+      const equipmentsMapped = eqJson.map(eq => ({
+        id: eq.id,
+        merk_type: eq.nama,
+        nomor_lambung: eq.status
+      }));
       
       // Fetch priority proposals to find unassigned ones
       const prioRes = await fetch(`/api/proposal/priority?tahun=${tahun}&role=${role}`);
@@ -65,7 +73,7 @@ export default function TabSchedule({ tahun, role }) {
       }));
       
       setData([...schedules, ...unassignedSchedules]);
-      setEquipments(eqJson || []);
+      setEquipments(equipmentsMapped);
     } catch (e) {
       console.error('Fetch error:', e);
     } finally {
