@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
 
+export const dynamic = 'force-dynamic';
+
 // GET - Surveyed proposals with priority scores and all active criteria
 export async function GET(request) {
   try {

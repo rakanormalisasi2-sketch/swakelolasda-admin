@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
 
+export const dynamic = 'force-dynamic';
+
 // GET - Get schedules for a specific year
 export async function GET(request) {
   try {
@@ -13,7 +15,7 @@ export async function GET(request) {
       .from('work_schedules')
       .select(`
         *,
-        equipment:equipments (id, nama_alat),
+        equipment:heavy_equipment (id, name, merk_type, nomor_lambung),
         proposal:proposals (id, nama_usulan, nomor_urut, prioritas:proposal_scores(criteria_id, skor)),
         assignment:assignments (id, status, operator_id)
       `)

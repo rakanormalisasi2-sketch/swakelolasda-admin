@@ -21,22 +21,16 @@ export default function TabSchedule({ tahun, role }) {
   const fetchData = useCallback(async () => {
     setLoading(true);
     try {
-      const res = await fetch(`/api/proposal/schedule?tahun=${tahun}&role=${role}`);
+      const res = await fetch(`/api/proposal/schedule?tahun=${tahun}&role=${role}`, { cache: 'no-store' });
       const rawJson = await res.json();
       const json = Array.isArray(rawJson) ? rawJson : [];
       
-      const eqRes = await fetch(`/api/alat`);
+      const eqRes = await fetch(`/api/heavy-equipment`, { cache: 'no-store' });
       const eqRaw = await eqRes.json();
       const eqJson = Array.isArray(eqRaw) ? eqRaw : [];
       
-      const equipmentsMapped = eqJson.map(eq => ({
-        id: eq.id,
-        merk_type: eq.nama,
-        nomor_lambung: eq.status
-      }));
-      
       // Fetch priority proposals to find unassigned ones
-      const prioRes = await fetch(`/api/proposal/priority?tahun=${tahun}&role=${role}`);
+      const prioRes = await fetch(`/api/proposal/priority?tahun=${tahun}&role=${role}`, { cache: 'no-store' });
       const prioJson = await prioRes.json();
       
       const priorityProposals = (prioJson.proposals || []).filter(p => p.prioritas);
@@ -73,7 +67,7 @@ export default function TabSchedule({ tahun, role }) {
       }));
       
       setData([...schedules, ...unassignedSchedules]);
-      setEquipments(equipmentsMapped);
+      setEquipments(eqJson || []);
     } catch (e) {
       console.error('Fetch error:', e);
     } finally {
