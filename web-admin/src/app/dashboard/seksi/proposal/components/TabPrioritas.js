@@ -258,8 +258,12 @@ export default function TabPrioritas({ tahun, role }) {
                   </td>
                   
                   <td style={{ ...tdStyle, textAlign: 'center' }}>
-                    <button className="btn btn-sm btn-outline" style={{ fontSize: 10, padding: '4px 8px' }}>
-                      → Schedule
+                    <button 
+                      className="btn btn-sm btn-outline" 
+                      style={{ fontSize: 10, padding: '4px 8px' }}
+                      onClick={() => alert('Proposal ini otomatis terdaftar di Tab Schedule pada bagian "Belum Dialokasikan Alat". Silakan buka Tab Schedule untuk mengatur alat berat dan jadwalnya.')}
+                    >
+                      Atur di Schedule
                     </button>
                   </td>
                 </tr>

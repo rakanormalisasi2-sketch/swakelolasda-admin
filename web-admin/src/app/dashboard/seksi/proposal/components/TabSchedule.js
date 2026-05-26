@@ -1,5 +1,6 @@
 'use client';
 import React, { useState, useEffect, useCallback } from 'react';
+import ManualRowModal from './ManualRowModal';
 
 // Helpers for 12 months x 4 weeks
 const MONTHS = ['Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'];
@@ -14,6 +15,8 @@ export default function TabSchedule({ tahun, role }) {
   // State for dragging/selecting weeks
   const [isDragging, setIsDragging] = useState(false);
   const [dragStartInfo, setDragStartInfo] = useState(null); // { scheduleId, weekIdx }
+  
+  const [showManualModal, setShowManualModal] = useState(false);
 
   const fetchData = useCallback(async () => {
     setLoading(true);
@@ -167,29 +170,8 @@ export default function TabSchedule({ tahun, role }) {
     }
   };
 
-  const addManualRow = async () => {
-    setSaving(true);
-    try {
-      const res = await fetch('/api/proposal/schedule', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          tahun,
-          nama_desa: 'Desa Manual',
-          kecamatan: '',
-          status: 'estimasi_rencana',
-          created_by_role: role
-        }),
-      });
-      const saved = await res.json();
-      if (saved && saved.id) {
-        setData(prev => [...prev, saved]);
-      }
-    } catch (e) {
-      alert('Gagal tambah baris');
-    } finally {
-      setSaving(false);
-    }
+  const addManualRow = () => {
+    setShowManualModal(true);
   };
 
   const deleteRow = async (id) => {
@@ -405,6 +387,16 @@ export default function TabSchedule({ tahun, role }) {
           </table>
         )}
       </div>
+
+      <ManualRowModal 
+        show={showManualModal}
+        onClose={() => setShowManualModal(false)}
+        onSaved={() => {
+          fetchData(); // Refresh data to fetch new proposal and schedule
+        }}
+        tahun={tahun}
+        role={role}
+      />
     </div>
   );
 }
