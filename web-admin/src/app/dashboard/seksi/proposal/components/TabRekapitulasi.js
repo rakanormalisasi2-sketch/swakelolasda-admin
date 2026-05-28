@@ -129,75 +129,35 @@ export default function TabRekapitulasi({ tahun, role }) {
     XLSX.writeFile(wb, `Template_Proposal_${tahun}.xlsx`);
   };
 
-  const handleUploadExcel = (e) => {
+  const handleUploadExcel = async (e) => {
     const file = e.target.files[0];
     if (!file) return;
 
     setSaving(true);
-    const reader = new FileReader();
-    reader.onload = async (evt) => {
-      try {
-        const bstr = evt.target.result;
-        const wb = XLSX.read(bstr, { type: 'binary' });
-        const wsname = wb.SheetNames[0];
-        const ws = wb.Sheets[wsname];
-        const dataJson = XLSX.utils.sheet_to_json(ws);
+    try {
+      const formData = new FormData();
+      formData.append('file', file);
+      formData.append('section_role', role);
 
-        if (dataJson.length === 0) {
-          alert('Excel kosong');
-          setSaving(false);
-          return;
-        }
+      const res = await fetch('/api/proposal/bulk-upload', {
+        method: 'POST',
+        body: formData
+      });
 
-        const formattedData = dataJson.map(row => {
-          // Attempt to parse Excel serial date or string date
-          let tgl = null;
-          if (row.tanggal_usulan) {
-            if (typeof row.tanggal_usulan === 'number') {
-              const excelEpoch = new Date(1899, 11, 30);
-              tgl = new Date(excelEpoch.getTime() + row.tanggal_usulan * 86400000).toISOString();
-            } else {
-              tgl = new Date(row.tanggal_usulan).toISOString();
-            }
-          }
-
-          return {
-            tahun,
-            created_by_role: role,
-            nama_usulan: row.nama_usulan || 'Tanpa Nama',
-            tanggal_usulan: tgl,
-            desa: row.desa || '',
-            kecamatan: row.kecamatan || '',
-            kabupaten: row.kabupaten || 'Bojonegoro',
-            panjang_lokasi: String(row.panjang_lokasi || ''),
-            usulan_desa: row.usulan_desa || (role === 'seksi_embung' ? 'embung' : 'normalisasi'),
-            tahun_pelaksanaan: parseInt(row.tahun_pelaksanaan) || null,
-            keterangan: String(row.keterangan || ''),
-            link_proposal: String(row.link_proposal || '')
-          };
-        });
-
-        const res = await fetch('/api/proposal/upload', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(formattedData)
-        });
-
-        if (res.ok) {
-          alert(`Berhasil upload ${dataJson.length} proposal!`);
-          fetchData();
-        } else {
-          alert('Gagal upload data');
-        }
-      } catch (err) {
-        console.error(err);
-        alert('Format file tidak didukung / error memproses');
-      } finally {
-        setSaving(false);
-        e.target.value = ''; // reset file input
+      const data = await res.json();
+      if (res.ok) {
+        alert(`Berhasil upload ${data.count || ''} proposal!`);
+        fetchData();
+      } else {
+        alert('Gagal upload data: ' + (data.error || 'Unknown error'));
       }
-    };
-    reader.readAsBinaryString(file);
+    } catch (err) {
+      console.error(err);
+      alert('Error memproses file');
+    } finally {
+      setSaving(false);
+      e.target.value = ''; // reset file input
+    }
   };
 
   const thStyle = { padding: '10px 8px', border: '1px solid #dde2eb', background: '#f0f4ff', color: '#1e3a5f', fontSize: 11, fontWeight: 700, textAlign: 'center', whiteSpace: 'nowrap', position: 'sticky', top: 0, zIndex: 5 };

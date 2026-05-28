@@ -42,8 +42,15 @@ export default function SurveySearchScreen() {
 
   return (
     <View style={styles.container}>
-      <Text style={styles.header}>Daftar Proposal (Survei)</Text>
-      
+      <View style={styles.headerContainer}>
+        <Text style={styles.header}>Daftar Proposal (Survei)</Text>
+        <TouchableOpacity 
+          style={styles.urgentBtn}
+          onPress={() => router.push('/proposal/form')}
+        >
+          <Text style={styles.urgentBtnText}>+ Survei Urgent</Text>
+        </TouchableOpacity>
+      </View>
       <View style={styles.searchBox}>
         <TextInput 
           style={styles.searchInput} 
@@ -86,7 +93,10 @@ export default function SurveySearchScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#f8fafc' },
-  header: { fontSize: 22, fontWeight: 'bold', color: '#1e3a5f', padding: 20, paddingBottom: 10 },
+  headerContainer: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 20, paddingBottom: 10 },
+  header: { fontSize: 22, fontWeight: 'bold', color: '#1e3a5f' },
+  urgentBtn: { backgroundColor: '#ef4444', paddingHorizontal: 12, paddingVertical: 8, borderRadius: 8 },
+  urgentBtnText: { color: '#fff', fontWeight: 'bold', fontSize: 14 },
   searchBox: { flexDirection: 'row', paddingHorizontal: 20, marginBottom: 10, gap: 10 },
   searchInput: { flex: 1, backgroundColor: '#fff', borderWidth: 1, borderColor: '#cbd5e1', borderRadius: 8, padding: 12 },
   searchBtn: { backgroundColor: '#1e3a5f', justifyContent: 'center', paddingHorizontal: 16, borderRadius: 8 },

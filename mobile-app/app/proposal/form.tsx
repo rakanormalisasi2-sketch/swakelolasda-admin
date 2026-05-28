@@ -1,17 +1,59 @@
-import React, { useState, useRef } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator, Alert, Image, Modal } from 'react-native';
+import React, { useState, useEffect, useRef } from 'react';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator, Alert, Image, TextInput, Modal } from 'react-native';
 import { useLocalSearchParams, router } from 'expo-router';
-import * as ImagePicker from 'expo-image-picker';
-import * as Print from 'expo-print';
+import DocumentScanner from 'react-native-document-scanner-plugin';
+import * as FileSystem from 'expo-file-system';
 import * as Sharing from 'expo-sharing';
+import * as Print from 'expo-print';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import SignatureCanvas from 'react-native-signature-canvas';
+import SignatureScreen from 'react-native-signature-canvas';
+import DateTimePicker from '@react-native-community/datetimepicker';
+
+// Helper for dates
+const numToWords = (num: number): string => {
+  const units = ['Nol', 'Satu', 'Dua', 'Tiga', 'Empat', 'Lima', 'Enam', 'Tujuh', 'Delapan', 'Sembilan', 'Sepuluh', 'Sebelas'];
+  if (num < 12) return units[num];
+  if (num < 20) return units[num - 10] + ' Belas';
+  if (num < 100) return units[Math.floor(num / 10)] + ' Puluh ' + (num % 10 !== 0 ? units[num % 10] : '');
+  if (num < 200) return 'Seratus ' + numToWords(num - 100);
+  if (num < 1000) return units[Math.floor(num / 100)] + ' Ratus ' + (num % 100 !== 0 ? numToWords(num % 100) : '');
+  if (num < 2000) return 'Seribu ' + numToWords(num - 1000);
+  if (num < 1000000) return numToWords(Math.floor(num / 1000)) + ' Ribu ' + (num % 1000 !== 0 ? numToWords(num % 1000) : '');
+  return num.toString();
+};
+
+const getDayName = (date: Date) => ['Minggu', 'Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu'][date.getDay()];
+const getMonthName = (date: Date) => ['Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'][date.getMonth()];
 
 export default function SurveyFormScreen() {
   const { id, nama, kecamatan, desa } = useLocalSearchParams();
   const [loading, setLoading] = useState(false);
   
   const [photo, setPhoto] = useState<string | null>(null);
+  const [signatureSurveyor, setSignatureSurveyor] = useState<string | null>(null);
+  const [namaSurveyor, setNamaSurveyor] = useState('');
+  const [signatureNarasumber, setSignatureNarasumber] = useState<string | null>(null);
+  const [namaNarasumber, setNamaNarasumber] = useState('');
+  const [activeSignTarget, setActiveSignTarget] = useState<'surveyor' | 'narasumber' | null>(null);
+
+  // Data Primer
+  const [kecamatanForm, setKecamatanForm] = useState((kecamatan as string) || '');
+  const [desaForm, setDesaForm] = useState((desa as string) || '');
+  const [namaUsulanForm, setNamaUsulanForm] = useState((nama as string) || '');
+
+  // Field Form Tambahan
+  const [tanggal, setTanggal] = useState(new Date());
+  const [showDatePicker, setShowDatePicker] = useState(false);
+  const [sungai, setSungai] = useState('');
+  const [penyebab, setPenyebab] = useState('');
+  const [kewenangan, setKewenangan] = useState('');
+  const [panjangUsulan, setPanjangUsulan] = useState('');
+  const [keteranganLapangan, setKeteranganLapangan] = useState('');
+
+  // Equipments
+  const [equipments, setEquipments] = useState<any[]>([]);
+  const [selectedEq, setSelectedEq] = useState<string>('');
+
   const [scores, setScores] = useState({
     kerawanan_bencana: '', skor_kerawanan: null as any,
     dampak_kerusakan: '', skor_dampak: null as any,
@@ -20,128 +62,260 @@ export default function SurveyFormScreen() {
     jarak_akses: '', skor_jarak: null as any,
   });
 
-  const [sigSurveyor, setSigSurveyor] = useState<string | null>(null);
-  const [sigPengusul, setSigPengusul] = useState<string | null>(null);
-  const [showSigModal, setShowSigModal] = useState<'surveyor' | 'pengusul' | null>(null);
+  useEffect(() => {
+    fetchEquipments();
+  }, []);
 
-  const takePhoto = async () => {
-    const { status } = await ImagePicker.requestCameraPermissionsAsync();
-    if (status !== 'granted') return Alert.alert('Error', 'Izin kamera ditolak');
-
-    const result = await ImagePicker.launchCameraAsync({
-      mediaTypes: ['images'],
-      allowsEditing: true,
-      quality: 0.5,
-    });
-
-    if (!result.canceled) {
-      setPhoto(result.assets[0].uri);
+  const fetchEquipments = async () => {
+    try {
+      const apiUrl = process.env.EXPO_PUBLIC_API_URL || 'http://192.168.1.100:3000/api';
+      const res = await fetch(`${apiUrl}/heavy-equipment`);
+      const data = await res.json();
+      if (Array.isArray(data)) setEquipments(data);
+    } catch (e) {
+      console.log('Failed to fetch equipments', e);
     }
   };
 
-  const generateHTML = () => {
-    return `
-      <html>
-        <head>
-          <style>
-            body { font-family: Arial, sans-serif; padding: 20px; line-height: 1.5; }
-            h2 { text-align: center; text-decoration: underline; }
-            table { width: 100%; border-collapse: collapse; margin-top: 20px; }
-            th, td { border: 1px solid #000; padding: 8px; text-align: left; }
-            .signatures { width: 100%; margin-top: 50px; text-align: center; }
-            .sig-box { display: inline-block; width: 45%; }
-            img { max-width: 150px; height: auto; }
-          </style>
-        </head>
-        <body>
-          <h2>BERITA ACARA VERIFIKASI PROPOSAL TAHUN 2026</h2>
-          <p>Pada hari ini tanggal <b>${new Date().toLocaleDateString('id-ID')}</b> telah dilakukan survei untuk usulan pekerjaan:</p>
-          <table>
-            <tr><td><b>Nama Pekerjaan</b></td><td>${nama}</td></tr>
-            <tr><td><b>Desa</b></td><td>${desa}</td></tr>
-            <tr><td><b>Kecamatan</b></td><td>${kecamatan}</td></tr>
-            <tr><td><b>Kerawanan Bencana</b></td><td>${scores.kerawanan_bencana} (Skor: ${scores.skor_kerawanan})</td></tr>
-            <tr><td><b>Dampak Kerusakan</b></td><td>${scores.dampak_kerusakan} (Skor: ${scores.skor_dampak})</td></tr>
-            <tr><td><b>Kelas Bahaya</b></td><td>${scores.kelas_bahaya} (Skor: ${scores.skor_bahaya})</td></tr>
-            <tr><td><b>Bentuk Kegiatan</b></td><td>${scores.bentuk_kegiatan} (Skor: ${scores.skor_bentuk})</td></tr>
-            <tr><td><b>Jarak Akses</b></td><td>${scores.jarak_akses} (Skor: ${scores.skor_jarak})</td></tr>
-          </table>
+  const scanDocument = async () => {
+    try {
+      const { scannedImages } = await DocumentScanner.scanDocument({
+        maxNumDocuments: 1,
+        croppedImageQuality: 40
+      });
+      if (scannedImages && scannedImages.length > 0) {
+        setPhoto(scannedImages[0]);
+      }
+    } catch (error) {
+      Alert.alert('Scanner Error', 'Gagal membuka scanner');
+    }
+  };
 
-          <div class="signatures">
-            <div class="sig-box">
-              <p>Pengusul</p>
-              ${sigPengusul ? `<img src="${sigPengusul}" />` : '<br><br><br>'}
-              <p>(______________________)</p>
-            </div>
-            <div class="sig-box">
-              <p>Tim Verifikator</p>
-              ${sigSurveyor ? `<img src="${sigSurveyor}" />` : '<br><br><br>'}
-              <p>(______________________)</p>
-            </div>
-          </div>
-        </body>
-      </html>
-    `;
+  const handleSignature = (sig: string) => {
+    if (activeSignTarget === 'surveyor') setSignatureSurveyor(sig);
+    if (activeSignTarget === 'narasumber') setSignatureNarasumber(sig);
+    setActiveSignTarget(null);
   };
 
   const submitSurvey = async () => {
-    if (!scores.skor_kerawanan || !scores.skor_dampak || !scores.skor_bahaya || !scores.skor_bentuk || !scores.skor_jarak) {
-      return Alert.alert('Error', 'Semua kriteria wajib diisi');
+    const isAnyEmpty = !kecamatanForm || !desaForm || !namaUsulanForm || !sungai || !penyebab || !kewenangan || !panjangUsulan || 
+                       !scores.skor_kerawanan || !scores.skor_dampak || !scores.skor_bahaya || !scores.skor_bentuk || !scores.skor_jarak ||
+                       !selectedEq || !photo || !signatureSurveyor || !signatureNarasumber || !namaSurveyor || !namaNarasumber;
+                       
+    if (isAnyEmpty) {
+      Alert.alert(
+        'Peringatan',
+        'Ada beberapa field yang belum terisi (termasuk kriteria, foto, atau tanda tangan). Jika Anda melanjutkan, data tersebut akan dikosongkan pada Berita Acara resmi. Lanjutkan?',
+        [
+          { text: 'Batal', style: 'cancel' },
+          { text: 'Ya, Lanjutkan', onPress: processSubmit }
+        ]
+      );
+    } else {
+      processSubmit();
     }
-    if (!sigSurveyor || !sigPengusul) {
-      return Alert.alert('Error', 'Kedua tanda tangan wajib diisi');
-    }
+  };
 
+  const processSubmit = async () => {
     setLoading(true);
     try {
-      // 1. Generate PDF
-      const { uri: pdfUri } = await Print.printToFileAsync({ html: generateHTML() });
-      
-      // Provide option to save locally or share before upload
-      try {
-        await Sharing.shareAsync(pdfUri, { dialogTitle: 'Simpan / Bagikan Berita Acara PDF' });
-      } catch (e) {
-        console.warn('Share cancelled or failed', e);
-      }
-      
       const sess = await AsyncStorage.getItem('apk_session');
       const role = sess ? JSON.parse(sess).role : 'seksi_normalisasi';
-
       const apiUrl = process.env.EXPO_PUBLIC_API_URL || 'http://192.168.1.100:3000/api';
       
-      // 2. Prepare Form Data
-      const formData = new FormData();
-      formData.append('proposal_id', id as string);
-      formData.append('scores', JSON.stringify(scores));
-      formData.append('section_role', role);
-      formData.append('kecamatan', kecamatan as string);
-      formData.append('desa', desa as string);
-      formData.append('nama_usulan', nama as string);
+      // 1. Convert Image to Base64
+      let photoBase64 = '';
+      if (photo) {
+        photoBase64 = await FileSystem.readAsStringAsync(photo, { encoding: FileSystem.EncodingType.Base64 });
+        photoBase64 = `data:image/jpeg;base64,${photoBase64}`;
+      }
 
-      // Attach PDF
+      const logoUrl = `${apiUrl.replace('/api', '')}/logo_bojonegoro.png`;
+
+      // 2. Generate HTML
+      const htmlContent = `
+      <html>
+      <head>
+      <style>
+        body { font-family: 'Times New Roman', Times, serif; padding: 30px; font-size: 11pt; color: black; line-height: 1.5; }
+        .header { text-align: center; font-weight: bold; font-size: 13pt; margin-bottom: 20px; position: relative; line-height: 1.2; }
+        .logo { position: absolute; left: 0; top: 0; width: 75px; }
+        .title { text-decoration: underline; font-weight: bold; text-align: center; margin-top: 30px; margin-bottom: 20px; font-size: 11pt; }
+        .table-list { width: 100%; border-collapse: collapse; margin-top: 10px; margin-bottom: 15px; }
+        .table-list td { padding: 4px; vertical-align: top; }
+        .table-grid { width: 100%; border-collapse: collapse; margin-top: 5px; margin-bottom: 15px; }
+        .table-grid td, .table-grid th { border: 1px solid black; padding: 4px 8px; font-size: 10pt; }
+        .table-grid .check-col { width: 40px; text-align: center; font-weight: bold; }
+        .page-break { page-break-before: always; }
+        .sign-container { margin-top: 40px; display: flex; justify-content: space-between; text-align: center; }
+      </style>
+      </head>
+      <body>
+      <!-- Page 1 -->
+      <div class="header">
+        <img src="${logoUrl}" class="logo" />
+        PEMERINTAH KABUPATEN BOJONEGORO<br/>
+        DINAS PEKERJAAN UMUM SUMBER DAYA AIR<br/>
+        BIDANG OPERASI DAN PEMELIHARAAN<br/>
+        <span style="font-size:10pt; font-weight:normal;">Jl. Basuki Rachmad Nomor 04 A Telp. 0353-881491</span>
+      </div>
+
+      <div class="title">BERITA ACARA VERIFIKASI PROPOSAL</div>
+
+      <p style="text-align: justify;">
+        Pada hari ini <b>${getDayName(tanggal)}</b> tanggal <b>${numToWords(tanggal.getDate()).toLowerCase()}</b> bulan <b>${getMonthName(tanggal).toLowerCase()}</b> tahun <b>${numToWords(tanggal.getFullYear()).toLowerCase()}</b>, Tim Verifikasi SKPD Dinas Pekerjaan Umum Sumber Daya Air Kab. Bojonegoro telah melaksanakan verifikasi lapangan ke lokasi usulan kegiatan di
+      </p>
+      
+      <table class="table-list">
+        <tr><td style="width: 150px;">Sungai/Avoer</td><td style="width: 10px;">:</td><td>${sungai || '...........................................'}</td></tr>
+        <tr><td>Desa</td><td>:</td><td>${desaForm || '...........................................'}</td></tr>
+        <tr><td>Kecamatan</td><td>:</td><td>${kecamatanForm || '...........................................'}</td></tr>
+        <tr><td>Penyebab</td><td>:</td><td>${penyebab || '...........................................'}</td></tr>
+        <tr><td>Kewenangan</td><td>:</td><td>${kewenangan || '...........................................'}</td></tr>
+      </table>
+
+      <!-- Kriteria -->
+      <div style="display:flex;">
+        <div style="width:150px;">Kerawanan Bencana</div><div style="width:10px;">:</div>
+        <div style="flex:1;">
+          <table class="table-grid">
+            <tr><td>Kekeringan</td><td class="check-col">${scores.kerawanan_bencana === 'Kekeringan' ? 'V' : ''}</td></tr>
+            <tr><td>Banjir Luapan</td><td class="check-col">${scores.kerawanan_bencana === 'Banjir Luapan' ? 'V' : ''}</td></tr>
+            <tr><td>Longsor</td><td class="check-col">${scores.kerawanan_bencana === 'Longsor' ? 'V' : ''}</td></tr>
+            <tr><td>Banjir Bandang</td><td class="check-col">${scores.kerawanan_bencana === 'Banjir Bandang' ? 'V' : ''}</td></tr>
+          </table>
+        </div>
+      </div>
+
+      <div style="display:flex;">
+        <div style="width:150px;">Dampak Kerusakan</div><div style="width:10px;">:</div>
+        <div style="flex:1;">
+          <table class="table-grid">
+            <tr><td>Lahan Non Produktif</td><td class="check-col">${scores.dampak_kerusakan === 'Lahan Non Produktif' ? 'V' : ''}</td></tr>
+            <tr><td>Lahan Produktif</td><td class="check-col">${scores.dampak_kerusakan === 'Lahan Produktif' ? 'V' : ''}</td></tr>
+            <tr><td>Sarana Umum</td><td class="check-col">${scores.dampak_kerusakan === 'Sarana Umum' ? 'V' : ''}</td></tr>
+            <tr><td>Permukiman</td><td class="check-col">${scores.dampak_kerusakan === 'Permukiman' ? 'V' : ''}</td></tr>
+          </table>
+        </div>
+      </div>
+
+      <div style="display:flex;">
+        <div style="width:150px;">Kelas Bahaya</div><div style="width:10px;">:</div>
+        <div style="flex:1;">
+          <table class="table-grid">
+            <tr><td>Kecil</td><td class="check-col">${scores.kelas_bahaya === 'Kecil' ? 'V' : ''}</td></tr>
+            <tr><td>Sedang</td><td class="check-col">${scores.kelas_bahaya === 'Sedang' ? 'V' : ''}</td></tr>
+            <tr><td>Tinggi</td><td class="check-col">${scores.kelas_bahaya === 'Tinggi' ? 'V' : ''}</td></tr>
+          </table>
+        </div>
+      </div>
+
+      <div style="display:flex;">
+        <div style="width:150px;">Bentuk Kegiatan</div><div style="width:10px;">:</div>
+        <div style="flex:1;">
+          <table class="table-grid">
+            <tr><td>Pembangunan Baru</td><td class="check-col">${scores.bentuk_kegiatan === 'Pembangunan Baru' ? 'V' : ''}</td></tr>
+            <tr><td>Perbaikan</td><td class="check-col">${scores.bentuk_kegiatan === 'Perbaikan' ? 'V' : ''}</td></tr>
+            <tr><td>Penggalian/Penimbunan</td><td class="check-col">${scores.bentuk_kegiatan === 'Penggalian/Penimbunan' ? 'V' : ''}</td></tr>
+            <tr><td>Mitigasi Bencana</td><td class="check-col">${scores.bentuk_kegiatan === 'Mitigasi Bencana' ? 'V' : ''}</td></tr>
+          </table>
+        </div>
+      </div>
+
+      <div style="display:flex;">
+        <div style="width:150px;">Jarak Lokasi & Akses</div><div style="width:10px;">:</div>
+        <div style="flex:1;">
+          <table class="table-grid">
+            <tr><td>Jauh (> 15 km)</td><td class="check-col">${scores.jarak_akses === 'Jauh (> 15 km)' ? 'V' : ''}</td></tr>
+            <tr><td>Menengah (10-15 km)</td><td class="check-col">${scores.jarak_akses === 'Menengah (10-15 km)' ? 'V' : ''}</td></tr>
+            <tr><td>Dekat (5-10 km)</td><td class="check-col">${scores.jarak_akses === 'Dekat (5-10 km)' ? 'V' : ''}</td></tr>
+            <tr><td>Sangat Dekat (< 5 km)</td><td class="check-col">${scores.jarak_akses === 'Sangat Dekat (< 5 km)' ? 'V' : ''}</td></tr>
+          </table>
+        </div>
+      </div>
+      
+      <div style="display:flex;">
+        <div style="width:150px;">Kebutuhan Alat Berat</div><div style="width:10px;">:</div>
+        <div style="flex:1;">
+          <table class="table-grid">
+            ${equipments.map(eq => `
+              <tr><td>${eq.merk_type} (${eq.nomor_lambung})</td><td class="check-col">${selectedEq === eq.id ? 'V' : ''}</td></tr>
+            `).join('')}
+          </table>
+        </div>
+      </div>
+
+      <table class="table-list">
+        <tr><td style="width: 150px;">Panjang Usulan</td><td style="width: 10px;">:</td><td>${panjangUsulan || '...........................................'}</td></tr>
+      </table>
+
+      <div class="page-break"></div>
+      
+      <!-- Page 2 -->
+      <table style="width:100%; border-collapse: collapse;">
+        <tr><td style="border:1px solid black; text-align:center; font-weight:bold; padding:8px;">SKETSA / GAMBAR / DENAH</td></tr>
+        <tr><td style="border:1px solid black; height:450px; text-align:center; vertical-align:middle; padding: 10px;">
+          ${photoBase64 ? `<img src="${photoBase64}" style="max-width:100%; max-height:430px; object-fit: contain;" />` : ''}
+        </td></tr>
+        <tr><td style="border:1px solid black; padding:10px; height:120px; vertical-align:top;">
+          <span style="text-decoration:underline; font-weight:bold;">KETERANGAN :</span><br/><br/>
+          ${keteranganLapangan || '..................................................................................'}
+        </td></tr>
+      </table>
+
+      <p style="margin-top:30px; text-align: justify;">
+      Demikian Berita Acara Peninjauan Lapangan / Pengukuran Bersama ini dibuat dan dipergunakan sebagaimana mestinya.
+      </p>
+
+      <div class="sign-container">
+        <div style="width:40%; text-align:center;">
+          <br/><br/>
+          ${signatureNarasumber ? `<img src="${signatureNarasumber}" style="height:100px; object-fit: contain;" />` : '<br/><br/><br/>'}
+          <br/>
+          <span style="text-decoration:underline; font-weight:bold;">${namaNarasumber || '(......................................)'}</span>
+        </div>
+        <div style="width:40%; text-align:center;">
+          <b>SURVEYOR/VERIFIKATOR</b><br/><br/>
+          ${signatureSurveyor ? `<img src="${signatureSurveyor}" style="height:100px; object-fit: contain;" />` : '<br/><br/><br/>'}
+          <br/>
+          <span style="text-decoration:underline; font-weight:bold;">${namaSurveyor || '(......................................)'}</span>
+        </div>
+      </div>
+
+      </body>
+      </html>
+      `;
+
+      // 3. Generate PDF
+      const { uri: pdfUri } = await Print.printToFileAsync({ html: htmlContent, base64: false });
+
+      // 4. Submit PDF to API
+      const formData = new FormData();
+      if (id) formData.append('proposal_id', id as string);
+      
+      formData.append('section_role', role);
+      formData.append('kecamatan', kecamatanForm);
+      formData.append('desa', desaForm);
+      formData.append('nama_usulan', namaUsulanForm);
+      formData.append('equipment_id', selectedEq);
+
+      // Score for the system (keeps percentage logic for database/schedule prioritization)
+      formData.append('scores', JSON.stringify(Object.keys(scores).filter(k => k.startsWith('skor_')).map(k => ({
+        criteria_id: k.replace('skor_', ''),
+        pilihan_label: (scores as any)[k.replace('skor_', '')] || '',
+        skor: (scores as any)[k] || 0
+      }))));
+
       formData.append('pdf_file', {
         uri: pdfUri,
-        name: 'ba_survei.pdf',
+        name: 'BA_Survei.pdf',
         type: 'application/pdf'
       } as any);
 
-      // Attach Photo
-      if (photo) {
-        formData.append('photo_file', {
-          uri: photo,
-          name: 'foto.jpg',
-          type: 'image/jpeg'
-        } as any);
-      }
-
-      // 3. Send
       const res = await fetch(`${apiUrl}/proposal/survey-submit`, {
         method: 'POST',
         body: formData,
-        headers: {
-          'Accept': 'application/json',
-          // Note: fetch will set the multipart/form-data boundary automatically
-        }
+        headers: { 'Accept': 'application/json' }
       });
 
       if (!res.ok) {
@@ -149,10 +323,29 @@ export default function SurveyFormScreen() {
         throw new Error(err);
       }
 
-      Alert.alert('Sukses', 'Survey berhasil diupload ke Google Drive dan Database!');
-      router.back();
+      const data = await res.json();
+      
+      Alert.alert(
+        'Sukses',
+        'Survei berhasil disubmit. BA PDF telah dibuat dan di-upload. Download ke HP?',
+        [
+          { text: 'Tidak', onPress: () => router.back(), style: 'cancel' },
+          { 
+            text: 'Download', 
+            onPress: async () => {
+              try {
+                await Sharing.shareAsync(pdfUri);
+                router.back();
+              } catch (e) {
+                Alert.alert('Gagal', 'Tidak dapat mendownload PDF lokal');
+                router.back();
+              }
+            } 
+          }
+        ]
+      );
     } catch (e: any) {
-      Alert.alert('Gagal Upload', e.message);
+      Alert.alert('Gagal Submit', e.message);
     } finally {
       setLoading(false);
     }
@@ -161,10 +354,53 @@ export default function SurveyFormScreen() {
   return (
     <View style={styles.container}>
       <ScrollView contentContainerStyle={{ padding: 20 }}>
-        <Text style={styles.header}>Survei: {nama}</Text>
+        <Text style={styles.header}>{id ? `Survei: ${nama}` : 'Survei Urgent (Baru)'}</Text>
 
-        {/* Criterias - simplified for code size, just using Picker or Buttons. We'll use simple touchable lists for UX */}
-        <Text style={styles.label}>1. Kerawanan Bencana (Max 4)</Text>
+        {!id && (
+          <View style={styles.urgentSection}>
+            <Text style={styles.label}>Nama Usulan</Text>
+            <TextInput style={styles.input} value={namaUsulanForm} onChangeText={setNamaUsulanForm} placeholder="Contoh: Normalisasi Kali..." />
+            
+            <Text style={styles.label}>Kecamatan</Text>
+            <TextInput style={styles.input} value={kecamatanForm} onChangeText={setKecamatanForm} placeholder="Kecamatan..." />
+            
+            <Text style={styles.label}>Desa</Text>
+            <TextInput style={styles.input} value={desaForm} onChangeText={setDesaForm} placeholder="Desa..." />
+          </View>
+        )}
+
+        <Text style={styles.sectionTitle}>Data Berita Acara</Text>
+        
+        <Text style={styles.label}>Tanggal Survei</Text>
+        <TouchableOpacity style={styles.input} onPress={() => setShowDatePicker(true)}>
+          <Text style={{color: '#1e293b'}}>{getDayName(tanggal)}, {tanggal.getDate()} {getMonthName(tanggal)} {tanggal.getFullYear()}</Text>
+        </TouchableOpacity>
+        {showDatePicker && (
+          <DateTimePicker
+            value={tanggal}
+            mode="date"
+            display="default"
+            onChange={(event, selectedDate) => {
+              setShowDatePicker(false);
+              if (selectedDate) setTanggal(selectedDate);
+            }}
+          />
+        )}
+        
+        <Text style={styles.label}>Sungai/Avoer</Text>
+        <TextInput style={styles.input} value={sungai} onChangeText={setSungai} placeholder="Nama Sungai" />
+
+        <Text style={styles.label}>Penyebab</Text>
+        <TextInput style={styles.input} value={penyebab} onChangeText={setPenyebab} placeholder="Penyebab kerusakan/masalah" />
+
+        <Text style={styles.label}>Kewenangan</Text>
+        <TextInput style={styles.input} value={kewenangan} onChangeText={setKewenangan} placeholder="Kewenangan (Pusat/Prov/Kab)" />
+
+        <Text style={styles.label}>Panjang Usulan</Text>
+        <TextInput style={styles.input} value={panjangUsulan} onChangeText={setPanjangUsulan} placeholder="Contoh: 1500 Meter" />
+
+        <Text style={styles.sectionTitle}>Skoring Kriteria</Text>
+        <Text style={styles.label}>1. Kerawanan Bencana</Text>
         <View style={styles.btnRow}>
           {[ {l: 'Kekeringan', s: 1}, {l: 'Banjir Luapan', s: 2}, {l: 'Longsor', s: 3}, {l: 'Banjir Bandang', s: 4} ].map(opt => (
             <TouchableOpacity key={opt.s} style={[styles.optBtn, scores.skor_kerawanan === opt.s && styles.optBtnActive]} 
@@ -174,7 +410,7 @@ export default function SurveyFormScreen() {
           ))}
         </View>
 
-        <Text style={styles.label}>2. Dampak Kerusakan (Max 4)</Text>
+        <Text style={styles.label}>2. Dampak Kerusakan</Text>
         <View style={styles.btnRow}>
           {[ {l: 'Lahan Non Produktif', s: 1}, {l: 'Lahan Produktif', s: 2}, {l: 'Sarana Umum', s: 3}, {l: 'Permukiman', s: 4} ].map(opt => (
             <TouchableOpacity key={opt.s} style={[styles.optBtn, scores.skor_dampak === opt.s && styles.optBtnActive]} 
@@ -184,7 +420,7 @@ export default function SurveyFormScreen() {
           ))}
         </View>
 
-        <Text style={styles.label}>3. Kelas Bahaya (Max 3)</Text>
+        <Text style={styles.label}>3. Kelas Bahaya</Text>
         <View style={styles.btnRow}>
           {[ {l: 'Kecil', s: 1}, {l: 'Sedang', s: 2}, {l: 'Tinggi', s: 3} ].map(opt => (
             <TouchableOpacity key={opt.s} style={[styles.optBtn, scores.skor_bahaya === opt.s && styles.optBtnActive]} 
@@ -194,9 +430,9 @@ export default function SurveyFormScreen() {
           ))}
         </View>
 
-        <Text style={styles.label}>4. Bentuk Kegiatan (Max 4)</Text>
+        <Text style={styles.label}>4. Bentuk Kegiatan</Text>
         <View style={styles.btnRow}>
-          {[ {l: 'Pembangunan Baru', s: 1}, {l: 'Perbaikan', s: 2}, {l: 'Penggalian', s: 3}, {l: 'Mitigasi', s: 4} ].map(opt => (
+          {[ {l: 'Pembangunan Baru', s: 1}, {l: 'Perbaikan', s: 2}, {l: 'Penggalian/Penimbunan', s: 3}, {l: 'Mitigasi Bencana', s: 4} ].map(opt => (
             <TouchableOpacity key={opt.s} style={[styles.optBtn, scores.skor_bentuk === opt.s && styles.optBtnActive]} 
               onPress={() => setScores({...scores, bentuk_kegiatan: opt.l, skor_bentuk: opt.s})}>
               <Text style={[styles.optText, scores.skor_bentuk === opt.s && styles.optTextActive]}>{opt.l}</Text>
@@ -204,9 +440,9 @@ export default function SurveyFormScreen() {
           ))}
         </View>
 
-        <Text style={styles.label}>5. Jarak Akses (Max 9)</Text>
+        <Text style={styles.label}>5. Jarak Akses</Text>
         <View style={styles.btnRow}>
-          {[ {l: '15km', s: 1}, {l: '10-15km', s: 3}, {l: '5-10km', s: 6}, {l: '<5km', s: 9} ].map(opt => (
+          {[ {l: 'Jauh (> 15 km)', s: 1}, {l: 'Menengah (10-15 km)', s: 3}, {l: 'Dekat (5-10 km)', s: 6}, {l: 'Sangat Dekat (< 5 km)', s: 9} ].map(opt => (
             <TouchableOpacity key={opt.s} style={[styles.optBtn, scores.skor_jarak === opt.s && styles.optBtnActive]} 
               onPress={() => setScores({...scores, jarak_akses: opt.l, skor_jarak: opt.s})}>
               <Text style={[styles.optText, scores.skor_jarak === opt.s && styles.optTextActive]}>{opt.l}</Text>
@@ -214,49 +450,78 @@ export default function SurveyFormScreen() {
           ))}
         </View>
 
-        <Text style={styles.label}>Dokumentasi Lapangan</Text>
-        <TouchableOpacity style={styles.actionBtn} onPress={takePhoto}>
-          <Text style={styles.actionBtnText}>📷 Ambil Foto</Text>
+        <Text style={styles.sectionTitle}>Kebutuhan Alat Berat (Otomatis Jadwal)</Text>
+        <View style={styles.btnRow}>
+          {equipments.map(eq => (
+            <TouchableOpacity key={eq.id} style={[styles.optBtn, selectedEq === eq.id && styles.optBtnActive]} 
+              onPress={() => setSelectedEq(eq.id)}>
+              <Text style={[styles.optText, selectedEq === eq.id && styles.optTextActive]}>{eq.merk_type} ({eq.nomor_lambung})</Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+
+        <Text style={styles.sectionTitle}>Dokumentasi Lapangan</Text>
+        <Text style={styles.desc}>Foto lokasi akan ditaruh di kotak SKETSA/DENAH pada BA.</Text>
+        <TouchableOpacity style={styles.actionBtn} onPress={scanDocument}>
+          <Text style={styles.actionBtnText}>📄 Buka Document Scanner</Text>
         </TouchableOpacity>
         {photo && <Image source={{ uri: photo }} style={styles.previewImg} />}
 
-        <Text style={styles.label}>Tanda Tangan</Text>
-        <View style={{ flexDirection: 'row', gap: 10 }}>
-          <TouchableOpacity style={[styles.actionBtn, {flex:1, backgroundColor: sigPengusul ? '#16a34a' : '#1e3a5f'}]} onPress={() => setShowSigModal('pengusul')}>
-            <Text style={styles.actionBtnText}>{sigPengusul ? '✅ TTD Pengusul' : '✍️ TTD Pengusul'}</Text>
+        <Text style={styles.sectionTitle}>Keterangan Lapangan</Text>
+        <TextInput style={[styles.input, {height: 80}]} multiline value={keteranganLapangan} onChangeText={setKeteranganLapangan} placeholder="Catatan tambahan surveyor..." />
+
+        <Text style={styles.sectionTitle}>Tanda Tangan Narasumber</Text>
+        <TextInput style={styles.input} value={namaNarasumber} onChangeText={setNamaNarasumber} placeholder="Nama Jelas Narasumber" />
+        {signatureNarasumber ? (
+          <View>
+            <Image source={{ uri: signatureNarasumber }} style={styles.previewSign} />
+            <TouchableOpacity style={styles.actionBtnAlt} onPress={() => setActiveSignTarget('narasumber')}>
+              <Text style={styles.actionBtnAltText}>Ulangi Tanda Tangan Narasumber</Text>
+            </TouchableOpacity>
+          </View>
+        ) : (
+          <TouchableOpacity style={styles.actionBtn} onPress={() => setActiveSignTarget('narasumber')}>
+            <Text style={styles.actionBtnText}>✍️ Buat Tanda Tangan Narasumber</Text>
           </TouchableOpacity>
-          <TouchableOpacity style={[styles.actionBtn, {flex:1, backgroundColor: sigSurveyor ? '#16a34a' : '#1e3a5f'}]} onPress={() => setShowSigModal('surveyor')}>
-            <Text style={styles.actionBtnText}>{sigSurveyor ? '✅ TTD Surveyor' : '✍️ TTD Surveyor'}</Text>
+        )}
+
+        <Text style={styles.sectionTitle}>Tanda Tangan Surveyor</Text>
+        <TextInput style={styles.input} value={namaSurveyor} onChangeText={setNamaSurveyor} placeholder="Nama Jelas Surveyor" />
+        {signatureSurveyor ? (
+          <View>
+            <Image source={{ uri: signatureSurveyor }} style={styles.previewSign} />
+            <TouchableOpacity style={styles.actionBtnAlt} onPress={() => setActiveSignTarget('surveyor')}>
+              <Text style={styles.actionBtnAltText}>Ulangi Tanda Tangan Surveyor</Text>
+            </TouchableOpacity>
+          </View>
+        ) : (
+          <TouchableOpacity style={styles.actionBtn} onPress={() => setActiveSignTarget('surveyor')}>
+            <Text style={styles.actionBtnText}>✍️ Buat Tanda Tangan Surveyor</Text>
           </TouchableOpacity>
-        </View>
+        )}
 
         <TouchableOpacity style={styles.submitBtn} onPress={submitSurvey} disabled={loading}>
-          {loading ? <ActivityIndicator color="#fff" /> : <Text style={styles.submitBtnText}>Simpan & Upload BA (PDF)</Text>}
+          {loading ? <ActivityIndicator color="#fff" /> : <Text style={styles.submitBtnText}>Submit & Generate BA PDF</Text>}
         </TouchableOpacity>
 
       </ScrollView>
 
       {/* Signature Modal */}
-      <Modal visible={!!showSigModal} animationType="slide">
-        <View style={{ flex: 1, backgroundColor: '#fff', padding: 20, paddingTop: 50 }}>
-          <Text style={{ fontSize: 18, fontWeight: 'bold', marginBottom: 10 }}>
-            Tanda Tangan {showSigModal === 'pengusul' ? 'Pengusul' : 'Surveyor'}
+      <Modal visible={activeSignTarget !== null} animationType="slide">
+        <View style={{flex: 1, backgroundColor: '#fff', paddingTop: 40}}>
+          <Text style={{textAlign: 'center', fontSize: 18, fontWeight: 'bold', marginBottom: 10}}>
+            Tanda Tangan {activeSignTarget === 'surveyor' ? 'Surveyor' : 'Narasumber'}
           </Text>
-          <View style={{ height: 300, borderColor: '#ccc', borderWidth: 1 }}>
-            <SignatureCanvas
-              onOK={(signature) => {
-                if (showSigModal === 'pengusul') setSigPengusul(signature);
-                else setSigSurveyor(signature);
-                setShowSigModal(null);
-              }}
-              onEmpty={() => Alert.alert('Error', 'Tanda tangan kosong')}
-              descriptionText="Tanda Tangan di atas"
-              clearText="Hapus"
-              confirmText="Simpan"
-            />
-          </View>
-          <TouchableOpacity style={[styles.actionBtn, {marginTop: 20, backgroundColor: '#ef4444'}]} onPress={() => setShowSigModal(null)}>
-            <Text style={styles.actionBtnText}>Batal</Text>
+          <SignatureScreen
+            onOK={handleSignature}
+            onEmpty={() => Alert.alert('Error', 'Tanda tangan kosong')}
+            descriptionText="Tanda Tangan"
+            clearText="Hapus"
+            confirmText="Simpan"
+            webStyle={`.m-signature-pad {box-shadow: none; border: 1px solid #ccc;} .m-signature-pad--footer {display: none; margin: 0px;}`}
+          />
+          <TouchableOpacity style={{backgroundColor: '#ef4444', padding: 15, margin: 20, borderRadius: 8, alignItems: 'center'}} onPress={() => setActiveSignTarget(null)}>
+             <Text style={{color: '#fff', fontWeight: 'bold'}}>Batal</Text>
           </TouchableOpacity>
         </View>
       </Modal>
@@ -267,15 +532,22 @@ export default function SurveyFormScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#f8fafc' },
   header: { fontSize: 20, fontWeight: 'bold', color: '#1e3a5f', marginBottom: 20 },
+  sectionTitle: { fontSize: 16, fontWeight: 'bold', color: '#0f172a', marginTop: 25, marginBottom: 5, paddingBottom: 5, borderBottomWidth: 1, borderColor: '#e2e8f0' },
+  urgentSection: { backgroundColor: '#fef2f2', padding: 15, borderRadius: 8, borderWidth: 1, borderColor: '#fca5a5' },
   label: { fontSize: 14, fontWeight: 'bold', color: '#334155', marginTop: 15, marginBottom: 8 },
+  desc: { fontSize: 12, color: '#64748b', marginBottom: 10 },
+  input: { backgroundColor: '#fff', borderWidth: 1, borderColor: '#cbd5e1', borderRadius: 8, padding: 10, color: '#1e293b' },
   btnRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   optBtn: { padding: 8, borderWidth: 1, borderColor: '#cbd5e1', borderRadius: 8, backgroundColor: '#fff' },
   optBtnActive: { backgroundColor: '#dbeafe', borderColor: '#3b82f6' },
   optText: { fontSize: 12, color: '#475569' },
   optTextActive: { color: '#1d4ed8', fontWeight: 'bold' },
   actionBtn: { backgroundColor: '#1e3a5f', padding: 12, borderRadius: 8, alignItems: 'center', marginTop: 5 },
+  actionBtnAlt: { backgroundColor: '#f1f5f9', padding: 12, borderRadius: 8, alignItems: 'center', marginTop: 5, borderWidth: 1, borderColor: '#cbd5e1' },
   actionBtnText: { color: '#fff', fontWeight: 'bold' },
-  previewImg: { width: '100%', height: 200, borderRadius: 8, marginTop: 10, resizeMode: 'cover' },
-  submitBtn: { backgroundColor: '#16a34a', padding: 16, borderRadius: 8, alignItems: 'center', marginTop: 30, marginBottom: 40 },
+  actionBtnAltText: { color: '#334155', fontWeight: 'bold' },
+  previewImg: { width: '100%', height: 300, borderRadius: 8, marginTop: 10, resizeMode: 'contain' },
+  previewSign: { width: '100%', height: 150, borderRadius: 8, marginTop: 10, resizeMode: 'contain', backgroundColor: '#fff', borderWidth: 1, borderColor: '#cbd5e1' },
+  submitBtn: { backgroundColor: '#16a34a', padding: 16, borderRadius: 8, alignItems: 'center', marginTop: 40, marginBottom: 40 },
   submitBtnText: { color: '#fff', fontWeight: 'bold', fontSize: 16 }
 });

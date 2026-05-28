@@ -1,119 +1,146 @@
+import fs from 'fs';
+import path from 'path';
+import PizZip from 'pizzip';
+import Docxtemplater from 'docxtemplater';
+import ImageModule from 'docxtemplater-image-module-free';
 import { NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
-import { uploadSurveyDocToDrive } from '@/lib/gdrive-upload';
+import { uploadSurveyDocToDrive, uploadDocxAsPdfToDrive } from '@/lib/gdrive-upload';
 
 export async function POST(request) {
   try {
     const formData = await request.formData();
     
     const proposal_id = formData.get('proposal_id');
-    const scoresStr = formData.get('scores'); // JSON string
+    const dynamicScoresStr = formData.get('dynamic_scores'); // Array of { criteria_id, pilihan_label, skor }
     const sectionRole = formData.get('section_role');
-    const kecamatan = formData.get('kecamatan');
-    const desa = formData.get('desa');
-    const nama_usulan = formData.get('nama_usulan');
+    const kecamatan = formData.get('kecamatan') || '';
+    const desa = formData.get('desa') || '';
+    const nama_usulan = formData.get('nama_usulan') || '';
+    const keterangan_lapangan = formData.get('keterangan_lapangan') || '';
+    
+    // New fields for the BA template
+    const sungai = formData.get('sungai') || '';
+    const penyebab = formData.get('penyebab') || '';
+    const kewenangan = formData.get('kewenangan') || '';
     
     const pdfFile = formData.get('pdf_file'); // File object
-    const photoFile = formData.get('photo_file'); // File object
+    const equipment_id = formData.get('equipment_id'); // From APK
     
-    if (!proposal_id || !scoresStr) {
-      return NextResponse.json({ error: 'Missing data' }, { status: 400 });
+    if (!dynamicScoresStr) {
+      return NextResponse.json({ error: 'Missing scores data' }, { status: 400 });
     }
 
-    const scores = JSON.parse(scoresStr);
+    const dynamicScores = JSON.parse(dynamicScoresStr);
+    
+    // If no proposal_id, this is an Urgent Survey. We create a stub proposal first.
+    let currentProposalId = proposal_id;
+    let noUrut = '';
+    
+    if (!currentProposalId || currentProposalId === 'null') {
+      const { data: newProp, error: propErr } = await supabaseAdmin
+        .from('proposals')
+        .insert({
+          nama_usulan: nama_usulan || `Survei Urgent - ${kecamatan} ${desa}`.trim(),
+          desa,
+          kecamatan,
+          created_by_role: sectionRole,
+          sudah_survey: true,
+          tanggal_survey: new Date().toISOString().split('T')[0],
+          tanggal_usulan: new Date().toISOString().split('T')[0],
+          keterangan: keterangan_lapangan
+        })
+        .select('id, nomor_urut')
+        .single();
+        
+      if (propErr) throw propErr;
+      currentProposalId = newProp.id;
+      noUrut = newProp.nomor_urut || newProp.id;
+    } else {
+      const { data: existingProp } = await supabaseAdmin
+        .from('proposals')
+        .select('nomor_urut')
+        .eq('id', currentProposalId)
+        .single();
+      noUrut = existingProp?.nomor_urut || currentProposalId;
+    }
 
-    let pdfUrl = null;
-    let photoUrl = null;
+    let pdfLinks = null;
 
-    // 1. Upload PDF to Google Drive
+    // 1. Upload PDF directly to Google Drive (sent from APK)
     if (pdfFile && typeof pdfFile !== 'string') {
       const pdfBuffer = Buffer.from(await pdfFile.arrayBuffer());
-      pdfUrl = await uploadSurveyDocToDrive({
+      pdfLinks = await uploadSurveyDocToDrive({
         sectionRole,
         submenuName: 'Perencanaan Proposal',
         kecamatan,
         desa,
-        proposalName: nama_usulan,
+        noUrut,
+        proposalName: nama_usulan || 'Urgent',
         fileBuffer: pdfBuffer,
-        mimeType: 'application/pdf',
-        filename: `BA_Survei_${nama_usulan.replace(/\s+/g, '_')}.pdf`
+        mimeType: pdfFile.type || 'application/pdf',
+        filename: `BA_Survei_${(nama_usulan || 'Urgent').replace(/\\s+/g, '_')}.pdf`,
+        isPhoto: false
       });
     }
 
-    // 2. Upload Photo to Google Drive
-    if (photoFile && typeof photoFile !== 'string') {
-      const photoBuffer = Buffer.from(await photoFile.arrayBuffer());
-      photoUrl = await uploadSurveyDocToDrive({
-        sectionRole,
-        submenuName: 'Perencanaan Proposal',
-        kecamatan,
-        desa,
-        proposalName: nama_usulan,
-        fileBuffer: photoBuffer,
-        mimeType: photoFile.type || 'image/jpeg',
-        filename: `Foto_Survei_${nama_usulan.replace(/\s+/g, '_')}.jpg`
-      });
+    // 2. Update DB
+    if (currentProposalId) {
+      const updatePayload = {
+        sudah_survey: true,
+        tanggal_survey: new Date().toISOString().split('T')[0],
+      };
+      if (pdfLinks?.webViewLink) updatePayload.link_proposal = pdfLinks.webViewLink;
+      if (keterangan_lapangan) updatePayload.keterangan = keterangan_lapangan;
+      await supabaseAdmin.from('proposals').update(updatePayload).eq('id', currentProposalId);
     }
 
-    // 3. Update DB
-    // First update the proposal to sudah_survey = true
-    await supabaseAdmin.from('proposals').update({
-      sudah_survey: true,
-      tanggal_survey: new Date().toISOString().split('T')[0],
-      link_proposal: pdfUrl || undefined // Store the BA link in link_proposal
-    }).eq('id', proposal_id);
+    // 3. Insert dynamic scores into proposal_scores
+    if (Array.isArray(dynamicScores) && dynamicScores.length > 0) {
+      const scoreInserts = dynamicScores.map(score => ({
+        proposal_id: currentProposalId,
+        criteria_id: score.criteria_id,
+        pilihan_label: score.pilihan_label,
+        skor: score.skor
+      }));
 
-    // Calculate presentase
-    // We assume the criteria structure from TabPrioritas
-    // Kerawanan Bencana (1-4, 30%), Dampak (1-4, 25%), Bahaya (1-3, 20%), Bentuk (1-4, 15%), Jarak (1-9, 10%)
-    let skor_kerawanan = scores.skor_kerawanan || null;
-    let skor_dampak = scores.skor_dampak || null;
-    let skor_bahaya = scores.skor_bahaya || null;
-    let skor_bentuk = scores.skor_bentuk || null;
-    let skor_jarak = scores.skor_jarak || null;
+      const { error: scoresErr } = await supabaseAdmin
+        .from('proposal_scores')
+        .upsert(scoreInserts, { onConflict: 'proposal_id, criteria_id' });
 
-    let presentase = 0;
-    let filledCount = 0;
-
-    if (skor_kerawanan) { presentase += (skor_kerawanan / 4) * 0.30; filledCount++; }
-    if (skor_dampak) { presentase += (skor_dampak / 4) * 0.25; filledCount++; }
-    if (skor_bahaya) { presentase += (skor_bahaya / 3) * 0.20; filledCount++; }
-    if (skor_bentuk) { presentase += (skor_bentuk / 4) * 0.15; filledCount++; }
-    if (skor_jarak) { presentase += (skor_jarak / 9) * 0.10; filledCount++; }
-
-    let prioritas = null;
-    let presentase_total = null;
-
-    if (filledCount > 0) {
-      presentase_total = Math.round(presentase * 100 * 100) / 100;
-      if (filledCount === 5) {
-        prioritas = presentase_total > 75 ? 'A' : presentase_total > 50 ? 'B' : presentase_total > 25 ? 'C' : 'D';
-      }
+      if (scoresErr) throw scoresErr;
     }
 
-    const { data: priorityData, error: priorityErr } = await supabaseAdmin
-      .from('proposal_priorities')
-      .upsert({
-        proposal_id,
-        kerawanan_bencana: scores.kerawanan_bencana,
-        skor_kerawanan,
-        dampak_kerusakan: scores.dampak_kerusakan,
-        skor_dampak,
-        kelas_bahaya: scores.kelas_bahaya,
-        skor_bahaya,
-        bentuk_kegiatan: scores.bentuk_kegiatan,
-        skor_bentuk,
-        jarak_akses: scores.jarak_akses,
-        skor_jarak,
-        presentase_total,
-        prioritas,
-        updated_at: new Date().toISOString()
-      }, { onConflict: 'proposal_id' })
-      .select();
+    // 4. Auto-Schedule if Equipment is selected
+    if (equipment_id) {
+      // Calculate current week
+      const d = new Date();
+      const firstDayOfYear = new Date(d.getFullYear(), 0, 1);
+      const pastDaysOfYear = (d.getTime() - firstDayOfYear.getTime()) / 86400000;
+      const weekNum = Math.ceil((pastDaysOfYear + firstDayOfYear.getDay() + 1) / 7);
 
-    if (priorityErr) throw priorityErr;
+      const { error: scheduleErr } = await supabaseAdmin
+        .from('schedule')
+        .upsert({
+          proposal_id: currentProposalId,
+          tahun: d.getFullYear(),
+          equipment_id: equipment_id,
+          nama_desa: desa,
+          kecamatan: kecamatan,
+          minggu_mulai: weekNum,
+          minggu_selesai: weekNum + 1,
+          durasi_rencana_minggu: 2,
+          created_by_role: sectionRole
+        }, { onConflict: 'proposal_id, tahun' });
 
-    return NextResponse.json({ success: true, pdfUrl, photoUrl });
+      if (scheduleErr) console.error('Schedule upsert error:', scheduleErr);
+    }
+
+    return NextResponse.json({ 
+      success: true, 
+      pdfUrl: pdfLinks?.webViewLink, 
+      downloadUrl: pdfLinks?.webContentLink 
+    });
   } catch (error) {
     console.error('Survey Submit Error:', error);
     return NextResponse.json({ error: error.message }, { status: 500 });

@@ -39,7 +39,13 @@
           }
         }
       ],
-      "@react-native-community/datetimepicker"
+      "@react-native-community/datetimepicker",
+      [
+        "react-native-document-scanner-plugin",
+        {
+          "cameraPermission": "Kami memerlukan akses kamera untuk melakukan scan Berita Acara."
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": false,

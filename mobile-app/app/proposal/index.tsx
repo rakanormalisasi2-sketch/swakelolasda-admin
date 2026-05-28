@@ -1,7 +1,38 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, ScrollView, Alert, ActivityIndicator } from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, StyleSheet, ScrollView, Alert, ActivityIndicator, Modal, FlatList } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import WILAYAH from '@/lib/wilayah';
+
+const CustomPicker = ({ label, value, options, onSelect }: { label: string, value: string, options: string[], onSelect: (val: string) => void }) => {
+  const [modalVisible, setModalVisible] = useState(false);
+  return (
+    <View style={{ marginBottom: 16 }}>
+      <Text style={styles.label}>{label} *</Text>
+      <TouchableOpacity style={styles.input} onPress={() => setModalVisible(true)}>
+        <Text style={{ color: value ? '#1e293b' : '#94a3b8' }}>{value || `Pilih ${label}...`}</Text>
+      </TouchableOpacity>
+      <Modal visible={modalVisible} transparent animationType="fade">
+        <View style={styles.modalBg}>
+          <View style={styles.modalContent}>
+            <Text style={styles.modalTitle}>Pilih {label}</Text>
+            <FlatList
+              data={options}
+              keyExtractor={(item) => item}
+              renderItem={({ item }) => (
+                <TouchableOpacity style={styles.modalItem} onPress={() => { onSelect(item); setModalVisible(false); }}>
+                  <Text style={{ fontSize: 16 }}>{item}</Text>
+                </TouchableOpacity>
+              )}
+            />
+            <TouchableOpacity style={styles.modalCloseBtn} onPress={() => setModalVisible(false)}>
+              <Text style={{ color: '#fff', fontWeight: 'bold' }}>Batal</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+    </View>
+  );
+};
 
 export default function RekapitulasiScreen() {
   const [role, setRole] = useState('seksi_normalisasi');
@@ -36,11 +67,7 @@ export default function RekapitulasiScreen() {
 
     setLoading(true);
     try {
-      // Assuming Next.js runs on a specific local IP or domain. Use EXPO_PUBLIC_SUPABASE_URL domain equivalent or your API endpoint
-      // We will post to the Supabase Database directly since we have the keys, OR to the Next.js API.
-      // Next.js API is safer for auto_increment `nomor_urut`. So we must fetch the API.
-      // In mobile app, we need the API URL. We'll use a placeholder EXPO_PUBLIC_API_URL or hardcode for dev.
-      const apiUrl = process.env.EXPO_PUBLIC_API_URL || 'http://192.168.1.100:3000/api'; // Adjust for your local IP
+      const apiUrl = process.env.EXPO_PUBLIC_API_URL || 'http://192.168.1.100:3000/api';
       
       const payload = {
         ...form,
@@ -75,6 +102,9 @@ export default function RekapitulasiScreen() {
     }
   };
 
+  const kecamatanOptions = Object.keys(WILAYAH.Bojonegoro).sort();
+  const desaOptions = form.kecamatan ? (WILAYAH.Bojonegoro[form.kecamatan] || []).sort() : [];
+
   return (
     <ScrollView style={styles.container} contentContainerStyle={{ padding: 20 }}>
       <Text style={styles.header}>Input Rekap Proposal</Text>
@@ -85,14 +115,19 @@ export default function RekapitulasiScreen() {
       <Text style={styles.label}>Tanggal Usulan (YYYY-MM-DD)</Text>
       <TextInput style={styles.input} value={form.tanggal_usulan} onChangeText={t => setForm({...form, tanggal_usulan: t})} placeholder="2026-05-20" />
 
-      <Text style={styles.label}>Kecamatan *</Text>
-      {/* Basic Picker fallback for React Native without installing third-party libs to save space, using simple map for touchables or buttons. Let's just use Text inputs for now or a simple modal. Since the user asked for dropdown: */}
-      <TextInput style={styles.input} value={form.kecamatan} onChangeText={t => {
-        setForm({...form, kecamatan: t, desa: ''})
-      }} placeholder="Ketik Kecamatan..." />
+      <CustomPicker 
+        label="Kecamatan" 
+        value={form.kecamatan} 
+        options={kecamatanOptions} 
+        onSelect={(val) => setForm({...form, kecamatan: val, desa: ''})} 
+      />
 
-      <Text style={styles.label}>Desa *</Text>
-      <TextInput style={styles.input} value={form.desa} onChangeText={t => setForm({...form, desa: t})} placeholder="Ketik Desa..." />
+      <CustomPicker 
+        label="Desa" 
+        value={form.desa} 
+        options={desaOptions} 
+        onSelect={(val) => setForm({...form, desa: val})} 
+      />
 
       <Text style={styles.label}>Kabupaten</Text>
       <TextInput style={styles.input} value={form.kabupaten} onChangeText={t => setForm({...form, kabupaten: t})} />
@@ -125,5 +160,10 @@ const styles = StyleSheet.create({
   label: { fontSize: 13, fontWeight: '600', color: '#475569', marginBottom: 6 },
   input: { backgroundColor: '#fff', borderWidth: 1, borderColor: '#cbd5e1', borderRadius: 8, padding: 12, marginBottom: 16, color: '#1e293b' },
   btn: { backgroundColor: '#16a34a', padding: 16, borderRadius: 8, alignItems: 'center', marginTop: 10, marginBottom: 40 },
-  btnText: { color: '#fff', fontWeight: 'bold', fontSize: 16 }
+  btnText: { color: '#fff', fontWeight: 'bold', fontSize: 16 },
+  modalBg: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', padding: 20 },
+  modalContent: { backgroundColor: '#fff', borderRadius: 12, maxHeight: '80%', padding: 20 },
+  modalTitle: { fontSize: 18, fontWeight: 'bold', marginBottom: 15, color: '#1e3a5f' },
+  modalItem: { paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: '#f1f5f9' },
+  modalCloseBtn: { marginTop: 15, backgroundColor: '#ef4444', padding: 12, borderRadius: 8, alignItems: 'center' }
 });

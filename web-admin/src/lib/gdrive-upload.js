@@ -188,7 +188,7 @@ export async function uploadRekapDocToDrive({ sectionRole, submenuName, proposal
   return fileRes.data.webViewLink; // Return full link for PDF
 }
 
-export async function uploadSurveyDocToDrive({ sectionRole, submenuName, kecamatan, desa, proposalName, fileBuffer, mimeType, filename }) {
+export async function uploadSurveyDocToDrive({ sectionRole, submenuName, kecamatan, desa, noUrut, proposalName, fileBuffer, mimeType, filename, isPhoto }) {
   const { data: sectionData, error: dbErr } = await supabaseAdmin
     .from('section_settings')
     .select('google_refresh_token, google_root_folder_id')
@@ -203,21 +203,37 @@ export async function uploadSurveyDocToDrive({ sectionRole, submenuName, kecamat
   const drive = google.drive({ version: 'v3', auth: oauth2Client });
   const root = sectionData.google_root_folder_id;
 
+  // 1. Submenu
   const safeSubmenu = (submenuName || 'Perencanaan Proposal').replace(/[\\/:*?"<>|]/g, '_');
   const submenuId = await getOrCreateFolder(drive, safeSubmenu, root);
-  const surveyId = await getOrCreateFolder(drive, 'Data Survei', submenuId);
   
-  const safeKecDesa = `${kecamatan || 'Kec'}.${desa || 'Desa'}`.replace(/[\\/:*?"<>|]/g, '_');
-  const kecDesaId = await getOrCreateFolder(drive, safeKecDesa, surveyId);
+  // 2. BA Survey
+  const surveyId = await getOrCreateFolder(drive, 'BA Survey', submenuId);
   
-  const safeProposal = (proposalName || 'Tanpa Nama').replace(/[\\/:*?"<>|]/g, '_');
-  const proposalFolderId = await getOrCreateFolder(drive, safeProposal, kecDesaId);
+  // 3. Kecamatan
+  const safeKecamatan = (kecamatan || 'Kecamatan Tidak Diketahui').toUpperCase().replace(/[\\/:*?"<>|]/g, '_');
+  const kecId = await getOrCreateFolder(drive, safeKecamatan, surveyId);
+  
+  // 4. Desa
+  const safeDesa = (desa || 'Desa Tidak Diketahui').toUpperCase().replace(/[\\/:*?"<>|]/g, '_');
+  const desaId = await getOrCreateFolder(drive, safeDesa, kecId);
+  
+  // 5. No Urut_Nama Usulan
+  const prefix = noUrut ? `${noUrut}_` : '';
+  const safeProposal = `${prefix}${proposalName || 'Tanpa Nama'}`.replace(/[\\/:*?"<>|]/g, '_');
+  const proposalFolderId = await getOrCreateFolder(drive, safeProposal, desaId);
+
+  // 6. Dokumentasi Survey (Optional)
+  let targetFolderId = proposalFolderId;
+  if (isPhoto) {
+    targetFolderId = await getOrCreateFolder(drive, 'dokumentasi survey', proposalFolderId);
+  }
 
   const stream = Readable.from(fileBuffer);
   const fileRes = await drive.files.create({
-    requestBody: { name: filename, parents: [proposalFolderId] },
+    requestBody: { name: filename, parents: [targetFolderId] },
     media: { mimeType, body: stream },
-    fields: 'id, webViewLink',
+    fields: 'id, webViewLink, webContentLink',
   });
 
   await drive.permissions.create({
@@ -225,9 +241,82 @@ export async function uploadSurveyDocToDrive({ sectionRole, submenuName, kecamat
     requestBody: { role: 'reader', type: 'anyone' },
   });
 
-  // If it's an image, return thumbnail link, otherwise webViewLink
+  // If it's an image, return thumbnail link, otherwise object with links
   if (mimeType.startsWith('image/')) {
-    return `https://drive.google.com/thumbnail?id=${fileRes.data.id}&sz=w800`;
+    return `https://drive.google.com/thumbnail?id=${fileRes.data.id}&sz=w1000`;
   }
-  return fileRes.data.webViewLink;
+  return {
+    webViewLink: fileRes.data.webViewLink,
+    webContentLink: fileRes.data.webContentLink
+  };
+}
+
+export async function uploadDocxAsPdfToDrive({ sectionRole, submenuName, kecamatan, desa, noUrut, proposalName, fileBuffer, filename }) {
+  const { data: sectionData, error: dbErr } = await supabaseAdmin
+    .from('section_settings')
+    .select('google_refresh_token, google_root_folder_id')
+    .eq('role', sectionRole)
+    .single();
+
+  if (dbErr || !sectionData?.google_refresh_token) {
+    throw new Error('Google Drive belum terhubung.');
+  }
+
+  const oauth2Client = getOAuth2Client(sectionData.google_refresh_token);
+  const drive = google.drive({ version: 'v3', auth: oauth2Client });
+  const root = sectionData.google_root_folder_id;
+
+  // Folder Structure
+  const safeSubmenu = (submenuName || 'Perencanaan Proposal').replace(/[\\/:*?"<>|]/g, '_');
+  const submenuId = await getOrCreateFolder(drive, safeSubmenu, root);
+  const surveyId = await getOrCreateFolder(drive, 'BA Survey', submenuId);
+  const safeKecamatan = (kecamatan || 'Kecamatan Tidak Diketahui').toUpperCase().replace(/[\\/:*?"<>|]/g, '_');
+  const kecId = await getOrCreateFolder(drive, safeKecamatan, surveyId);
+  const safeDesa = (desa || 'Desa Tidak Diketahui').toUpperCase().replace(/[\\/:*?"<>|]/g, '_');
+  const desaId = await getOrCreateFolder(drive, safeDesa, kecId);
+  
+  const prefix = noUrut ? `${noUrut}_` : '';
+  const safeProposal = `${prefix}${proposalName || 'Tanpa Nama'}`.replace(/[\\/:*?"<>|]/g, '_');
+  const proposalFolderId = await getOrCreateFolder(drive, safeProposal, desaId);
+
+  // 1. Upload DOCX as a temporary Google Document
+  const tempDoc = await drive.files.create({
+    requestBody: { name: 'temp_doc_for_pdf_conversion', mimeType: 'application/vnd.google-apps.document' },
+    media: { mimeType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', body: Readable.from(fileBuffer) },
+    fields: 'id'
+  });
+  
+  const tempDocId = tempDoc.data.id;
+
+  try {
+    // 2. Export the Google Document as PDF stream
+    const pdfResponse = await drive.files.export({
+      fileId: tempDocId,
+      mimeType: 'application/pdf',
+    }, { responseType: 'stream' });
+
+    // 3. Upload the PDF stream to the target folder
+    const pdfFile = await drive.files.create({
+      requestBody: { name: filename, parents: [proposalFolderId] },
+      media: { mimeType: 'application/pdf', body: pdfResponse.data },
+      fields: 'id, webViewLink, webContentLink'
+    });
+
+    await drive.permissions.create({
+      fileId: pdfFile.data.id,
+      requestBody: { role: 'reader', type: 'anyone' },
+    });
+
+    return {
+      webViewLink: pdfFile.data.webViewLink,
+      webContentLink: pdfFile.data.webContentLink, // used for downloading locally in the APK
+    };
+  } finally {
+    // 4. Clean up the temporary document
+    try {
+      await drive.files.delete({ fileId: tempDocId });
+    } catch (err) {
+      console.warn('Failed to delete temp doc', tempDocId, err);
+    }
+  }
 }

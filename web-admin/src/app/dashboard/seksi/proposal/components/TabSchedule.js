@@ -16,6 +16,7 @@ export default function TabSchedule({ tahun, role }) {
   const [isDragging, setIsDragging] = useState(false);
   const [dragStartInfo, setDragStartInfo] = useState(null); // { scheduleId, weekIdx }
   const [dragCurrentWeek, setDragCurrentWeek] = useState(null); // weekIdx while dragging
+  const [isLocked, setIsLocked] = useState(true); // Default locked to prevent accidental clicks
   
   const [showManualModal, setShowManualModal] = useState(false);
 
@@ -202,6 +203,7 @@ export default function TabSchedule({ tahun, role }) {
 
   // Drag logic
   const handleMouseDown = (scheduleId, weekIdx) => {
+    if (isLocked) return;
     const item = data.find(d => d.id === scheduleId);
     if (item.status === 'selesai' || item.status === 'sedang_berjalan') return; // Cannot edit active/finished
     
@@ -211,12 +213,19 @@ export default function TabSchedule({ tahun, role }) {
   };
 
   const handleMouseEnter = (scheduleId, weekIdx) => {
+    if (isLocked) return;
     if (isDragging && dragStartInfo && dragStartInfo.scheduleId === scheduleId) {
       setDragCurrentWeek(weekIdx);
     }
   };
 
   const handleMouseUp = (scheduleId, weekIdx) => {
+    if (isLocked) {
+      setIsDragging(false);
+      setDragStartInfo(null);
+      setDragCurrentWeek(null);
+      return;
+    }
     if (isDragging && dragStartInfo && dragStartInfo.scheduleId === scheduleId) {
       updateScheduleWeeks(scheduleId, dragStartInfo.weekIdx, weekIdx);
     }
@@ -358,7 +367,13 @@ export default function TabSchedule({ tahun, role }) {
           <div style={{ width: 16, height: 16, background: '#cbd5e1', borderRadius: 4 }}></div>
           <span><strong>Selesai</strong> (Real)</span>
         </div>
-        <div style={{ marginLeft: 'auto' }}>
+        <div style={{ marginLeft: 'auto', display: 'flex', gap: 10 }}>
+          <button 
+            onClick={() => setIsLocked(!isLocked)} 
+            className={`btn btn-sm ${isLocked ? 'btn-danger' : 'btn-success'}`}
+          >
+            {isLocked ? '🔒 Unlock Timeline' : '🔓 Lock Timeline'}
+          </button>
           <button onClick={addManualRow} disabled={saving} className="btn btn-primary btn-sm">+ Tambah Pekerjaan Manual</button>
         </div>
       </div>
