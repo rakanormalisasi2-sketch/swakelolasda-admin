@@ -19,7 +19,8 @@
         "backgroundImage": "./assets/images/android-icon-background.png"
       },
       "edgeToEdgeEnabled": true,
-      "predictiveBackGestureEnabled": false
+      "predictiveBackGestureEnabled": false,
+      "softwareKeyboardLayoutMode": "resize"
     },
     "web": {
       "output": "static",
@@ -41,11 +42,19 @@
       ],
       "@react-native-community/datetimepicker",
       [
-        "react-native-document-scanner-plugin",
+        "expo-image-picker",
         {
-          "cameraPermission": "Kami memerlukan akses kamera untuk melakukan scan Berita Acara."
+          "cameraPermission": "Kami memerlukan akses kamera untuk mengambil foto Berita Acara."
         }
-      ]
+      ],
+      [
+        "@preeternal/react-native-document-scanner-plugin",
+        {
+          "cameraPermission": "Kami memerlukan akses kamera untuk menscan Dokumen Proposal."
+        }
+      ],
+      "expo-font",
+      "expo-web-browser"
     ],
     "experiments": {
       "typedRoutes": false,

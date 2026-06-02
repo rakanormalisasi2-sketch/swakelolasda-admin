@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import {
   View, Text, TextInput, TouchableOpacity, StyleSheet,
   SafeAreaView, StatusBar, Alert, ActivityIndicator,
+  KeyboardAvoidingView, Platform, ScrollView,
 } from 'react-native';
 import { router } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -28,7 +29,11 @@ export default function AdminPasswordScreen() {
         } else if (session.role === 'gudang') {
           router.replace('/gudang');
           return;
+        } else if (['seksi_normalisasi', 'seksi_embung'].includes(session.role)) {
+          router.replace('/proposal');
+          return;
         }
+        // If role is survey_normalisasi or survey_embung, we do NOT auto login
       }
     } catch (e) {
       console.warn('Gagal cek sesi:', e);
@@ -47,7 +52,14 @@ export default function AdminPasswordScreen() {
       const { data: settings, error } = await supabaseWarehouse
         .from('app_settings')
         .select('config_key, config_value')
-        .in('config_key', ['apk_password_mekanik', 'apk_password_gudang', 'apk_password_normalisasi', 'apk_password_embung']);
+        .in('config_key', [
+          'apk_password_mekanik', 
+          'apk_password_gudang', 
+          'apk_password_normalisasi', 
+          'apk_password_embung',
+          'apk_password_surveynormalisasi',
+          'apk_password_surveyembung'
+        ]);
 
       if (error) throw error;
 
@@ -55,6 +67,8 @@ export default function AdminPasswordScreen() {
       const passGudang = settings?.find(s => s.config_key === 'apk_password_gudang')?.config_value || 'gudang2024';
       const passNormalisasi = settings?.find(s => s.config_key === 'apk_password_normalisasi')?.config_value || 'normalisasi';
       const passEmbung = settings?.find(s => s.config_key === 'apk_password_embung')?.config_value || 'embung';
+      const passSurveyNormalisasi = settings?.find(s => s.config_key === 'apk_password_surveynormalisasi')?.config_value || 'surveynormalisasi';
+      const passSurveyEmbung = settings?.find(s => s.config_key === 'apk_password_surveyembung')?.config_value || 'surveyembung';
 
       if (passInput === passMekanik) {
         await AsyncStorage.setItem('apk_session', JSON.stringify({ role: 'mekanik', loggedInAt: new Date().toISOString() }));
@@ -67,6 +81,12 @@ export default function AdminPasswordScreen() {
         router.replace('/proposal');
       } else if (passInput === passEmbung) {
         await AsyncStorage.setItem('apk_session', JSON.stringify({ role: 'seksi_embung', loggedInAt: new Date().toISOString() }));
+        router.replace('/proposal');
+      } else if (passInput === passSurveyNormalisasi) {
+        await AsyncStorage.setItem('apk_session', JSON.stringify({ role: 'survey_normalisasi', loggedInAt: new Date().toISOString() }));
+        router.replace('/proposal');
+      } else if (passInput === passSurveyEmbung) {
+        await AsyncStorage.setItem('apk_session', JSON.stringify({ role: 'survey_embung', loggedInAt: new Date().toISOString() }));
         router.replace('/proposal');
       } else {
         Alert.alert('Akses Ditolak', 'Password tidak dikenali. Silakan hubungi Superadmin.');
@@ -92,62 +112,66 @@ export default function AdminPasswordScreen() {
     <SafeAreaView style={styles.container}>
       <StatusBar barStyle="light-content" backgroundColor="#92400e" />
 
-      <View style={styles.header}>
-        <TouchableOpacity 
-          onPress={() => router.replace('/')} 
-          style={styles.backBtn} 
-          hitSlop={{ top: 20, bottom: 20, left: 20, right: 20 }}
-          activeOpacity={0.7}
-        >
-          <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: 'rgba(255,255,255,0.15)', paddingVertical: 6, paddingHorizontal: 12, borderRadius: 20 }}>
-            <Text style={{ color: '#fff', fontSize: 20, marginRight: 4, fontWeight: 'bold' }}>‹</Text>
-            <Text style={styles.backText}>Kembali</Text>
+      <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
+        <ScrollView contentContainerStyle={{ flexGrow: 1 }} keyboardShouldPersistTaps="handled" bounces={false}>
+          <View style={styles.header}>
+            <TouchableOpacity 
+              onPress={() => router.replace('/')} 
+              style={styles.backBtn} 
+              hitSlop={{ top: 20, bottom: 20, left: 20, right: 20 }}
+              activeOpacity={0.7}
+            >
+              <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: 'rgba(255,255,255,0.15)', paddingVertical: 6, paddingHorizontal: 12, borderRadius: 20 }}>
+                <Text style={{ color: '#fff', fontSize: 20, marginRight: 4, fontWeight: 'bold' }}>‹</Text>
+                <Text style={styles.backText}>Kembali</Text>
+              </View>
+            </TouchableOpacity>
+            <Text style={styles.icon}>🔐</Text>
+            <Text style={styles.title}>Portal Admin</Text>
+            <Text style={styles.subtitle}>Akses Fitur Khusus E-Monitoring</Text>
           </View>
-        </TouchableOpacity>
-        <Text style={styles.icon}>🔐</Text>
-        <Text style={styles.title}>Portal Admin</Text>
-        <Text style={styles.subtitle}>Akses Fitur Khusus E-Monitoring</Text>
-      </View>
 
-      <View style={styles.card}>
-        <Text style={styles.cardTitle}>Masukkan Kredensial</Text>
-        <Text style={styles.cardSub}>Akses akan menyesuaikan dengan password Anda</Text>
+          <View style={styles.card}>
+            <Text style={styles.cardTitle}>Masukkan Kredensial</Text>
+            <Text style={styles.cardSub}>Akses akan menyesuaikan dengan password Anda</Text>
 
-        <View style={styles.passRow}>
-          <TextInput
-            style={styles.passInput}
-            value={password}
-            onChangeText={setPassword}
-            secureTextEntry={!showPass}
-            placeholder="Password..."
-            placeholderTextColor="#a0aec0"
-            autoCapitalize="none"
-            onSubmitEditing={handleLogin}
-          />
-          <TouchableOpacity
-            style={styles.eyeBtn}
-            onPress={() => setShowPass(v => !v)}
-          >
-            <Text style={styles.eyeText}>{showPass ? '🙈' : '👁️'}</Text>
-          </TouchableOpacity>
-        </View>
+            <View style={styles.passRow}>
+              <TextInput
+                style={styles.passInput}
+                value={password}
+                onChangeText={setPassword}
+                secureTextEntry={!showPass}
+                placeholder="Password..."
+                placeholderTextColor="#a0aec0"
+                autoCapitalize="none"
+                onSubmitEditing={handleLogin}
+              />
+              <TouchableOpacity
+                style={styles.eyeBtn}
+                onPress={() => setShowPass(v => !v)}
+              >
+                <Text style={styles.eyeText}>{showPass ? '🙈' : '👁️'}</Text>
+              </TouchableOpacity>
+            </View>
 
-        <TouchableOpacity
-          style={[styles.loginBtn, loading && styles.loginBtnDisabled]}
-          onPress={handleLogin}
-          disabled={loading}
-          activeOpacity={0.85}
-        >
-          {loading
-            ? <ActivityIndicator color="#fff" />
-            : <Text style={styles.loginText}>Masuk →</Text>
-          }
-        </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.loginBtn, loading && styles.loginBtnDisabled]}
+              onPress={handleLogin}
+              disabled={loading}
+              activeOpacity={0.85}
+            >
+              {loading
+                ? <ActivityIndicator color="#fff" />
+                : <Text style={styles.loginText}>Masuk →</Text>
+              }
+            </TouchableOpacity>
 
-        <Text style={styles.hint}>
-          Hint: Password default adalah "mekanik" atau "gudang"
-        </Text>
-      </View>
+            <Text style={styles.hint}>
+              Hint: Password default adalah "mekanik" atau "gudang"
+            </Text>
+          </View>
+        </ScrollView>
+      </KeyboardAvoidingView>
     </SafeAreaView>
   );
 }

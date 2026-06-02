@@ -1,13 +1,14 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator, Alert, Image, TextInput, Modal } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator, Alert, Image, TextInput, Modal, KeyboardAvoidingView, Platform, Switch } from 'react-native';
 import { useLocalSearchParams, router } from 'expo-router';
-import DocumentScanner from 'react-native-document-scanner-plugin';
-import * as FileSystem from 'expo-file-system';
+import * as ImagePicker from 'expo-image-picker';
+import * as FileSystem from 'expo-file-system/legacy';
 import * as Sharing from 'expo-sharing';
 import * as Print from 'expo-print';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import SignatureScreen from 'react-native-signature-canvas';
 import DateTimePicker from '@react-native-community/datetimepicker';
+import { logoBase64 } from './logoBase64';
 
 // Helper for dates
 const numToWords = (num: number): string => {
@@ -35,6 +36,9 @@ export default function SurveyFormScreen() {
   const [signatureNarasumber, setSignatureNarasumber] = useState<string | null>(null);
   const [namaNarasumber, setNamaNarasumber] = useState('');
   const [activeSignTarget, setActiveSignTarget] = useState<'surveyor' | 'narasumber' | null>(null);
+  const [saveLocal, setSaveLocal] = useState(false);
+  
+  const signatureRef = useRef<any>(null);
 
   // Data Primer
   const [kecamatanForm, setKecamatanForm] = useState((kecamatan as string) || '');
@@ -64,11 +68,21 @@ export default function SurveyFormScreen() {
 
   useEffect(() => {
     fetchEquipments();
+    loadSavedSignature();
   }, []);
+
+  const loadSavedSignature = async () => {
+    try {
+      const savedSig = await AsyncStorage.getItem('saved_surveyor_signature');
+      const savedName = await AsyncStorage.getItem('saved_surveyor_name');
+      if (savedSig) setSignatureSurveyor(savedSig);
+      if (savedName) setNamaSurveyor(savedName);
+    } catch(e) {}
+  };
 
   const fetchEquipments = async () => {
     try {
-      const apiUrl = process.env.EXPO_PUBLIC_API_URL || 'http://192.168.1.100:3000/api';
+      const apiUrl = process.env.EXPO_PUBLIC_API_URL || 'http://192.168.0.144:3000/api';
       const res = await fetch(`${apiUrl}/heavy-equipment`);
       const data = await res.json();
       if (Array.isArray(data)) setEquipments(data);
@@ -79,20 +93,56 @@ export default function SurveyFormScreen() {
 
   const scanDocument = async () => {
     try {
-      const { scannedImages } = await DocumentScanner.scanDocument({
-        maxNumDocuments: 1,
-        croppedImageQuality: 40
+      const { status } = await ImagePicker.requestCameraPermissionsAsync();
+      if (status !== 'granted') {
+        Alert.alert('Izin Ditolak', 'Maaf, kami memerlukan akses kamera untuk mengambil foto.');
+        return;
+      }
+
+      const result = await ImagePicker.launchCameraAsync({
+        mediaTypes: ['images'],
+        allowsEditing: true,
+        quality: 0.4,
       });
-      if (scannedImages && scannedImages.length > 0) {
-        setPhoto(scannedImages[0]);
+
+      if (!result.canceled && result.assets && result.assets.length > 0) {
+        setPhoto(result.assets[0].uri);
       }
     } catch (error) {
-      Alert.alert('Scanner Error', 'Gagal membuka scanner');
+      Alert.alert('Scanner Error', 'Gagal membuka kamera');
     }
   };
 
-  const handleSignature = (sig: string) => {
-    if (activeSignTarget === 'surveyor') setSignatureSurveyor(sig);
+  const pickFromGallery = async () => {
+    try {
+      const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (status !== 'granted') {
+        Alert.alert('Izin Ditolak', 'Maaf, kami memerlukan akses galeri.');
+        return;
+      }
+
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ['images'],
+        allowsEditing: true,
+        quality: 0.4,
+      });
+
+      if (!result.canceled && result.assets && result.assets.length > 0) {
+        setPhoto(result.assets[0].uri);
+      }
+    } catch (error) {
+      Alert.alert('Gallery Error', 'Gagal membuka galeri');
+    }
+  };
+
+  const handleSignature = async (sig: string) => {
+    if (activeSignTarget === 'surveyor') {
+      setSignatureSurveyor(sig);
+      try {
+        await AsyncStorage.setItem('saved_surveyor_signature', sig);
+        if (namaSurveyor) await AsyncStorage.setItem('saved_surveyor_name', namaSurveyor);
+      } catch(e) {}
+    }
     if (activeSignTarget === 'narasumber') setSignatureNarasumber(sig);
     setActiveSignTarget(null);
   };
@@ -120,40 +170,42 @@ export default function SurveyFormScreen() {
     setLoading(true);
     try {
       const sess = await AsyncStorage.getItem('apk_session');
-      const role = sess ? JSON.parse(sess).role : 'seksi_normalisasi';
-      const apiUrl = process.env.EXPO_PUBLIC_API_URL || 'http://192.168.1.100:3000/api';
+      let role = sess ? JSON.parse(sess).role : 'seksi_normalisasi';
+      if (role === 'survey_normalisasi') role = 'seksi_normalisasi';
+      if (role === 'survey_embung') role = 'seksi_embung';
+      const apiUrl = process.env.EXPO_PUBLIC_API_URL || 'http://192.168.0.144:3000/api';
       
       // 1. Convert Image to Base64
       let photoBase64 = '';
       if (photo) {
-        photoBase64 = await FileSystem.readAsStringAsync(photo, { encoding: FileSystem.EncodingType.Base64 });
+        photoBase64 = await FileSystem.readAsStringAsync(photo, { encoding: 'base64' });
         photoBase64 = `data:image/jpeg;base64,${photoBase64}`;
       }
-
-      const logoUrl = `${apiUrl.replace('/api', '')}/logo_bojonegoro.png`;
 
       // 2. Generate HTML
       const htmlContent = `
       <html>
       <head>
       <style>
-        body { font-family: 'Times New Roman', Times, serif; padding: 30px; font-size: 11pt; color: black; line-height: 1.5; }
+        @page { size: 215.9mm 330.2mm; margin: 20mm; }
+        body { font-family: 'Times New Roman', Times, serif; font-size: 11pt; color: black; line-height: 1.5; padding: 0; margin: 0; }
         .header { text-align: center; font-weight: bold; font-size: 13pt; margin-bottom: 20px; position: relative; line-height: 1.2; }
-        .logo { position: absolute; left: 0; top: 0; width: 75px; }
+        .logo { position: absolute; left: 0; top: -5px; width: 85px; }
         .title { text-decoration: underline; font-weight: bold; text-align: center; margin-top: 30px; margin-bottom: 20px; font-size: 11pt; }
         .table-list { width: 100%; border-collapse: collapse; margin-top: 10px; margin-bottom: 15px; }
         .table-list td { padding: 4px; vertical-align: top; }
-        .table-grid { width: 100%; border-collapse: collapse; margin-top: 5px; margin-bottom: 15px; }
-        .table-grid td, .table-grid th { border: 1px solid black; padding: 4px 8px; font-size: 10pt; }
+        .table-grid { width: 100%; border-collapse: collapse; margin-top: 5px; margin-bottom: 15px; page-break-inside: avoid; }
+        .table-grid td, .table-grid th { border: 1px solid black; padding: 6px 8px; font-size: 10pt; }
         .table-grid .check-col { width: 40px; text-align: center; font-weight: bold; }
         .page-break { page-break-before: always; }
-        .sign-container { margin-top: 40px; display: flex; justify-content: space-between; text-align: center; }
+        .sign-container { margin-top: 50px; display: flex; justify-content: space-between; text-align: center; page-break-inside: avoid; }
+        .criteria-row { display: flex; page-break-inside: avoid; }
       </style>
       </head>
       <body>
       <!-- Page 1 -->
       <div class="header">
-        <img src="${logoUrl}" class="logo" />
+        <img src="${logoBase64}" class="logo" />
         PEMERINTAH KABUPATEN BOJONEGORO<br/>
         DINAS PEKERJAAN UMUM SUMBER DAYA AIR<br/>
         BIDANG OPERASI DAN PEMELIHARAAN<br/>
@@ -175,7 +227,7 @@ export default function SurveyFormScreen() {
       </table>
 
       <!-- Kriteria -->
-      <div style="display:flex;">
+      <div class="criteria-row">
         <div style="width:150px;">Kerawanan Bencana</div><div style="width:10px;">:</div>
         <div style="flex:1;">
           <table class="table-grid">
@@ -187,7 +239,7 @@ export default function SurveyFormScreen() {
         </div>
       </div>
 
-      <div style="display:flex;">
+      <div class="criteria-row">
         <div style="width:150px;">Dampak Kerusakan</div><div style="width:10px;">:</div>
         <div style="flex:1;">
           <table class="table-grid">
@@ -199,7 +251,7 @@ export default function SurveyFormScreen() {
         </div>
       </div>
 
-      <div style="display:flex;">
+      <div class="criteria-row">
         <div style="width:150px;">Kelas Bahaya</div><div style="width:10px;">:</div>
         <div style="flex:1;">
           <table class="table-grid">
@@ -210,7 +262,7 @@ export default function SurveyFormScreen() {
         </div>
       </div>
 
-      <div style="display:flex;">
+      <div class="criteria-row">
         <div style="width:150px;">Bentuk Kegiatan</div><div style="width:10px;">:</div>
         <div style="flex:1;">
           <table class="table-grid">
@@ -222,7 +274,7 @@ export default function SurveyFormScreen() {
         </div>
       </div>
 
-      <div style="display:flex;">
+      <div class="criteria-row">
         <div style="width:150px;">Jarak Lokasi & Akses</div><div style="width:10px;">:</div>
         <div style="flex:1;">
           <table class="table-grid">
@@ -234,7 +286,7 @@ export default function SurveyFormScreen() {
         </div>
       </div>
       
-      <div style="display:flex;">
+      <div class="criteria-row">
         <div style="width:150px;">Kebutuhan Alat Berat</div><div style="width:10px;">:</div>
         <div style="flex:1;">
           <table class="table-grid">
@@ -252,7 +304,7 @@ export default function SurveyFormScreen() {
       <div class="page-break"></div>
       
       <!-- Page 2 -->
-      <table style="width:100%; border-collapse: collapse;">
+      <table style="width:100%; border-collapse: collapse; page-break-inside: avoid;">
         <tr><td style="border:1px solid black; text-align:center; font-weight:bold; padding:8px;">SKETSA / GAMBAR / DENAH</td></tr>
         <tr><td style="border:1px solid black; height:450px; text-align:center; vertical-align:middle; padding: 10px;">
           ${photoBase64 ? `<img src="${photoBase64}" style="max-width:100%; max-height:430px; object-fit: contain;" />` : ''}
@@ -268,15 +320,15 @@ export default function SurveyFormScreen() {
       </p>
 
       <div class="sign-container">
-        <div style="width:40%; text-align:center;">
-          <br/><br/>
-          ${signatureNarasumber ? `<img src="${signatureNarasumber}" style="height:100px; object-fit: contain;" />` : '<br/><br/><br/>'}
+        <div style="width:45%; text-align:center;">
+          <b>NARASUMBER</b><br/><br/>
+          ${signatureNarasumber ? `<img src="${signatureNarasumber}" style="height:150px; width:100%; object-fit: contain;" />` : '<br/><br/><br/><br/><br/>'}
           <br/>
           <span style="text-decoration:underline; font-weight:bold;">${namaNarasumber || '(......................................)'}</span>
         </div>
-        <div style="width:40%; text-align:center;">
+        <div style="width:45%; text-align:center;">
           <b>SURVEYOR/VERIFIKATOR</b><br/><br/>
-          ${signatureSurveyor ? `<img src="${signatureSurveyor}" style="height:100px; object-fit: contain;" />` : '<br/><br/><br/>'}
+          ${signatureSurveyor ? `<img src="${signatureSurveyor}" style="height:150px; width:100%; object-fit: contain;" />` : '<br/><br/><br/><br/><br/>'}
           <br/>
           <span style="text-decoration:underline; font-weight:bold;">${namaSurveyor || '(......................................)'}</span>
         </div>
@@ -289,6 +341,28 @@ export default function SurveyFormScreen() {
       // 3. Generate PDF
       const { uri: pdfUri } = await Print.printToFileAsync({ html: htmlContent, base64: false });
 
+      // OPSI SIMPAN LOKAL (Storage Access Framework)
+      if (saveLocal) {
+        try {
+          let dirUri = await AsyncStorage.getItem('saved_pdf_folder');
+          if (!dirUri) {
+            const permissions = await FileSystem.StorageAccessFramework.requestDirectoryPermissionsAsync();
+            if (permissions.granted) {
+              dirUri = permissions.directoryUri;
+              await AsyncStorage.setItem('saved_pdf_folder', dirUri);
+            }
+          }
+          if (dirUri) {
+            const pdfBase64 = await FileSystem.readAsStringAsync(pdfUri, { encoding: 'base64' });
+            const filename = `BA_Survei_${namaUsulanForm.replace(/\s+/g, '_')}_${Date.now()}.pdf`;
+            const newUri = await FileSystem.StorageAccessFramework.createFileAsync(dirUri, filename, 'application/pdf');
+            await FileSystem.writeAsStringAsync(newUri, pdfBase64, { encoding: 'base64' });
+          }
+        } catch (storageErr) {
+          console.warn('Gagal simpan lokal', storageErr);
+        }
+      }
+
       // 4. Submit PDF to API
       const formData = new FormData();
       if (id) formData.append('proposal_id', id as string);
@@ -300,7 +374,7 @@ export default function SurveyFormScreen() {
       formData.append('equipment_id', selectedEq);
 
       // Score for the system (keeps percentage logic for database/schedule prioritization)
-      formData.append('scores', JSON.stringify(Object.keys(scores).filter(k => k.startsWith('skor_')).map(k => ({
+      formData.append('dynamic_scores', JSON.stringify(Object.keys(scores).filter(k => k.startsWith('skor_')).map(k => ({
         criteria_id: k.replace('skor_', ''),
         pilihan_label: (scores as any)[k.replace('skor_', '')] || '',
         skor: (scores as any)[k] || 0
@@ -312,38 +386,66 @@ export default function SurveyFormScreen() {
         type: 'application/pdf'
       } as any);
 
-      const res = await fetch(`${apiUrl}/proposal/survey-submit`, {
-        method: 'POST',
-        body: formData,
-        headers: { 'Accept': 'application/json' }
-      });
+      try {
+        const res = await fetch(`${apiUrl}/proposal/survey-submit`, {
+          method: 'POST',
+          body: formData,
+          headers: { 'Accept': 'application/json' }
+        });
 
-      if (!res.ok) {
-        const err = await res.text();
-        throw new Error(err);
+        if (!res.ok) {
+          const err = await res.text();
+          throw new Error(err);
+        }
+
+        const data = await res.json();
+        
+        Alert.alert(
+          'Sukses',
+          'Survei berhasil disubmit. BA PDF telah dibuat dan di-upload.',
+          [
+            { text: 'Tutup', onPress: () => router.back(), style: 'cancel' }
+          ]
+        );
+      } catch (apiError: any) {
+        if (apiError.message?.includes('Network request failed') || apiError.message?.includes('Failed to fetch')) {
+          // OFFLINE QUEUE LOGIC
+          // Karena FormData tidak bisa disimpan ke AsyncStorage dengan mudah,
+          // Kita simpan file PDF asli ke documentDirectory agar aman, lalu simpan payload JSON
+          const offlinePdfUri = FileSystem.documentDirectory + `offline_${Date.now()}.pdf`;
+          await FileSystem.copyAsync({ from: pdfUri, to: offlinePdfUri });
+          
+          const offlinePayload = {
+            id: Date.now().toString(),
+            proposal_id: id || null,
+            section_role: role,
+            kecamatan: kecamatanForm,
+            desa: desaForm,
+            nama_usulan: namaUsulanForm,
+            equipment_id: selectedEq,
+            dynamic_scores: Object.keys(scores).filter(k => k.startsWith('skor_')).map(k => ({
+              criteria_id: k.replace('skor_', ''),
+              pilihan_label: (scores as any)[k.replace('skor_', '')] || '',
+              skor: (scores as any)[k] || 0
+            })),
+            pdfUri: offlinePdfUri,
+            timestamp: new Date().toISOString()
+          };
+
+          const existingQ = await AsyncStorage.getItem('offline_surveys');
+          const queue = existingQ ? JSON.parse(existingQ) : [];
+          queue.push(offlinePayload);
+          await AsyncStorage.setItem('offline_surveys', JSON.stringify(queue));
+
+          Alert.alert(
+            'Mode Offline Aktif',
+            'Anda sedang tidak terhubung ke internet. Survei telah disimpan ke Antrean Offline. Jangan lupa tekan "Sync Data Offline" di tab Survei saat internet sudah kembali.',
+            [{ text: 'Mengerti', onPress: () => router.back() }]
+          );
+        } else {
+          throw apiError;
+        }
       }
-
-      const data = await res.json();
-      
-      Alert.alert(
-        'Sukses',
-        'Survei berhasil disubmit. BA PDF telah dibuat dan di-upload. Download ke HP?',
-        [
-          { text: 'Tidak', onPress: () => router.back(), style: 'cancel' },
-          { 
-            text: 'Download', 
-            onPress: async () => {
-              try {
-                await Sharing.shareAsync(pdfUri);
-                router.back();
-              } catch (e) {
-                Alert.alert('Gagal', 'Tidak dapat mendownload PDF lokal');
-                router.back();
-              }
-            } 
-          }
-        ]
-      );
     } catch (e: any) {
       Alert.alert('Gagal Submit', e.message);
     } finally {
@@ -353,7 +455,8 @@ export default function SurveyFormScreen() {
 
   return (
     <View style={styles.container}>
-      <ScrollView contentContainerStyle={{ padding: 20 }}>
+      <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined} keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}>
+      <ScrollView contentContainerStyle={{ padding: 20 }} keyboardShouldPersistTaps="handled">
         <Text style={styles.header}>{id ? `Survei: ${nama}` : 'Survei Urgent (Baru)'}</Text>
 
         {!id && (
@@ -462,9 +565,14 @@ export default function SurveyFormScreen() {
 
         <Text style={styles.sectionTitle}>Dokumentasi Lapangan</Text>
         <Text style={styles.desc}>Foto lokasi akan ditaruh di kotak SKETSA/DENAH pada BA.</Text>
-        <TouchableOpacity style={styles.actionBtn} onPress={scanDocument}>
-          <Text style={styles.actionBtnText}>📄 Buka Document Scanner</Text>
-        </TouchableOpacity>
+        <View style={styles.btnRow}>
+          <TouchableOpacity style={[styles.actionBtn, { flex: 1 }]} onPress={scanDocument}>
+            <Text style={styles.actionBtnText}>📷 Kamera</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={[styles.actionBtnAlt, { flex: 1, marginTop: 5 }]} onPress={pickFromGallery}>
+            <Text style={styles.actionBtnAltText}>🖼️ Galeri</Text>
+          </TouchableOpacity>
+        </View>
         {photo && <Image source={{ uri: photo }} style={styles.previewImg} />}
 
         <Text style={styles.sectionTitle}>Keterangan Lapangan</Text>
@@ -500,11 +608,18 @@ export default function SurveyFormScreen() {
           </TouchableOpacity>
         )}
 
+        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 30, padding: 15, backgroundColor: '#e0f2fe', borderRadius: 8 }}>
+          <Text style={{ flex: 1, color: '#0369a1', fontWeight: 'bold' }}>Simpan salinan BA PDF ke folder perangkat?</Text>
+          <Switch value={saveLocal} onValueChange={setSaveLocal} />
+        </View>
+        {saveLocal && <Text style={{ fontSize: 11, color: '#64748b', marginTop: 5, paddingHorizontal: 5 }}>Anda akan diminta memilih/membuat folder saat submit pertama kali.</Text>}
+
         <TouchableOpacity style={styles.submitBtn} onPress={submitSurvey} disabled={loading}>
           {loading ? <ActivityIndicator color="#fff" /> : <Text style={styles.submitBtnText}>Submit & Generate BA PDF</Text>}
         </TouchableOpacity>
 
       </ScrollView>
+      </KeyboardAvoidingView>
 
       {/* Signature Modal */}
       <Modal visible={activeSignTarget !== null} animationType="slide">
@@ -512,15 +627,26 @@ export default function SurveyFormScreen() {
           <Text style={{textAlign: 'center', fontSize: 18, fontWeight: 'bold', marginBottom: 10}}>
             Tanda Tangan {activeSignTarget === 'surveyor' ? 'Surveyor' : 'Narasumber'}
           </Text>
-          <SignatureScreen
-            onOK={handleSignature}
-            onEmpty={() => Alert.alert('Error', 'Tanda tangan kosong')}
-            descriptionText="Tanda Tangan"
-            clearText="Hapus"
-            confirmText="Simpan"
-            webStyle={`.m-signature-pad {box-shadow: none; border: 1px solid #ccc;} .m-signature-pad--footer {display: none; margin: 0px;}`}
-          />
-          <TouchableOpacity style={{backgroundColor: '#ef4444', padding: 15, margin: 20, borderRadius: 8, alignItems: 'center'}} onPress={() => setActiveSignTarget(null)}>
+          <View style={{flex: 1}}>
+            <SignatureScreen
+              ref={signatureRef}
+              onOK={handleSignature}
+              onEmpty={() => Alert.alert('Error', 'Tanda tangan kosong')}
+              descriptionText="Tanda Tangan"
+              clearText="Hapus"
+              confirmText="Simpan"
+              webStyle={`.m-signature-pad {box-shadow: none; border: 1px solid #ccc;} .m-signature-pad--footer {display: none; margin: 0px;}`}
+            />
+          </View>
+          <View style={{flexDirection: 'row', padding: 20, gap: 10, paddingBottom: 10}}>
+             <TouchableOpacity style={{flex: 1, backgroundColor: '#f59e0b', padding: 15, borderRadius: 8, alignItems: 'center'}} onPress={() => signatureRef.current?.clearSignature()}>
+               <Text style={{color: '#fff', fontWeight: 'bold'}}>Hapus</Text>
+             </TouchableOpacity>
+             <TouchableOpacity style={{flex: 1, backgroundColor: '#16a34a', padding: 15, borderRadius: 8, alignItems: 'center'}} onPress={() => signatureRef.current?.readSignature()}>
+               <Text style={{color: '#fff', fontWeight: 'bold'}}>Simpan</Text>
+             </TouchableOpacity>
+          </View>
+          <TouchableOpacity style={{backgroundColor: '#ef4444', padding: 15, marginHorizontal: 20, marginBottom: 20, borderRadius: 8, alignItems: 'center'}} onPress={() => setActiveSignTarget(null)}>
              <Text style={{color: '#fff', fontWeight: 'bold'}}>Batal</Text>
           </TouchableOpacity>
         </View>
