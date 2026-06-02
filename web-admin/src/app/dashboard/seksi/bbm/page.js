@@ -5,6 +5,7 @@ import { useAuth } from '@/context/AuthContext';
 export default function BBMPage() {
   const { profile } = useAuth();
   const [activeTab, setActiveTab] = useState('pemakaian');
+  const [searchTerm, setSearchTerm] = useState('');
   const [tahunAnggaran, setTahunAnggaran] = useState(new Date().getFullYear().toString());
   const [loading, setLoading] = useState(true);
   const [bbmPemakaian, setBbmPemakaian] = useState([]);
@@ -269,17 +270,43 @@ export default function BBMPage() {
     }
   };
 
-  // Group Pemakaian by Assignment/Kegiatan
+  // Group Pemakaian by Assignment/Kegiatan with Search
   const groupedPemakaian = useMemo(() => {
     const groups = {};
-    bbmPemakaian.forEach(b => {
+    const term = searchTerm.toLowerCase();
+    const filtered = bbmPemakaian.filter(b => 
+      !term || 
+      (b.kegiatan || '').toLowerCase().includes(term) ||
+      (b.tipe_alat || '').toLowerCase().includes(term) ||
+      (b.desa || '').toLowerCase().includes(term) ||
+      (b.keterangan || '').toLowerCase().includes(term)
+    );
+    filtered.forEach(b => {
       const key = `${b.kegiatan} | Alat: ${b.tipe_alat}`;
       if(!groups[key]) groups[key] = { items: [], total: 0 };
       groups[key].items.push(b);
       groups[key].total += Number(b.jumlah_liter);
     });
     return groups;
-  }, [bbmPemakaian]);
+  }, [bbmPemakaian, searchTerm]);
+
+  const filteredPengadaan = useMemo(() => {
+    const term = searchTerm.toLowerCase();
+    return bbmPengadaan.filter(b => 
+      !term || 
+      (b.keterangan || '').toLowerCase().includes(term)
+    );
+  }, [bbmPengadaan, searchTerm]);
+
+  const groupedAssignments = useMemo(() => {
+    const groups = {};
+    assignments.forEach(a => {
+      const jobLabel = SUB_LABELS[a.job_sub_type] || a.job_type || 'Lainnya';
+      if (!groups[jobLabel]) groups[jobLabel] = [];
+      groups[jobLabel].push(a);
+    });
+    return groups;
+  }, [assignments]);
 
   const generateExcelBBM = async () => {
     const dataToExport = activeTab === 'pemakaian' ? bbmPemakaian : bbmPengadaan;
@@ -402,16 +429,28 @@ export default function BBMPage() {
         )}
 
         <div className="card" style={{padding: 0, overflow:'hidden'}}>
-           <div className="card-header" style={{borderBottom:'1px solid #e2e8f0', display:'flex', gap:0, padding: 0}}>
-             {['pemakaian', 'pengadaan'].map(t => (
-                <button key={t} onClick={() => setActiveTab(t)} style={{
-                  padding: '16px 24px', background: 'transparent', border:'none', fontSize: 14, fontWeight:'bold',
-                  borderBottom: activeTab === t ? '2px solid #2563eb' : '2px solid transparent',
-                  color: activeTab === t ? '#2563eb' : '#64748b', cursor:'pointer'
-                }}>
-                  Riwayat {t === 'pemakaian' ? 'BBM Keluar' : 'BBM Masuk'}
-                </button>
-             ))}
+           <div className="card-header" style={{borderBottom:'1px solid #e2e8f0', display:'flex', justifyContent:'space-between', alignItems:'center', paddingRight:20}}>
+             <div style={{display:'flex', gap:0, padding: 0}}>
+               {['pemakaian', 'pengadaan'].map(t => (
+                  <button key={t} onClick={() => setActiveTab(t)} style={{
+                    padding: '16px 24px', background: 'transparent', border:'none', fontSize: 14, fontWeight:'bold',
+                    borderBottom: activeTab === t ? '2px solid #2563eb' : '2px solid transparent',
+                    color: activeTab === t ? '#2563eb' : '#64748b', cursor:'pointer'
+                  }}>
+                    Riwayat {t === 'pemakaian' ? 'BBM Keluar' : 'BBM Masuk'}
+                  </button>
+               ))}
+             </div>
+             <div>
+               <input 
+                 type="text" 
+                 placeholder="Cari data..." 
+                 className="form-control" 
+                 style={{width: 250}}
+                 value={searchTerm}
+                 onChange={e => setSearchTerm(e.target.value)} 
+               />
+             </div>
            </div>
 
            <div style={{padding: 20}}>
@@ -457,14 +496,14 @@ export default function BBMPage() {
                   ))}
                 </div>
              ) : (
-                bbmPengadaan.length === 0 ? <div className="text-muted" style={{textAlign:'center', padding:20}}>Belum ada data pengadaan.</div> :
+                filteredPengadaan.length === 0 ? <div className="text-muted" style={{textAlign:'center', padding:20}}>Belum ada data pengadaan.</div> :
                 <table>
                   <thead><tr><th width="30"><input type="checkbox" onChange={(e) => {
-                    if (e.target.checked) setBatchDeletePengadaan(bbmPengadaan.map(i => i.id));
+                    if (e.target.checked) setBatchDeletePengadaan(filteredPengadaan.map(i => i.id));
                     else setBatchDeletePengadaan([]);
-                  }} checked={bbmPengadaan.length > 0 && bbmPengadaan.every(i => batchDeletePengadaan.includes(i.id))} /></th><th>No</th><th>Tanggal Pesan</th><th>Tanggal Terima</th><th>Jumlah Liter</th><th>Keterangan</th><th>Aksi</th></tr></thead>
+                  }} checked={filteredPengadaan.length > 0 && filteredPengadaan.every(i => batchDeletePengadaan.includes(i.id))} /></th><th>No</th><th>Tanggal Pesan</th><th>Tanggal Terima</th><th>Jumlah Liter</th><th>Keterangan</th><th>Aksi</th></tr></thead>
                   <tbody>
-                    {bbmPengadaan.map((item, idx) => (
+                    {filteredPengadaan.map((item, idx) => (
                       <tr key={item.id}>
                         <td style={{textAlign:'center'}}><input type="checkbox" checked={batchDeletePengadaan.includes(item.id)} onChange={() => toggleBatchPengadaan(item.id)} /></td>
                         <td style={{textAlign:'center'}}>{idx+1}</td>
@@ -507,11 +546,13 @@ export default function BBMPage() {
                                ))}
                              </optgroup>
                            )}
-                           <optgroup label="Daftar Penugasan Aktif & Selesai">
-                           {assignments.map(a => (
-                             <option key={a.id} value={a.id}>{a.location_village} — {a.equipment?.name || 'Alat'} ({new Date(a.start_date).toLocaleDateString('id-ID')})</option>
+                           {Object.keys(groupedAssignments).map(groupName => (
+                             <optgroup label={`Pekerjaan: ${groupName.toUpperCase()}`} key={groupName}>
+                               {groupedAssignments[groupName].map(a => (
+                                 <option key={a.id} value={a.id}>{a.location_village} — {a.equipment?.name || 'Alat'} ({new Date(a.start_date).toLocaleDateString('id-ID')})</option>
+                               ))}
+                             </optgroup>
                            ))}
-                           </optgroup>
                          </select>
                       </div>
                       <div className="form-group">

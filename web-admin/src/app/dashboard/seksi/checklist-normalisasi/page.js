@@ -12,6 +12,7 @@ export default function ChecklistNormalisasi() {
   const [data, setData] = useState([]);
   const [targetTahunan, setTargetTahunan] = useState(0);
   const [targetInput, setTargetInput] = useState('');
+  const [searchTerm, setSearchTerm] = useState('');
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [batchDeleteIds, setBatchDeleteIds] = useState([]);
@@ -102,11 +103,11 @@ export default function ChecklistNormalisasi() {
     setBatchDeleteIds(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]);
   };
 
-  const toggleBatchDeleteAll = () => {
-    if (batchDeleteIds.length === data.length) {
+  const toggleBatchDeleteAll = (filtered) => {
+    if (batchDeleteIds.length === filtered.length && filtered.length > 0) {
       setBatchDeleteIds([]);
     } else {
-      setBatchDeleteIds(data.map(d => d.id));
+      setBatchDeleteIds(filtered.map(d => d.id));
     }
   };
 
@@ -159,6 +160,13 @@ export default function ChecklistNormalisasi() {
   }
 
   const fN = n => Number(n||0).toLocaleString('id-ID', {maximumFractionDigits: 2});
+
+  const filteredData = data.filter(d => {
+    const term = searchTerm.toLowerCase();
+    return !term || 
+      (d.kegiatan || '').toLowerCase().includes(term) ||
+      (d.desa || '').toLowerCase().includes(term);
+  });
 
   function exportPDF() {
     const doc = new jsPDF({ orientation: 'landscape', format: 'a4' });
@@ -324,6 +332,13 @@ export default function ChecklistNormalisasi() {
                 <Trash2 size={16} /> Hapus Terpilih ({batchDeleteIds.length})
               </button>
             )}
+            <input 
+              type="text" 
+              placeholder="Cari kegiatan atau desa..." 
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              style={{ padding: '8px 12px', border: '1px solid #c2c6d3', borderRadius: 8, outline: 'none', width: 250, marginLeft: 'auto', marginRight: 16 }}
+            />
             <div style={{ display:'flex', gap: 8 }}>
               <button onClick={exportPDF} style={{ padding: '8px 16px', borderRadius: 8, background: '#ef4444', color: 'white', display: 'flex', alignItems: 'center', gap: 8, border: 'none', cursor: 'pointer', fontWeight: 600, fontSize: 13 }}>
                 <Printer size={16} /> Unduh PDF
@@ -340,7 +355,7 @@ export default function ChecklistNormalisasi() {
                 <thead>
                   <tr>
                     <Th w={40}>
-                      <input type="checkbox" onChange={toggleBatchDeleteAll} checked={data.length > 0 && batchDeleteIds.length === data.length} />
+                      <input type="checkbox" onChange={() => toggleBatchDeleteAll(filteredData)} checked={filteredData.length > 0 && batchDeleteIds.length === filteredData.length} />
                     </Th>
                     <Th w={40}>No</Th>
                     <Th w={250}>Kegiatan</Th>
@@ -361,10 +376,10 @@ export default function ChecklistNormalisasi() {
                   </tr>
                 </thead>
                 <tbody>
-                  {data.length === 0 && (
-                    <tr><td colSpan={17} style={{ padding: 24, textAlign: 'center', color: '#64748b' }}>Belum ada data checklist untuk tahun {tahun}</td></tr>
+                  {filteredData.length === 0 && (
+                    <tr><td colSpan={17} style={{ padding: 24, textAlign: 'center', color: '#64748b' }}>Belum ada data checklist untuk pencarian ini</td></tr>
                   )}
-                  {data.map((row, i) => (
+                  {filteredData.map((row, i) => (
                     <tr key={row.id} style={{ transition: 'background 0.2s', background: batchDeleteIds.includes(row.id) ? '#fee2e2' : undefined }}>
                       <td style={{ padding:'8px', border:'1px solid #c2c6d3', textAlign: 'center' }}>
                         <input type="checkbox" checked={batchDeleteIds.includes(row.id)} onChange={() => toggleBatchDelete(row.id)} />

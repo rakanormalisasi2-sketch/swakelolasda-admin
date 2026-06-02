@@ -30,7 +30,14 @@ export default function TabRekapitulasi({ tahun, role }) {
   const filtered = data.filter(d => {
     if (filter === 'sudah' && !d.sudah_survey) return false;
     if (filter === 'belum' && d.sudah_survey) return false;
-    if (search && !d.nama_usulan?.toLowerCase().includes(search.toLowerCase())) return false;
+    if (search) {
+      const term = search.toLowerCase();
+      const match = 
+        (d.nama_usulan || '').toLowerCase().includes(term) ||
+        (d.desa || '').toLowerCase().includes(term) ||
+        (d.kecamatan || '').toLowerCase().includes(term);
+      if (!match) return false;
+    }
     return true;
   });
 

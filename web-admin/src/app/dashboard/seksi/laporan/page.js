@@ -58,6 +58,7 @@ function driveUrlToView(url) {
 export default function LaporanPelaksanaanPage() {
   const { profile } = useAuth();
   const [logs, setLogs] = useState([]);
+  const [searchTerm, setSearchTerm] = useState('');
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [operators, setOperators] = useState([]);
@@ -223,7 +224,7 @@ export default function LaporanPelaksanaanPage() {
     } finally {
       setLoading(false);
     }
-  }, [profile, filterTab, tahunLaporan]);
+  }, [profile, tahunLaporan]);
 
   useEffect(() => { loadData(); }, [loadData]);
 
@@ -331,26 +332,38 @@ export default function LaporanPelaksanaanPage() {
   };
 
   // ============ MAIN TABLE GROUPING ============
-  const mainTableGroups = {};
-  logs.filter(log => {
-      if (filterTab === 'semua') return true;
-      const st = (log.assignment?.status || '').toLowerCase();
-      if (filterTab === 'active') return st === 'active';
-      if (filterTab === 'finished') return st === 'finished' || st === 'selesai';
-      return true;
-  }).forEach(log => {
-      const op = log.override_operator || log.operator?.full_name || '-';
-      const eq = log.equipment;
-      const alatLabel = log.override_alat || (
-        eq ? [eq.nomor_lambung, eq.merk_type ? `(${eq.merk_type})` : null, eq.name].filter(Boolean).join(' ') : null
-      ) || log.jenis_alat || '-';
-      const k = log.override_kecamatan || log.assignment?.location_district || '-';
-      const d = log.override_desa || log.assignment?.location_village || '-';
-      const gId = `${op} | ${alatLabel} | Kec. ${k} - Desa ${d}`;
-      
-      if(!mainTableGroups[gId]) mainTableGroups[gId] = [];
-      mainTableGroups[gId].push(log);
-  });
+  const mainTableGroups = useMemo(() => {
+    const groups = {};
+    logs.filter(log => {
+        if (filterTab === 'semua') return true;
+        const st = (log.assignment?.status || '').toLowerCase();
+        if (filterTab === 'active') return st === 'active';
+        if (filterTab === 'finished') return st === 'finished' || st === 'selesai';
+        return true;
+    }).filter(log => {
+        const term = searchTerm.toLowerCase();
+        if (!term) return true;
+        const op = (log.override_operator || log.operator?.full_name || '').toLowerCase();
+        const alat = (log.override_alat || log.equipment?.name || '').toLowerCase();
+        const desa = (log.override_desa || log.assignment?.location_village || '').toLowerCase();
+        const kec = (log.override_kecamatan || log.assignment?.location_district || '').toLowerCase();
+        const pek = (log.custom_pekerjaan || '').toLowerCase();
+        return op.includes(term) || alat.includes(term) || desa.includes(term) || kec.includes(term) || pek.includes(term);
+    }).forEach(log => {
+        const op = log.override_operator || log.operator?.full_name || '-';
+        const eq = log.equipment;
+        const alatLabel = log.override_alat || (
+          eq ? [eq.nomor_lambung, eq.merk_type ? `(${eq.merk_type})` : null, eq.name].filter(Boolean).join(' ') : null
+        ) || log.jenis_alat || '-';
+        const k = log.override_kecamatan || log.assignment?.location_district || '-';
+        const d = log.override_desa || log.assignment?.location_village || '-';
+        const gId = `${op} | ${alatLabel} | Kec. ${k} - Desa ${d}`;
+        
+        if(!groups[gId]) groups[gId] = [];
+        groups[gId].push(log);
+    });
+    return groups;
+  }, [logs, filterTab, searchTerm]);
 
   const handleCustomPekerjaanApply = async (gId, customVal) => {
     if(!confirm(`Terapkan label pekerjaan khusus "${customVal || '(Default)'}" ke seluruh baris pada kelompok ini (${mainTableGroups[gId].length} baris)?`)) return;
@@ -1152,6 +1165,14 @@ export default function LaporanPelaksanaanPage() {
                  {t === 'semua' ? 'Semua Pekerjaan' : t === 'active' ? '🟢 Sedang Aktif' : '✅ Sudah Selesai'}
               </button>
            ))}
+           <input 
+             type="text" 
+             placeholder="Cari desa, alat, atau operator..." 
+             className="form-control" 
+             style={{width: 250, marginLeft: 'auto'}}
+             value={searchTerm}
+             onChange={e => setSearchTerm(e.target.value)} 
+           />
         </div>
 
         <div className="card" style={{padding:0, overflow:'hidden', borderRadius: 8, boxShadow: '0 4px 12px rgba(0,0,0,0.1)'}}>
