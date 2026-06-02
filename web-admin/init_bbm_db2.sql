@@ -12,7 +12,8 @@ CREATE TABLE IF NOT EXISTS bbm_pengadaan (
 
 CREATE TABLE IF NOT EXISTS bbm_pemakaian (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  assignment_id UUID NOT NULL,
+  assignment_id UUID,
+  operator_log_id UUID,
   seksi TEXT NOT NULL,
   kegiatan TEXT,
   tipe_alat TEXT,

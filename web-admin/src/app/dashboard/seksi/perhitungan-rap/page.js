@@ -339,7 +339,7 @@ export default function RapWizard() {
             const resultBbm = await resBbm.json();
             (resultBbm.data || []).forEach(b => {
               const tglStr = (b.tanggal_kirim || '').split('T')[0];
-              const key = `${b.assignment_id}|${tglStr}`;
+              const key = b.operator_log_id ? `log_${b.operator_log_id}` : `${b.assignment_id}|${tglStr}`;
               if (!bbmMap[key]) bbmMap[key] = 0;
               bbmMap[key] += Number(b.jumlah_liter) || 0;
             });
@@ -364,9 +364,9 @@ export default function RapWizard() {
             const jobType = SUB_TYPE_MAP[d.assignment?.job_sub_type] || 'NORMALISASI SUNGAI';
             const judulPekerjaan = d.custom_pekerjaan || `${jobType} DESA ${desa} KECAMATAN ${kec}`;
 
-            // Match BBM receipt by assignment_id + tanggal
+            // Match BBM receipt by assignment_id + tanggal or log_id
             const tglStr = (d.tanggal || '').split('T')[0];
-            const bbmKey = `${d.assignment_id}|${tglStr}`;
+            const bbmKey = d.is_manual ? `log_${d.id}` : `${d.assignment_id}|${tglStr}`;
             const bbmReceived = bbmMap[bbmKey] || 0;
 
             return {

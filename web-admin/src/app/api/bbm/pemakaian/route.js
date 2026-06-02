@@ -37,15 +37,16 @@ export async function GET(request) {
 export async function POST(request) {
   try {
     const body = await request.json();
-    const { seksi, assignment_id, kegiatan, tipe_alat, desa, kecamatan, tanggal_kirim, jumlah_liter, keterangan } = body;
+    const { seksi, assignment_id, operator_log_id, kegiatan, tipe_alat, desa, kecamatan, tanggal_kirim, jumlah_liter, keterangan } = body;
 
-    if (!seksi || !assignment_id || !tanggal_kirim || jumlah_liter === undefined) {
-      return NextResponse.json({ error: 'Field wajib: seksi, assignment_id, tanggal_kirim, jumlah_liter' }, { status: 400 });
+    if (!seksi || (!assignment_id && !operator_log_id) || !tanggal_kirim || jumlah_liter === undefined) {
+      return NextResponse.json({ error: 'Field wajib: seksi, assignment_id ATAU operator_log_id, tanggal_kirim, jumlah_liter' }, { status: 400 });
     }
 
     const { error } = await supabaseBBM.from('bbm_pemakaian').insert({
       seksi,
-      assignment_id,
+      assignment_id: assignment_id || null,
+      operator_log_id: operator_log_id || null,
       kegiatan,
       tipe_alat,
       desa,

@@ -209,7 +209,7 @@ export default function LaporanPelaksanaanPage() {
           const map = {};
           (resultBbm.data || []).forEach(b => {
             const tglStr = b.tanggal_kirim.split('T')[0];
-            const key = `${b.assignment_id}|${tglStr}`;
+            const key = b.operator_log_id ? `log_${b.operator_log_id}` : `${b.assignment_id}|${tglStr}`;
             if (!map[key]) map[key] = [];
             map[key].push(b);
           });
@@ -750,7 +750,7 @@ export default function LaporanPelaksanaanPage() {
               <div>2. GREASE</div>
             </td>
             <td style="text-align:right">
-              <div style="margin-bottom:4px;"><b>${bbmMap[`${log.assignment_id}|${log.tanggal.split('T')[0]}`] ? bbmMap[`${log.assignment_id}|${log.tanggal.split('T')[0]}`].reduce((sum, b) => sum + Number(b.jumlah_liter), 0) : '......'}</b> Liter</div>
+              <div style="margin-bottom:4px;"><b>${(bbmMap[`log_${log.id}`] || bbmMap[`${log.assignment_id}|${log.tanggal.split('T')[0]}`]) ? (bbmMap[`log_${log.id}`] || bbmMap[`${log.assignment_id}|${log.tanggal.split('T')[0]}`]).reduce((sum, b) => sum + Number(b.jumlah_liter), 0) : '......'}</b> Liter</div>
               <div>...... Kg</div>
             </td>
           </tr>

@@ -10,6 +10,7 @@ export default function BBMPage() {
   const [bbmPemakaian, setBbmPemakaian] = useState([]);
   const [bbmPengadaan, setBbmPengadaan] = useState([]);
   const [assignments, setAssignments] = useState([]); // for dropdown
+  const [manualLogs, setManualLogs] = useState([]); // for manual rows dropdown
   const [saving, setSaving] = useState(false);
   const [batchDeletePemakaian, setBatchDeletePemakaian] = useState([]);
   const [batchDeletePengadaan, setBatchDeletePengadaan] = useState([]);
@@ -43,10 +44,19 @@ export default function BBMPage() {
         .from('assignments')
         .select('*, equipment:heavy_equipment(name, merk_type, nomor_lambung)')
         .eq('created_by_role', profile.role)
-        .eq('status', 'active')
         .order('start_date', { ascending: false });
       
       setAssignments(assignmentsData || []);
+
+      const { data: manualLogsData } = await supabase
+        .from('operator_logs')
+        .select('*, operator:user_profiles!operator_logs_operator_id_fkey(full_name), equipment:heavy_equipment(name, merk_type, nomor_lambung)')
+        .eq('is_manual', true)
+        .eq('created_by_role', profile.role)
+        .is('assignment_id', null)
+        .order('tanggal', { ascending: false });
+        
+      setManualLogs(manualLogsData || []);
 
       // 2. Fetch BBM Data from DB2 (via API routes that Claude Code will build)
       // Since Claude Code might not have built them yet, we wrap in try-catch
@@ -95,6 +105,26 @@ export default function BBMPage() {
       return;
     }
 
+    if (aId.startsWith('manual_')) {
+      const logId = aId.replace('manual_', '');
+      const log = manualLogs.find(l => l.id === logId);
+      if (!log) return;
+
+      const kegiatanStr = log.custom_pekerjaan || log.keterangan_tambahan || 'PEKERJAAN MANUAL';
+      const alatStr = log.override_alat || log.jenis_alat || (log.equipment ? 
+        `${log.equipment.nomor_lambung || ''} (${log.equipment.merk_type || ''}) ${log.equipment.name || ''}`.trim() : '');
+
+      setFormPemakaian({
+        ...formPemakaian,
+        assignment_id: aId,
+        kegiatan: kegiatanStr.toUpperCase(),
+        tipe_alat: alatStr,
+        desa: log.override_desa || '',
+        kecamatan: log.override_kecamatan || ''
+      });
+      return;
+    }
+
     const asgn = assignments.find(a => a.id === aId);
     if(!asgn) {
       setFormPemakaian({...formPemakaian, assignment_id: aId});
@@ -126,14 +156,19 @@ export default function BBMPage() {
     e.preventDefault();
     setSaving(true);
     try {
+      const isManual = formPemakaian.assignment_id.startsWith('manual_');
+      const payload = {
+        seksi: profile.role,
+        ...formPemakaian,
+        assignment_id: isManual ? null : formPemakaian.assignment_id,
+        operator_log_id: isManual ? formPemakaian.assignment_id.replace('manual_', '') : null,
+        jumlah_liter: parseFloat(formPemakaian.jumlah_liter)
+      };
+
       const res = await fetch('/api/bbm/pemakaian', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          seksi: profile.role,
-          ...formPemakaian,
-          jumlah_liter: parseFloat(formPemakaian.jumlah_liter)
-        })
+        body: JSON.stringify(payload)
       });
       if(res.ok) {
         setShowModal(false);
@@ -463,6 +498,15 @@ export default function BBMPage() {
                          <select className="form-control" required value={formPemakaian.assignment_id} onChange={(e) => handleAssignmentChange(e.target.value)}>
                            <option value="">— Pilih Penugasan (Atau Pilih Manual) —</option>
                            <option value="00000000-0000-0000-0000-000000000000" style={{fontWeight:'bold', color:'#2563eb'}}>✏️ INPUT MANUAL (TANPA PENUGASAN)</option>
+                           {manualLogs.length > 0 && (
+                             <optgroup label="Baris Laporan Manual (Tanpa Penugasan)">
+                               {manualLogs.map(l => (
+                                 <option key={l.id} value={`manual_${l.id}`}>
+                                   📝 {new Date(l.tanggal).toLocaleDateString('id-ID')} — {l.override_desa || 'Desa'} — {l.override_alat || l.equipment?.name || 'Alat'}
+                                 </option>
+                               ))}
+                             </optgroup>
+                           )}
                            <optgroup label="Daftar Penugasan Aktif & Selesai">
                            {assignments.map(a => (
                              <option key={a.id} value={a.id}>{a.location_village} — {a.equipment?.name || 'Alat'} ({new Date(a.start_date).toLocaleDateString('id-ID')})</option>

@@ -36,6 +36,10 @@ async function runMigration() {
         created_at TIMESTAMPTZ DEFAULT NOW()
       );
 
+      ALTER TABLE bbm_pemakaian 
+      ADD COLUMN IF NOT EXISTS operator_log_id UUID,
+      ALTER COLUMN assignment_id DROP NOT NULL;
+
       ALTER TABLE bbm_pengadaan ENABLE ROW LEVEL SECURITY;
       ALTER TABLE bbm_pemakaian ENABLE ROW LEVEL SECURITY;
       
