@@ -61,6 +61,18 @@ export default function ProposalLayout() {
           href: null,
         }}
       />
+      <Tabs.Screen
+        name="form-rekap"
+        options={{
+          href: null,
+        }}
+      />
+      <Tabs.Screen
+        name="logoBase64"
+        options={{
+          href: null,
+        }}
+      />
     </Tabs>
   );
 }

@@ -52,7 +52,7 @@ export default function SurveySearchScreen() {
         formData.append('kecamatan', item.kecamatan);
         formData.append('desa', item.desa);
         formData.append('nama_usulan', item.nama_usulan);
-        formData.append('equipment_id', item.equipment_id);
+        formData.append('equipment_category', item.equipment_category || item.equipment_id);
         formData.append('dynamic_scores', JSON.stringify(item.dynamic_scores || item.scores));
         
         formData.append('pdf_file', {

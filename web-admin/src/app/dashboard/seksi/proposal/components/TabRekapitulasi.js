@@ -91,6 +91,21 @@ export default function TabRekapitulasi({ tahun, role }) {
     }
   };
 
+  const restoreToPriority = async (id) => {
+    if (!confirm('Kembalikan proposal ini ke Rencana Prioritas?')) return;
+    setData(prev => prev.map(d => d.id === id ? { ...d, is_rejected_priority: false } : d));
+    try {
+      await fetch('/api/proposal', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id, is_rejected_priority: false }),
+      });
+    } catch (e) {
+      console.error('Restore failed:', e);
+      alert('Gagal memulihkan ke prioritas');
+    }
+  };
+
   const deleteRow = async (id) => {
     if (!confirm('Hapus proposal ini?')) return;
     try {
@@ -331,9 +346,16 @@ export default function TabRekapitulasi({ tahun, role }) {
                     </button>
                   </td>
                   <td style={{ ...tdStyle, textAlign: 'center', padding: 4 }}>
-                    <button onClick={() => deleteRow(row.id)} style={{ background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer', padding: 4 }} title="Hapus">
-                      <svg fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24" style={{ width: 15, height: 15 }}><path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
-                    </button>
+                    <div style={{ display: 'flex', gap: 4, justifyContent: 'center' }}>
+                      {row.is_rejected_priority && (
+                        <button onClick={() => restoreToPriority(row.id)} style={{ background: 'none', border: 'none', color: '#16a34a', cursor: 'pointer', padding: 4 }} title="Pulihkan ke Rencana Prioritas">
+                          <svg fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24" style={{ width: 15, height: 15 }}><path strokeLinecap="round" strokeLinejoin="round" d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6" /></svg>
+                        </button>
+                      )}
+                      <button onClick={() => deleteRow(row.id)} style={{ background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer', padding: 4 }} title="Hapus">
+                        <svg fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24" style={{ width: 15, height: 15 }}><path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                      </button>
+                    </div>
                   </td>
                 </tr>
               ))}

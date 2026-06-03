@@ -32,8 +32,10 @@ export default function AdminPasswordScreen() {
         } else if (['seksi_normalisasi', 'seksi_embung'].includes(session.role)) {
           router.replace('/proposal');
           return;
+        } else if (['survey_normalisasi', 'survey_embung'].includes(session.role)) {
+          router.replace('/proposal/survey');
+          return;
         }
-        // If role is survey_normalisasi or survey_embung, we do NOT auto login
       }
     } catch (e) {
       console.warn('Gagal cek sesi:', e);
@@ -84,10 +86,10 @@ export default function AdminPasswordScreen() {
         router.replace('/proposal');
       } else if (passInput === passSurveyNormalisasi) {
         await AsyncStorage.setItem('apk_session', JSON.stringify({ role: 'survey_normalisasi', loggedInAt: new Date().toISOString() }));
-        router.replace('/proposal');
+        router.replace('/proposal/survey');
       } else if (passInput === passSurveyEmbung) {
         await AsyncStorage.setItem('apk_session', JSON.stringify({ role: 'survey_embung', loggedInAt: new Date().toISOString() }));
-        router.replace('/proposal');
+        router.replace('/proposal/survey');
       } else {
         Alert.alert('Akses Ditolak', 'Password tidak dikenali. Silakan hubungi Superadmin.');
         setPassword('');

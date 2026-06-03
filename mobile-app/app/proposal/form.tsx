@@ -54,9 +54,17 @@ export default function SurveyFormScreen() {
   const [panjangUsulan, setPanjangUsulan] = useState('');
   const [keteranganLapangan, setKeteranganLapangan] = useState('');
 
-  // Equipments
-  const [equipments, setEquipments] = useState<any[]>([]);
+  // Equipments (Hardcoded categories as requested)
   const [selectedEq, setSelectedEq] = useState<string>('');
+  const equipmentCategories = [
+    "Excavator 20 ton Longarm",
+    "Bulldozer",
+    "Excavator 20 ton",
+    "Excavator 13 Ton",
+    "Excavator 7,5 Ton",
+    "Excavator 5 Ton",
+    "Speeder"
+  ];
 
   const [scores, setScores] = useState({
     kerawanan_bencana: '', skor_kerawanan: null as any,
@@ -67,7 +75,6 @@ export default function SurveyFormScreen() {
   });
 
   useEffect(() => {
-    fetchEquipments();
     loadSavedSignature();
   }, []);
 
@@ -80,16 +87,7 @@ export default function SurveyFormScreen() {
     } catch(e) {}
   };
 
-  const fetchEquipments = async () => {
-    try {
-      const apiUrl = process.env.EXPO_PUBLIC_API_URL || 'http://192.168.0.144:3000/api';
-      const res = await fetch(`${apiUrl}/heavy-equipment`);
-      const data = await res.json();
-      if (Array.isArray(data)) setEquipments(data);
-    } catch (e) {
-      console.log('Failed to fetch equipments', e);
-    }
-  };
+
 
   const scanDocument = async () => {
     try {
@@ -102,7 +100,7 @@ export default function SurveyFormScreen() {
       const result = await ImagePicker.launchCameraAsync({
         mediaTypes: ['images'],
         allowsEditing: true,
-        quality: 0.4,
+        quality: 0.2,
       });
 
       if (!result.canceled && result.assets && result.assets.length > 0) {
@@ -124,7 +122,7 @@ export default function SurveyFormScreen() {
       const result = await ImagePicker.launchImageLibraryAsync({
         mediaTypes: ['images'],
         allowsEditing: true,
-        quality: 0.4,
+        quality: 0.2,
       });
 
       if (!result.canceled && result.assets && result.assets.length > 0) {
@@ -290,8 +288,8 @@ export default function SurveyFormScreen() {
         <div style="width:150px;">Kebutuhan Alat Berat</div><div style="width:10px;">:</div>
         <div style="flex:1;">
           <table class="table-grid">
-            ${equipments.map(eq => `
-              <tr><td>${eq.merk_type} (${eq.nomor_lambung})</td><td class="check-col">${selectedEq === eq.id ? 'V' : ''}</td></tr>
+            ${equipmentCategories.map(cat => `
+              <tr><td>${cat}</td><td class="check-col">${selectedEq === cat ? 'V' : ''}</td></tr>
             `).join('')}
           </table>
         </div>
@@ -371,7 +369,7 @@ export default function SurveyFormScreen() {
       formData.append('kecamatan', kecamatanForm);
       formData.append('desa', desaForm);
       formData.append('nama_usulan', namaUsulanForm);
-      formData.append('equipment_id', selectedEq);
+      formData.append('equipment_category', selectedEq);
 
       // Score for the system (keeps percentage logic for database/schedule prioritization)
       formData.append('dynamic_scores', JSON.stringify(Object.keys(scores).filter(k => k.startsWith('skor_')).map(k => ({
@@ -387,11 +385,17 @@ export default function SurveyFormScreen() {
       } as any);
 
       try {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 20000); // 20s timeout
+        
         const res = await fetch(`${apiUrl}/proposal/survey-submit`, {
           method: 'POST',
           body: formData,
-          headers: { 'Accept': 'application/json' }
+          headers: { 'Accept': 'application/json' },
+          signal: controller.signal as any
         });
+        
+        clearTimeout(timeoutId);
 
         if (!res.ok) {
           const err = await res.text();
@@ -408,7 +412,7 @@ export default function SurveyFormScreen() {
           ]
         );
       } catch (apiError: any) {
-        if (apiError.message?.includes('Network request failed') || apiError.message?.includes('Failed to fetch')) {
+        if (apiError.name === 'AbortError' || apiError.message?.includes('Network request failed') || apiError.message?.includes('Failed to fetch')) {
           // OFFLINE QUEUE LOGIC
           // Karena FormData tidak bisa disimpan ke AsyncStorage dengan mudah,
           // Kita simpan file PDF asli ke documentDirectory agar aman, lalu simpan payload JSON
@@ -422,7 +426,7 @@ export default function SurveyFormScreen() {
             kecamatan: kecamatanForm,
             desa: desaForm,
             nama_usulan: namaUsulanForm,
-            equipment_id: selectedEq,
+            equipment_category: selectedEq,
             dynamic_scores: Object.keys(scores).filter(k => k.startsWith('skor_')).map(k => ({
               criteria_id: k.replace('skor_', ''),
               pilihan_label: (scores as any)[k.replace('skor_', '')] || '',
@@ -555,10 +559,10 @@ export default function SurveyFormScreen() {
 
         <Text style={styles.sectionTitle}>Kebutuhan Alat Berat (Otomatis Jadwal)</Text>
         <View style={styles.btnRow}>
-          {equipments.map(eq => (
-            <TouchableOpacity key={eq.id} style={[styles.optBtn, selectedEq === eq.id && styles.optBtnActive]} 
-              onPress={() => setSelectedEq(eq.id)}>
-              <Text style={[styles.optText, selectedEq === eq.id && styles.optTextActive]}>{eq.merk_type} ({eq.nomor_lambung})</Text>
+          {equipmentCategories.map(cat => (
+            <TouchableOpacity key={cat} style={[styles.optBtn, selectedEq === cat && styles.optBtnActive]} 
+              onPress={() => setSelectedEq(cat)}>
+              <Text style={[styles.optText, selectedEq === cat && styles.optTextActive]}>{cat}</Text>
             </TouchableOpacity>
           ))}
         </View>

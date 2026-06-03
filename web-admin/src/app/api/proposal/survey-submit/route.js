@@ -25,8 +25,16 @@ export async function POST(request) {
     const kewenangan = formData.get('kewenangan') || '';
     
     const pdfFile = formData.get('pdf_file'); // File object
-    const equipment_id = formData.get('equipment_id'); // From APK
+    const equipment_id = formData.get('equipment_id'); // From APK (legacy)
+    const equipment_category = formData.get('equipment_category'); // From new APK
     
+    // Append equipment_category to keterangan_lapangan if provided
+    let finalKeterangan = keterangan_lapangan;
+    if (equipment_category) {
+      finalKeterangan = finalKeterangan 
+        ? `${finalKeterangan}\n\nKebutuhan Alat: ${equipment_category}`
+        : `Kebutuhan Alat: ${equipment_category}`;
+    }
     if (!dynamicScoresStr) {
       return NextResponse.json({ error: 'Missing scores data' }, { status: 400 });
     }
@@ -48,7 +56,7 @@ export async function POST(request) {
           sudah_survey: true,
           tanggal_survey: new Date().toISOString().split('T')[0],
           tanggal_usulan: new Date().toISOString().split('T')[0],
-          keterangan: keterangan_lapangan
+          keterangan: finalKeterangan
         })
         .select('id, nomor_urut')
         .single();
@@ -91,7 +99,7 @@ export async function POST(request) {
         tanggal_survey: new Date().toISOString().split('T')[0],
       };
       if (pdfLinks?.webViewLink) updatePayload.link_proposal = pdfLinks.webViewLink;
-      if (keterangan_lapangan) updatePayload.keterangan = keterangan_lapangan;
+      if (finalKeterangan) updatePayload.keterangan = finalKeterangan;
       await supabaseAdmin.from('proposals').update(updatePayload).eq('id', currentProposalId);
     }
 
