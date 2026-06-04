@@ -24,7 +24,7 @@ export default function RekapitulasiListScreen() {
   const fetchProposals = async (currentRole = role, currentTahun = tahun) => {
     setLoading(true);
     try {
-      const apiUrl = process.env.EXPO_PUBLIC_API_URL || 'http://192.168.0.144:3000/api';
+      const apiUrl = process.env.EXPO_PUBLIC_API_URL || 'https://swakelolasda.vercel.app/api';
       const res = await fetch(`${apiUrl}/proposal?tahun=${currentTahun}&role=${currentRole}`);
       if (res.ok) {
         const data = await res.json();

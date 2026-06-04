@@ -28,7 +28,7 @@ export default function ProposalLayout() {
 
   return (
     <Tabs
-      initialRouteName={isSurveyor ? 'survey' : 'index'}
+      initialRouteName={isSurveyor ? 'survey' : 'list'}
       screenOptions={{ 
         headerShown: false,
         tabBarActiveTintColor: '#16a34a',
@@ -36,6 +36,16 @@ export default function ProposalLayout() {
         tabBarStyle: { paddingBottom: 5, height: 60 }
       }}
     >
+      <Tabs.Screen
+        name="list"
+        options={{
+          title: 'Proposal',
+          href: isSurveyor ? null : '/proposal/list',
+          tabBarIcon: ({ color, size }) => (
+            <Ionicons name="list-outline" size={size} color={color} />
+          ),
+        }}
+      />
       <Tabs.Screen
         name="index"
         options={{

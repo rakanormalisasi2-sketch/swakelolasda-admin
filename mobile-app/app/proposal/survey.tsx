@@ -40,7 +40,7 @@ export default function SurveySearchScreen() {
     let successCount = 0;
     
     try {
-      const apiUrl = process.env.EXPO_PUBLIC_API_URL || 'http://192.168.0.144:3000/api';
+      const apiUrl = process.env.EXPO_PUBLIC_API_URL || 'https://swakelolasda.vercel.app/api';
       const remainingQueue = [...offlineQueue];
 
       for (let i = 0; i < offlineQueue.length; i++) {
@@ -53,6 +53,11 @@ export default function SurveySearchScreen() {
         formData.append('desa', item.desa);
         formData.append('nama_usulan', item.nama_usulan);
         formData.append('equipment_category', item.equipment_category || item.equipment_id);
+        formData.append('sungai', item.sungai || '');
+        formData.append('penyebab', item.penyebab || '');
+        formData.append('kewenangan', item.kewenangan || '');
+        formData.append('panjang_usulan', item.panjang_usulan || '');
+        formData.append('keterangan_lapangan', item.keterangan_lapangan || '');
         formData.append('dynamic_scores', JSON.stringify(item.dynamic_scores || item.scores));
         
         formData.append('pdf_file', {
@@ -99,7 +104,7 @@ export default function SurveySearchScreen() {
   const fetchProposals = async (currentRole = role) => {
     setLoading(true);
     try {
-      const apiUrl = process.env.EXPO_PUBLIC_API_URL || 'http://192.168.0.144:3000/api';
+      const apiUrl = process.env.EXPO_PUBLIC_API_URL || 'https://swakelolasda.vercel.app/api';
       const res = await fetch(`${apiUrl}/proposal/survey-search?role=${currentRole}`);
       if (res.ok) {
         const data = await res.json();

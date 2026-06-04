@@ -75,7 +75,7 @@ export default function FormRekapScreen() {
     
     setUploadingDoc(true);
     try {
-      const apiUrl = process.env.EXPO_PUBLIC_API_URL || 'http://192.168.0.144:3000/api';
+      const apiUrl = process.env.EXPO_PUBLIC_API_URL || 'https://swakelolasda.vercel.app/api';
       const formData = new FormData();
       formData.append('file', {
         uri,
@@ -156,7 +156,7 @@ export default function FormRekapScreen() {
 
     setLoading(true);
     try {
-      const apiUrl = process.env.EXPO_PUBLIC_API_URL || 'http://192.168.0.144:3000/api';
+      const apiUrl = process.env.EXPO_PUBLIC_API_URL || 'https://swakelolasda.vercel.app/api';
       
       const payload = {
         ...form,

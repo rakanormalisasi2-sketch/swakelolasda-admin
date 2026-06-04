@@ -30,7 +30,7 @@ export default function SurveyFormScreen() {
   const { id, nama, kecamatan, desa } = useLocalSearchParams();
   const [loading, setLoading] = useState(false);
   
-  const [photo, setPhoto] = useState<string | null>(null);
+  const [photos, setPhotos] = useState<string[]>([]);
   const [signatureSurveyor, setSignatureSurveyor] = useState<string | null>(null);
   const [namaSurveyor, setNamaSurveyor] = useState('');
   const [signatureNarasumber, setSignatureNarasumber] = useState<string | null>(null);
@@ -104,7 +104,7 @@ export default function SurveyFormScreen() {
       });
 
       if (!result.canceled && result.assets && result.assets.length > 0) {
-        setPhoto(result.assets[0].uri);
+        setPhotos(prev => [...prev, result.assets[0].uri]);
       }
     } catch (error) {
       Alert.alert('Scanner Error', 'Gagal membuka kamera');
@@ -121,16 +121,21 @@ export default function SurveyFormScreen() {
 
       const result = await ImagePicker.launchImageLibraryAsync({
         mediaTypes: ['images'],
-        allowsEditing: true,
+        allowsMultipleSelection: true,
         quality: 0.2,
       });
 
       if (!result.canceled && result.assets && result.assets.length > 0) {
-        setPhoto(result.assets[0].uri);
+        const newUris = result.assets.map(a => a.uri);
+        setPhotos(prev => [...prev, ...newUris]);
       }
     } catch (error) {
       Alert.alert('Gallery Error', 'Gagal membuka galeri');
     }
+  };
+
+  const removePhoto = (index: number) => {
+    setPhotos(prev => prev.filter((_, i) => i !== index));
   };
 
   const handleSignature = async (sig: string) => {
@@ -148,7 +153,7 @@ export default function SurveyFormScreen() {
   const submitSurvey = async () => {
     const isAnyEmpty = !kecamatanForm || !desaForm || !namaUsulanForm || !sungai || !penyebab || !kewenangan || !panjangUsulan || 
                        !scores.skor_kerawanan || !scores.skor_dampak || !scores.skor_bahaya || !scores.skor_bentuk || !scores.skor_jarak ||
-                       !selectedEq || !photo || !signatureSurveyor || !signatureNarasumber || !namaSurveyor || !namaNarasumber;
+                       !selectedEq || photos.length === 0 || !signatureSurveyor || !signatureNarasumber || !namaSurveyor || !namaNarasumber;
                        
     if (isAnyEmpty) {
       Alert.alert(
@@ -171,13 +176,17 @@ export default function SurveyFormScreen() {
       let role = sess ? JSON.parse(sess).role : 'seksi_normalisasi';
       if (role === 'survey_normalisasi') role = 'seksi_normalisasi';
       if (role === 'survey_embung') role = 'seksi_embung';
-      const apiUrl = process.env.EXPO_PUBLIC_API_URL || 'http://192.168.0.144:3000/api';
+      const apiUrl = process.env.EXPO_PUBLIC_API_URL || 'https://swakelolasda.vercel.app/api';
       
-      // 1. Convert Image to Base64
-      let photoBase64 = '';
-      if (photo) {
-        photoBase64 = await FileSystem.readAsStringAsync(photo, { encoding: 'base64' });
-        photoBase64 = `data:image/jpeg;base64,${photoBase64}`;
+      // 1. Convert all Images to Base64
+      const photosBase64: string[] = [];
+      for (const p of photos) {
+        try {
+          const b64 = await FileSystem.readAsStringAsync(p, { encoding: 'base64' });
+          photosBase64.push(`data:image/jpeg;base64,${b64}`);
+        } catch (e) {
+          console.warn('Skip foto gagal convert:', p);
+        }
       }
 
       // 2. Generate HTML
@@ -301,11 +310,17 @@ export default function SurveyFormScreen() {
 
       <div class="page-break"></div>
       
-      <!-- Page 2 -->
+      <!-- Page 2: Dokumentasi Foto -->
       <table style="width:100%; border-collapse: collapse; page-break-inside: avoid;">
         <tr><td style="border:1px solid black; text-align:center; font-weight:bold; padding:8px;">SKETSA / GAMBAR / DENAH</td></tr>
-        <tr><td style="border:1px solid black; height:450px; text-align:center; vertical-align:middle; padding: 10px;">
-          ${photoBase64 ? `<img src="${photoBase64}" style="max-width:100%; max-height:430px; object-fit: contain;" />` : ''}
+        <tr><td style="border:1px solid black; text-align:center; vertical-align:middle; padding: 10px;">
+          ${photosBase64.length > 0 ? (
+            photosBase64.length === 1 
+              ? `<img src="${photosBase64[0]}" style="max-width:100%; max-height:430px; object-fit: contain;" />`
+              : `<div style="display: flex; flex-wrap: wrap; gap: 8px; justify-content: center;">
+                  ${photosBase64.map((pb, i) => `<div style="text-align:center;"><img src="${pb}" style="max-width:${photosBase64.length === 2 ? '48%' : '31%'}; max-height:280px; object-fit: contain; border: 1px solid #ccc; padding: 4px;" /><br/><small>Foto ${i+1}</small></div>`).join('')}
+                </div>`
+          ) : ''}
         </td></tr>
         <tr><td style="border:1px solid black; padding:10px; height:120px; vertical-align:top;">
           <span style="text-decoration:underline; font-weight:bold;">KETERANGAN :</span><br/><br/>
@@ -370,6 +385,11 @@ export default function SurveyFormScreen() {
       formData.append('desa', desaForm);
       formData.append('nama_usulan', namaUsulanForm);
       formData.append('equipment_category', selectedEq);
+      formData.append('sungai', sungai);
+      formData.append('penyebab', penyebab);
+      formData.append('kewenangan', kewenangan);
+      formData.append('panjang_usulan', panjangUsulan);
+      formData.append('keterangan_lapangan', keteranganLapangan);
 
       // Score for the system (keeps percentage logic for database/schedule prioritization)
       formData.append('dynamic_scores', JSON.stringify(Object.keys(scores).filter(k => k.startsWith('skor_')).map(k => ({
@@ -427,6 +447,11 @@ export default function SurveyFormScreen() {
             desa: desaForm,
             nama_usulan: namaUsulanForm,
             equipment_category: selectedEq,
+            sungai,
+            penyebab,
+            kewenangan,
+            panjang_usulan: panjangUsulan,
+            keterangan_lapangan: keteranganLapangan,
             dynamic_scores: Object.keys(scores).filter(k => k.startsWith('skor_')).map(k => ({
               criteria_id: k.replace('skor_', ''),
               pilihan_label: (scores as any)[k.replace('skor_', '')] || '',
@@ -568,16 +593,32 @@ export default function SurveyFormScreen() {
         </View>
 
         <Text style={styles.sectionTitle}>Dokumentasi Lapangan</Text>
-        <Text style={styles.desc}>Foto lokasi akan ditaruh di kotak SKETSA/DENAH pada BA.</Text>
+        <Text style={styles.desc}>Foto lokasi akan ditaruh di kotak SKETSA/DENAH pada BA. Bisa menambahkan lebih dari 1 foto.</Text>
         <View style={styles.btnRow}>
           <TouchableOpacity style={[styles.actionBtn, { flex: 1 }]} onPress={scanDocument}>
             <Text style={styles.actionBtnText}>📷 Kamera</Text>
           </TouchableOpacity>
           <TouchableOpacity style={[styles.actionBtnAlt, { flex: 1, marginTop: 5 }]} onPress={pickFromGallery}>
-            <Text style={styles.actionBtnAltText}>🖼️ Galeri</Text>
+            <Text style={styles.actionBtnAltText}>🖼️ Galeri (Multi-Pilih)</Text>
           </TouchableOpacity>
         </View>
-        {photo && <Image source={{ uri: photo }} style={styles.previewImg} />}
+        {photos.length > 0 && (
+          <View style={{ marginTop: 10 }}>
+            <Text style={{ fontSize: 12, color: '#64748b', marginBottom: 8 }}>{photos.length} foto terpilih</Text>
+            {photos.map((p, idx) => (
+              <View key={idx} style={{ position: 'relative', marginBottom: 10 }}>
+                <Image source={{ uri: p }} style={styles.previewImg} />
+                <TouchableOpacity
+                  style={{ position: 'absolute', top: 5, right: 5, backgroundColor: 'rgba(239,68,68,0.9)', borderRadius: 14, width: 28, height: 28, alignItems: 'center', justifyContent: 'center' }}
+                  onPress={() => removePhoto(idx)}
+                >
+                  <Text style={{ color: '#fff', fontWeight: 'bold', fontSize: 14 }}>✕</Text>
+                </TouchableOpacity>
+                <Text style={{ textAlign: 'center', fontSize: 11, color: '#94a3b8', marginTop: 2 }}>Foto {idx + 1}</Text>
+              </View>
+            ))}
+          </View>
+        )}
 
         <Text style={styles.sectionTitle}>Keterangan Lapangan</Text>
         <TextInput style={[styles.input, {height: 80}]} multiline value={keteranganLapangan} onChangeText={setKeteranganLapangan} placeholder="Catatan tambahan surveyor..." />
