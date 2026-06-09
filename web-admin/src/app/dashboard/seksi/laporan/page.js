@@ -1355,9 +1355,12 @@ export default function LaporanPelaksanaanPage() {
 
                                {/* NORMAL EDITABLE FIELDS */}
                                <td style={{padding:'2px 6px', border:'1px solid rgba(0,0,0,0.1)'}}>
-                                  <input type="text" style={inputStyle} value={log.progress_pekerjaan || ''} 
+                                 <div style={{display:'flex', alignItems:'center'}}>
+                                  <input type="number" style={{...inputStyle, flex:1, textAlign:'right'}} value={log.progress_pekerjaan ? log.progress_pekerjaan.toString().replace('%','') : ''} 
                                          onChange={e => handleInlineEdit(log.id, 'progress_pekerjaan', e.target.value)} 
-                                         onBlur={e => handleBlurSave(log.id, 'progress_pekerjaan', e.target.value)} />
+                                         onBlur={e => handleBlurSave(log.id, 'progress_pekerjaan', e.target.value ? `${e.target.value}%` : '')} />
+                                  <span style={{fontSize:12, paddingRight:4, color:'#64748b'}}>%</span>
+                                 </div>
                                </td>
 
                                {/* HM Awal → HM Akhir → Jam Kerja */}
@@ -1375,19 +1378,6 @@ export default function LaporanPelaksanaanPage() {
                                   <input type="text" style={inputStyle} value={log.jam_kerja || ''} 
                                          onChange={e => handleInlineEdit(log.id, 'jam_kerja', e.target.value)} 
                                          onBlur={e => handleBlurSave(log.id, 'jam_kerja', e.target.value)} />
-                               </td>
-
-                               <td style={{padding:'4px 8px', border:'1px solid rgba(0,0,0,0.1)', minWidth: 200}}>
-                                 <textarea style={{...inputStyle, width:'100%', minHeight:34, resize:'vertical'}} value={log.keterangan_tambahan || ''} 
-                                        onChange={e => handleInlineEdit(log.id, 'keterangan_tambahan', e.target.value)} 
-                                        onBlur={e => handleBlurSave(log.id, 'keterangan_tambahan', e.target.value)} />
-                                 
-                                 {/* Tampilan BBM Otomatis */}
-                                 {bbmMap[`${log.assignment_id}|${log.tanggal?.split('T')[0]}`]?.map((bbm, i) => (
-                                   <div key={i} style={{ background: '#fef3c7', color: '#92400e', padding: '4px 8px', borderRadius: 4, fontSize: 11, fontWeight: 'bold', marginTop: 4, display:'inline-block'}}>
-                                     ⛽ BBM Diterima: {bbm.jumlah_liter} LTR
-                                   </div>
-                                 ))}
                                </td>
 
                                {/* Foto — link view untuk dibuka di tab baru */}
@@ -1415,11 +1405,17 @@ export default function LaporanPelaksanaanPage() {
                                          onBlur={e => handleBlurSave(log.id, 'panjang_pekerjaan', e.target.value)} />
                                </td>
 
-                               {/* Keterangan Tambahan — di akhir kolom sistem */}
-                               <td style={{padding:'2px 6px', border:'1px solid rgba(0,0,0,0.1)'}}>
-                                  <input type="text" style={inputStyle} value={log.keterangan_tambahan || ''} 
-                                         onChange={e => handleInlineEdit(log.id, 'keterangan_tambahan', e.target.value)} 
-                                         onBlur={e => handleBlurSave(log.id, 'keterangan_tambahan', e.target.value)} />
+                               <td style={{padding:'4px 8px', border:'1px solid rgba(0,0,0,0.1)', minWidth: 200}}>
+                                 <textarea style={{...inputStyle, width:'100%', minHeight:34, resize:'vertical'}} value={log.keterangan_tambahan || ''} 
+                                        onChange={e => handleInlineEdit(log.id, 'keterangan_tambahan', e.target.value)} 
+                                        onBlur={e => handleBlurSave(log.id, 'keterangan_tambahan', e.target.value)} />
+                                 
+                                 {/* Tampilan BBM Otomatis */}
+                                 {bbmMap[`${log.assignment_id}|${log.tanggal?.split('T')[0]}`]?.map((bbm, i) => (
+                                   <div key={i} style={{ background: '#fef3c7', color: '#92400e', padding: '4px 8px', borderRadius: 4, fontSize: 11, fontWeight: 'bold', marginTop: 4, display:'inline-block'}}>
+                                     ⛽ BBM Diterima: {bbm.jumlah_liter} LTR
+                                   </div>
+                                 ))}
                                </td>
 
                                {/* KOLOM CUSTOM DINAMIS */}

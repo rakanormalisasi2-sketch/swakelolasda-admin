@@ -2,6 +2,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import WILAYAH from '@/lib/wilayah';
 import * as XLSX from 'xlsx';
+import imageCompression from 'browser-image-compression';
 
 export default function TabRekapitulasi({ tahun, role }) {
   const [data, setData] = useState([]);
@@ -11,6 +12,8 @@ export default function TabRekapitulasi({ tahun, role }) {
   const [search, setSearch] = useState('');
   const [batchIds, setBatchIds] = useState([]);
   const fileInputRef = useRef(null);
+  const fileInputUploadRef = useRef(null);
+  const [uploadTarget, setUploadTarget] = useState(null);
 
   const fetchData = useCallback(async () => {
     setLoading(true);
@@ -137,6 +140,55 @@ export default function TabRekapitulasi({ tahun, role }) {
     else setBatchIds(filtered.map(d => d.id));
   };
 
+  const handleManualUpload = async (e) => {
+    const file = e.target.files[0];
+    if (!file || !uploadTarget) return;
+
+    setSaving(true);
+    try {
+      let finalFile = file;
+      if (file.type.startsWith('image/')) {
+        const options = { maxSizeMB: 1, maxWidthOrHeight: 1920, useWebWorker: true };
+        finalFile = await imageCompression(file, options);
+      }
+
+      const row = data.find(d => d.id === uploadTarget.id);
+
+      const formData = new FormData();
+      formData.append('file', finalFile);
+      formData.append('section_role', role);
+      formData.append('proposal_name', row.nama_usulan || 'Tanpa Nama');
+      
+      if (uploadTarget.field === 'link_ba_survey') {
+         formData.append('kecamatan', row.kecamatan || '');
+         formData.append('desa', row.desa || '');
+         formData.append('no_urut', row.nomor_urut || '');
+      }
+
+      const endpoint = uploadTarget.field === 'link_proposal' ? '/api/upload/proposal-doc' : '/api/upload/survey-doc-manual';
+      const res = await fetch(endpoint, { method: 'POST', body: formData });
+      const json = await res.json();
+
+      if (json.success && json.url) {
+        updateCell(uploadTarget.id, uploadTarget.field, json.url);
+      } else {
+        alert('Gagal upload: ' + json.error);
+      }
+    } catch (err) {
+      console.error(err);
+      alert('Error saat upload');
+    } finally {
+      setSaving(false);
+      setUploadTarget(null);
+      if (fileInputUploadRef.current) fileInputUploadRef.current.value = '';
+    }
+  };
+
+  const triggerUpload = (id, field) => {
+    setUploadTarget({ id, field });
+    if (fileInputUploadRef.current) fileInputUploadRef.current.click();
+  };
+
   const totalSurvey = data.filter(d => d.sudah_survey).length;
   const totalBelum = data.length - totalSurvey;
 
@@ -208,6 +260,12 @@ export default function TabRekapitulasi({ tahun, role }) {
             ref={fileInputRef}
             onChange={handleUploadExcel} 
           />
+          <input 
+            type="file" 
+            style={{ display: 'none' }} 
+            ref={fileInputUploadRef}
+            onChange={handleManualUpload} 
+          />
           <button onClick={() => fileInputRef.current.click()} disabled={saving} className="btn btn-outline" style={{ fontSize: 13 }}>
             <svg fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24" style={{ width: 14, height: 14 }}><path strokeLinecap="round" strokeLinejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" /></svg>
             Upload
@@ -267,8 +325,9 @@ export default function TabRekapitulasi({ tahun, role }) {
                 <th style={{ ...thStyle, width: 100 }}>Usulan</th>
                 <th style={{ ...thStyle, width: 70 }}>Tahun</th>
                 <th style={{ ...thStyle, width: 140 }}>Keterangan</th>
-                <th style={{ ...thStyle, width: 100 }}>Link</th>
+                <th style={{ ...thStyle, width: 120 }}>Link Proposal</th>
                 <th style={{ ...thStyle, width: 70, background: '#e8fdf0', color: '#0d6832' }}>Survey</th>
+                <th style={{ ...thStyle, width: 120 }}>Link BA Survey</th>
                 <th style={{ ...thStyle, width: 36 }}></th>
               </tr>
             </thead>
@@ -328,8 +387,11 @@ export default function TabRekapitulasi({ tahun, role }) {
                   <td style={tdStyle}>
                     <div style={{ display: 'flex', alignItems: 'center' }}>
                       <input value={row.link_proposal || ''} onChange={e => updateCell(row.id, 'link_proposal', e.target.value)} style={{ ...inputStyle, flex: 1 }} placeholder="URL..." />
+                      <button onClick={() => triggerUpload(row.id, 'link_proposal')} style={{ background: 'none', border: 'none', padding: '0 4px', cursor: 'pointer', color: '#64748b' }} title="Upload File">
+                        <svg fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24" style={{ width: 14, height: 14 }}><path strokeLinecap="round" strokeLinejoin="round" d="M3 15v4c0 1.1.9 2 2 2h14a2 2 0 002-2v-4M17 8l-5-5-5 5M12 3v12" /></svg>
+                      </button>
                       {row.link_proposal && (
-                        <a href={row.link_proposal} target="_blank" rel="noopener noreferrer" style={{ padding: '0 6px', color: '#3b82f6', textDecoration: 'none' }} title="Buka Link">
+                        <a href={row.link_proposal} target="_blank" rel="noopener noreferrer" style={{ padding: '0 4px', color: '#3b82f6', textDecoration: 'none' }} title="Buka Link">
                           <svg fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24" style={{ width: 14, height: 14 }}><path strokeLinecap="round" strokeLinejoin="round" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" /></svg>
                         </a>
                       )}
@@ -351,6 +413,19 @@ export default function TabRekapitulasi({ tahun, role }) {
                     >
                       {row.sudah_survey ? '✓' : ''}
                     </button>
+                  </td>
+                  <td style={tdStyle}>
+                    <div style={{ display: 'flex', alignItems: 'center' }}>
+                      <input value={row.link_ba_survey || ''} onChange={e => updateCell(row.id, 'link_ba_survey', e.target.value)} style={{ ...inputStyle, flex: 1 }} placeholder="URL BA..." />
+                      <button onClick={() => triggerUpload(row.id, 'link_ba_survey')} style={{ background: 'none', border: 'none', padding: '0 4px', cursor: 'pointer', color: '#64748b' }} title="Upload File">
+                        <svg fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24" style={{ width: 14, height: 14 }}><path strokeLinecap="round" strokeLinejoin="round" d="M3 15v4c0 1.1.9 2 2 2h14a2 2 0 002-2v-4M17 8l-5-5-5 5M12 3v12" /></svg>
+                      </button>
+                      {row.link_ba_survey && (
+                        <a href={row.link_ba_survey} target="_blank" rel="noopener noreferrer" style={{ padding: '0 4px', color: '#3b82f6', textDecoration: 'none' }} title="Buka Link">
+                          <svg fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24" style={{ width: 14, height: 14 }}><path strokeLinecap="round" strokeLinejoin="round" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" /></svg>
+                        </a>
+                      )}
+                    </div>
                   </td>
                   <td style={{ ...tdStyle, textAlign: 'center', padding: 4 }}>
                     <div style={{ display: 'flex', gap: 4, justifyContent: 'center' }}>

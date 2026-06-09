@@ -105,7 +105,7 @@ export async function POST(request) {
         sudah_survey: true,
         tanggal_survey: new Date().toISOString().split('T')[0],
       };
-      if (pdfLinks?.webViewLink) updatePayload.link_proposal = pdfLinks.webViewLink;
+      if (pdfLinks?.webViewLink) updatePayload.link_ba_survey = pdfLinks.webViewLink;
       if (finalKeterangan) updatePayload.keterangan = finalKeterangan;
       if (panjang_usulan) updatePayload.panjang_lokasi = panjang_usulan;
       if (nama_usulan) updatePayload.nama_usulan = nama_usulan;
