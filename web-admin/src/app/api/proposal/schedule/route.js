@@ -10,14 +10,14 @@ export async function GET(request) {
     const tahun = searchParams.get('tahun') || new Date().getFullYear();
     const role = searchParams.get('role');
 
-    // Join with heavy_equipment, proposals, assignments
+    // Join with heavy_equipment, proposals, assignments, and operator_logs
     let query = supabaseAdmin
       .from('work_schedules')
       .select(`
         *,
         equipment:heavy_equipment (id, name, merk_type, nomor_lambung),
         proposal:proposals (id, nama_usulan, nomor_urut, prioritas:proposal_scores(criteria_id, skor)),
-        assignment:assignments (id, status, operator_id)
+        assignment:assignments (id, status, operator_id, operator_logs(tanggal))
       `)
       .eq('tahun', tahun)
       .order('equipment_id', { ascending: true })
@@ -30,7 +30,28 @@ export async function GET(request) {
     const { data, error } = await query;
     if (error) throw error;
     
-    return NextResponse.json(data || []);
+    // Process data to set min/max dates from operator_logs dynamically
+    const processedData = data.map(item => {
+      if (item.assignment && item.assignment.operator_logs && item.assignment.operator_logs.length > 0) {
+        const dates = item.assignment.operator_logs
+          .map(log => new Date(log.tanggal))
+          .filter(d => !isNaN(d.getTime()));
+          
+        if (dates.length > 0) {
+          const minDate = new Date(Math.min(...dates));
+          const maxDate = new Date(Math.max(...dates));
+          item.tanggal_mulai_real = minDate.toISOString().split('T')[0];
+          item.tanggal_selesai_real = maxDate.toISOString().split('T')[0];
+        }
+      }
+      // Clean up operator_logs to avoid sending unnecessary large arrays to the client
+      if (item.assignment) {
+        delete item.assignment.operator_logs;
+      }
+      return item;
+    });
+
+    return NextResponse.json(processedData || []);
   } catch (error) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }

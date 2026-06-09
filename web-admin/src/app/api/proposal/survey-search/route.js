@@ -12,6 +12,7 @@ export async function GET(request) {
     let query = supabaseAdmin
       .from('proposals')
       .select('*')
+      .or('sudah_survey.eq.false,sudah_survey.is.null')
       .or('is_rejected_priority.eq.false,is_rejected_priority.is.null')
       .order('created_at', { ascending: false });
 

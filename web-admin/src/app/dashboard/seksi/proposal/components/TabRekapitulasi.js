@@ -326,7 +326,14 @@ export default function TabRekapitulasi({ tahun, role }) {
                     <input value={row.keterangan || ''} onChange={e => updateCell(row.id, 'keterangan', e.target.value)} style={inputStyle} />
                   </td>
                   <td style={tdStyle}>
-                    <input value={row.link_proposal || ''} onChange={e => updateCell(row.id, 'link_proposal', e.target.value)} style={inputStyle} placeholder="URL..." />
+                    <div style={{ display: 'flex', alignItems: 'center' }}>
+                      <input value={row.link_proposal || ''} onChange={e => updateCell(row.id, 'link_proposal', e.target.value)} style={{ ...inputStyle, flex: 1 }} placeholder="URL..." />
+                      {row.link_proposal && (
+                        <a href={row.link_proposal} target="_blank" rel="noopener noreferrer" style={{ padding: '0 6px', color: '#3b82f6', textDecoration: 'none' }} title="Buka Link">
+                          <svg fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24" style={{ width: 14, height: 14 }}><path strokeLinecap="round" strokeLinejoin="round" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" /></svg>
+                        </a>
+                      )}
+                    </div>
                   </td>
                   <td style={{ ...tdStyle, textAlign: 'center', padding: 6, background: row.sudah_survey ? '#dcfce7' : '#fffbeb' }}>
                     <button

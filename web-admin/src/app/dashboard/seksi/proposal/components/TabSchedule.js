@@ -284,23 +284,12 @@ export default function TabSchedule({ tahun, role }) {
         if (matchStart) realStartW = matchStart.weekNum;
       }
 
-      if (item.status === 'selesai' && item.tanggal_selesai_real) {
+      if (item.tanggal_selesai_real) {
         const dEnd = new Date(item.tanggal_selesai_real);
         const matchEnd = calendarWeeks.find(cw => dEnd >= cw.startDate && dEnd <= cw.endDate);
         if (matchEnd) realEndW = matchEnd.weekNum;
       } else if (item.status === 'sedang_berjalan') {
-        // extends up to current date
-        const dNow = new Date();
-        // If current year is different, cap it or extend it? 
-        // We'll just find the week for today
-        const matchNow = calendarWeeks.find(cw => dNow >= cw.startDate && dNow <= cw.endDate);
-        if (matchNow) {
-           realEndW = matchNow.weekNum;
-        } else if (dNow.getFullYear() > y) {
-           realEndW = 53; // cap at end of year
-        } else {
-           realEndW = 1;
-        }
+        realEndW = realStartW;
       }
     }
 

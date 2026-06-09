@@ -24,10 +24,12 @@ export async function POST(request) {
     const contentType = request.headers.get('content-type') || '';
 
     let photoBuffer, mimeType, filename, sectionRole, operatorName, village, district, equipment, date;
+    let formData = null;
+    let body = null;
 
     if (contentType.includes('multipart/form-data')) {
       // --- Mode: multipart/form-data (React Native FormData) ---
-      const formData = await request.formData();
+      formData = await request.formData();
       const file = formData.get('photo');
 
       if (!file || typeof file === 'string') {
@@ -47,7 +49,7 @@ export async function POST(request) {
 
     } else {
       // --- Mode: JSON dengan photo_base64 ---
-      const body = await request.json();
+      body = await request.json();
       if (!body.photo_base64) {
         return NextResponse.json({ success: false, error: 'Field "photo_base64" tidak ditemukan.' }, { status: 400 });
       }

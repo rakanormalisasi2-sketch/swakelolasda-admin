@@ -17,6 +17,7 @@ export async function POST(request) {
     const kecamatan = formData.get('kecamatan') || '';
     const desa = formData.get('desa') || '';
     const nama_usulan = formData.get('nama_usulan') || '';
+    const panjang_usulan = formData.get('panjang_usulan') || '';
     const keterangan_lapangan = formData.get('keterangan_lapangan') || '';
     
     // New fields for the BA template
@@ -49,9 +50,11 @@ export async function POST(request) {
       const { data: newProp, error: propErr } = await supabaseAdmin
         .from('proposals')
         .insert({
+          tahun: new Date().getFullYear(),
           nama_usulan: nama_usulan || `Survei Urgent - ${kecamatan} ${desa}`.trim(),
           desa,
           kecamatan,
+          panjang_lokasi: panjang_usulan,
           created_by_role: sectionRole,
           sudah_survey: true,
           tanggal_survey: new Date().toISOString().split('T')[0],
@@ -77,19 +80,23 @@ export async function POST(request) {
 
     // 1. Upload PDF directly to Google Drive (sent from APK)
     if (pdfFile && typeof pdfFile !== 'string') {
-      const pdfBuffer = Buffer.from(await pdfFile.arrayBuffer());
-      pdfLinks = await uploadSurveyDocToDrive({
-        sectionRole,
-        submenuName: 'Perencanaan Proposal',
-        kecamatan,
-        desa,
-        noUrut,
-        proposalName: nama_usulan || 'Urgent',
-        fileBuffer: pdfBuffer,
-        mimeType: pdfFile.type || 'application/pdf',
-        filename: `BA_Survei_${(nama_usulan || 'Urgent').replace(/\\s+/g, '_')}.pdf`,
-        isPhoto: false
-      });
+      try {
+        const pdfBuffer = Buffer.from(await pdfFile.arrayBuffer());
+        pdfLinks = await uploadSurveyDocToDrive({
+          sectionRole,
+          submenuName: 'Perencanaan Proposal',
+          kecamatan,
+          desa,
+          noUrut,
+          proposalName: nama_usulan || 'Urgent',
+          fileBuffer: pdfBuffer,
+          mimeType: pdfFile.type || 'application/pdf',
+          filename: `BA_Survei_${(nama_usulan || 'Urgent').replace(/\s+/g, '_')}.pdf`,
+          isPhoto: false
+        });
+      } catch (err) {
+        console.error('Google Drive Upload Failed in survey-submit:', err.message);
+      }
     }
 
     // 2. Update DB
@@ -100,23 +107,59 @@ export async function POST(request) {
       };
       if (pdfLinks?.webViewLink) updatePayload.link_proposal = pdfLinks.webViewLink;
       if (finalKeterangan) updatePayload.keterangan = finalKeterangan;
+      if (panjang_usulan) updatePayload.panjang_lokasi = panjang_usulan;
+      if (nama_usulan) updatePayload.nama_usulan = nama_usulan;
       await supabaseAdmin.from('proposals').update(updatePayload).eq('id', currentProposalId);
     }
 
     // 3. Insert dynamic scores into proposal_scores
+    // APK sends criteria_id as shorthand keys (e.g. 'kerawanan', 'dampak').
+    // We need to match them to actual UUID criteria IDs from priority_criteria table.
     if (Array.isArray(dynamicScores) && dynamicScores.length > 0) {
-      const scoreInserts = dynamicScores.map(score => ({
-        proposal_id: currentProposalId,
-        criteria_id: score.criteria_id,
-        pilihan_label: score.pilihan_label,
-        skor: score.skor
-      }));
+      // Fetch actual criteria from DB to map APK shorthand -> real UUID
+      let critQuery = supabaseAdmin
+        .from('priority_criteria')
+        .select('id, nama_kriteria, opsi')
+        .eq('is_active', true);
+      if (sectionRole) {
+        critQuery = critQuery.or(`role_scope.is.null,role_scope.eq.${sectionRole}`);
+      }
+      const { data: dbCriteria } = await critQuery;
 
-      const { error: scoresErr } = await supabaseAdmin
-        .from('proposal_scores')
-        .upsert(scoreInserts, { onConflict: 'proposal_id, criteria_id' });
+      const scoreInserts = [];
+      for (const score of dynamicScores) {
+        if (!score.skor && score.skor !== 0) continue;
+        
+        // Try to find matching criteria: first try direct UUID match,
+        // then try matching by APK shorthand key against criteria name
+        let matchedCriteria = dbCriteria?.find(c => c.id === score.criteria_id);
+        
+        if (!matchedCriteria && dbCriteria) {
+          // APK sends keys like 'kerawanan', 'dampak', etc.
+          // Match against criteria name containing that keyword
+          const apkKey = score.criteria_id?.toLowerCase();
+          matchedCriteria = dbCriteria.find(c => 
+            c.nama_kriteria?.toLowerCase().includes(apkKey)
+          );
+        }
 
-      if (scoresErr) throw scoresErr;
+        if (matchedCriteria) {
+          scoreInserts.push({
+            proposal_id: currentProposalId,
+            criteria_id: matchedCriteria.id,
+            pilihan_label: score.pilihan_label || '',
+            skor: score.skor
+          });
+        }
+      }
+
+      if (scoreInserts.length > 0) {
+        const { error: scoresErr } = await supabaseAdmin
+          .from('proposal_scores')
+          .upsert(scoreInserts, { onConflict: 'proposal_id, criteria_id' });
+
+        if (scoresErr) console.error('Score upsert error:', scoresErr);
+      }
     }
 
     // 4. Auto-Schedule if Equipment is selected
