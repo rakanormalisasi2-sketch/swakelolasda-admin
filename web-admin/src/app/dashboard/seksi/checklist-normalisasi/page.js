@@ -7,6 +7,22 @@ import 'jspdf-autotable';
 import ExcelJS from 'exceljs';
 import { saveAs } from 'file-saver';
 
+const Th = ({ children, w }) => <th style={{ padding:'12px 8px', border:'1px solid #c2c6d3', background:'#f8f9ff', color:'#00346f', fontSize:12, fontWeight:600, textAlign:'center', width: w }}>{children}</th>;
+const Td = ({ children, align='center' }) => <td style={{ padding:'8px', border:'1px solid #c2c6d3', textAlign: align, fontSize:12 }}>{children}</td>;
+
+const TdEdit = ({ val, type='text', onChange, align='center' }) => (
+  <td style={{ padding:0, border:'1px solid #c2c6d3' }}>
+    <input type={type} value={val||''} onChange={e => onChange(e.target.value)} 
+      style={{ width:'100%', height:'100%', padding:'8px', border:'none', background:'transparent', textAlign: align, outline:'none', fontSize:12 }} />
+  </td>
+);
+
+const TdCheck = ({ val, onChange }) => (
+  <Td>
+    <input type="checkbox" checked={!!val} onChange={e => onChange(e.target.checked)} style={{ cursor: 'pointer', width: 16, height: 16, accentColor: '#00346f' }} />
+  </Td>
+);
+
 export default function ChecklistNormalisasi() {
   const [tahun, setTahun] = useState(new Date().getFullYear());
   const [data, setData] = useState([]);
@@ -278,22 +294,6 @@ export default function ChecklistNormalisasi() {
     document.body.removeChild(a);
     setTimeout(() => URL.revokeObjectURL(xlUrl), 1000);
   }
-
-  const Th = ({ children, w }) => <th style={{ padding:'12px 8px', border:'1px solid #c2c6d3', background:'#f8f9ff', color:'#00346f', fontSize:12, fontWeight:600, textAlign:'center', width: w }}>{children}</th>;
-  const Td = ({ children, align='center' }) => <td style={{ padding:'8px', border:'1px solid #c2c6d3', textAlign: align, fontSize:12 }}>{children}</td>;
-  
-  const TdEdit = ({ val, type='text', onChange, align='center' }) => (
-    <td style={{ padding:0, border:'1px solid #c2c6d3' }}>
-      <input type={type} value={val||''} onChange={e => onChange(e.target.value)} 
-        style={{ width:'100%', height:'100%', padding:'8px', border:'none', background:'transparent', textAlign: align, outline:'none', fontSize:12 }} />
-    </td>
-  );
-
-  const TdCheck = ({ val, onChange }) => (
-    <Td>
-      <input type="checkbox" checked={!!val} onChange={e => onChange(e.target.checked)} style={{ cursor: 'pointer', width: 16, height: 16, accentColor: '#00346f' }} />
-    </Td>
-  );
 
   return (
     <>
