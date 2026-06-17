@@ -126,7 +126,7 @@ export default function LaporanPelaksanaanPage() {
 
       // Fetch Operators & Alat for dropdown overrides
       const [{ data: ops }, { data: alatData }] = await Promise.all([
-        supabase.from('user_profiles').select('*').eq('role', 'operator').order('full_name'),
+        supabase.from('user_profiles').select('*').in('role', ['operator', 'helper']).order('full_name'),
         supabase.from('heavy_equipment').select('*').order('name'),
       ]);
       setOperators(ops || []);
@@ -312,24 +312,51 @@ export default function LaporanPelaksanaanPage() {
     if (!files || files.length === 0) return;
     setSaving(true);
     let uploadedUrls = [];
+    const targetLog = logs.find(l => l.id === logId);
+    
+    if (!targetLog) {
+      setSaving(false);
+      return;
+    }
+
+    const sectionRole = targetLog.assignment?.created_by_role || (targetLog.assignment?.job_type === 'embung' ? 'seksi_embung' : 'seksi_normalisasi');
+    const operatorName = targetLog.override_operator || targetLog.operator?.full_name || targetLog.operator_name || 'Operator';
+    const village = targetLog.override_desa || targetLog.assignment?.location_village || 'Desa';
+    const district = targetLog.override_kecamatan || targetLog.assignment?.location_district || 'Kecamatan';
+    const equipment = targetLog.assignment?.equipment?.name || targetLog.jenis_alat || 'Alat Berat';
+    const date = targetLog.tanggal;
+
     for (let file of files) {
-      const fileName = `manual_${logId}_${Date.now()}_${file.name}`;
-      const { error } = await supabase.storage.from('laporan-photos').upload(fileName, file);
-      if (!error) {
-        const { data: publicData } = supabase.storage.from('laporan-photos').getPublicUrl(fileName);
-        uploadedUrls.push(publicData.publicUrl);
-      } else {
-        alert('Gagal upload foto: ' + error.message);
+      try {
+        const formData = new FormData();
+        formData.append('photo', file);
+        formData.append('section_role', sectionRole);
+        formData.append('operator_name', operatorName);
+        formData.append('village', village);
+        formData.append('district', district);
+        formData.append('equipment', equipment);
+        formData.append('date', date);
+
+        const res = await fetch('/api/upload/photo', {
+          method: 'POST',
+          body: formData
+        });
+        const json = await res.json();
+        if (json.success && json.url) {
+          uploadedUrls.push(json.url);
+        } else {
+          alert('Gagal upload foto: ' + (json.error || 'Unknown error'));
+        }
+      } catch (err) {
+        alert('Gagal upload foto: ' + err.message);
       }
     }
+
     if (uploadedUrls.length > 0) {
-      const targetLog = logs.find(l => l.id === logId);
-      if (targetLog) {
-         let fieldName = type === 'lapangan' ? 'foto_lapangan_urls' : 'foto_hourmeter_urls';
-         let currentUrls = targetLog[fieldName] ? targetLog[fieldName].split(',').map(s=>s.trim()).filter(Boolean) : [];
-         let newUrls = [...currentUrls, ...uploadedUrls].join(',');
-         await handleBlurSave(logId, fieldName, newUrls);
-      }
+       let fieldName = type === 'lapangan' ? 'foto_lapangan_urls' : 'foto_hourmeter_urls';
+       let currentUrls = targetLog[fieldName] ? targetLog[fieldName].split(',').map(s=>s.trim()).filter(Boolean) : [];
+       let newUrls = [...currentUrls, ...uploadedUrls].join(',');
+       await handleBlurSave(logId, fieldName, newUrls);
     }
     setSaving(false);
   };
@@ -1309,7 +1336,16 @@ export default function LaporanPelaksanaanPage() {
                                </td>
 
                                {/* HELPER (di samping Operator) */}
-                               <td style={{padding:'6px 12px', border:'1px solid rgba(0,0,0,0.1)'}}>{helper}</td>
+                               <td style={{padding:'2px 6px', border:'1px solid rgba(0,0,0,0.1)'}}>
+                                  {isSelesai ? (
+                                    <select style={openInputStyle} value={log.helper_name || helper || ''}
+                                         onChange={e => { handleInlineEdit(log.id, 'helper_name', e.target.value); handleBlurSave(log.id, 'helper_name', e.target.value); }}>
+                                      <option value="">— Kosong / Tidak Ada —</option>
+                                      {operators.map(o => <option key={o.id} value={o.full_name}>{o.full_name}</option>)}
+                                      {log.helper_name && !operators.find(o => o.full_name === log.helper_name) && <option value={log.helper_name}>{log.helper_name}</option>}
+                                    </select>
+                                  ) : ( log.helper_name || helper || '-' )}
+                               </td>
 
                                <td style={{padding:'2px 6px', border:'1px solid rgba(0,0,0,0.1)'}}>
                                   {isSelesai ? (

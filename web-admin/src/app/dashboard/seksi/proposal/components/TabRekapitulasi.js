@@ -67,7 +67,12 @@ export default function TabRekapitulasi({ tahun, role }) {
     }
   };
 
+  const handleLocalChange = (id, field, value) => {
+    setData(prev => prev.map(d => d.id === id ? { ...d, [field]: value } : d));
+  };
+
   const updateCell = async (id, field, value) => {
+    // setData already called by handleLocalChange during onChange, but we can ensure it's set
     setData(prev => prev.map(d => d.id === id ? { ...d, [field]: value } : d));
     try {
       await fetch('/api/proposal', {
@@ -345,48 +350,48 @@ export default function TabRekapitulasi({ tahun, role }) {
                     <input type="checkbox" checked={batchIds.includes(row.id)} onChange={() => toggleBatch(row.id)} style={{ cursor: 'pointer' }} />
                   </td>
                   <td style={tdStyle}>
-                    <input type="number" value={row.nomor_urut || ''} onChange={e => updateCell(row.id, 'nomor_urut', parseInt(e.target.value) || null)} style={{ ...inputStyle, textAlign: 'center', fontWeight: 'bold' }} />
+                    <input type="number" value={row.nomor_urut || ''} onChange={e => handleLocalChange(row.id, 'nomor_urut', parseInt(e.target.value) || null)} onBlur={e => updateCell(row.id, 'nomor_urut', parseInt(e.target.value) || null)} style={{ ...inputStyle, textAlign: 'center', fontWeight: 'bold' }} />
                   </td>
                   <td style={tdStyle}>
-                    <input value={row.nama_usulan || ''} onChange={e => updateCell(row.id, 'nama_usulan', e.target.value)} style={{ ...inputStyle, textAlign: 'left', fontWeight: 500 }} />
+                    <input value={row.nama_usulan || ''} onChange={e => handleLocalChange(row.id, 'nama_usulan', e.target.value)} onBlur={e => updateCell(row.id, 'nama_usulan', e.target.value)} style={{ ...inputStyle, textAlign: 'left', fontWeight: 500 }} />
                   </td>
                   <td style={tdStyle}>
-                    <input type="date" value={row.tanggal_usulan ? row.tanggal_usulan.split('T')[0] : ''} onChange={e => updateCell(row.id, 'tanggal_usulan', e.target.value)} style={{ ...inputStyle, textAlign: 'center' }} />
+                    <input type="date" value={row.tanggal_usulan ? row.tanggal_usulan.split('T')[0] : ''} onChange={e => handleLocalChange(row.id, 'tanggal_usulan', e.target.value)} onBlur={e => updateCell(row.id, 'tanggal_usulan', e.target.value)} style={{ ...inputStyle, textAlign: 'center' }} />
                   </td>
                   <td style={tdStyle}>
                     {row.kecamatan && WILAYAH[row.kecamatan] ? (
-                      <select value={row.desa || ''} onChange={e => updateCell(row.id, 'desa', e.target.value)} style={{ ...inputStyle, cursor: 'pointer' }}>
+                      <select value={row.desa || ''} onChange={e => { handleLocalChange(row.id, 'desa', e.target.value); updateCell(row.id, 'desa', e.target.value); }} style={{ ...inputStyle, cursor: 'pointer' }}>
                         <option value="">— Pilih Desa —</option>
                         {WILAYAH[row.kecamatan].map(d => <option key={d} value={d}>{d}</option>)}
                       </select>
                     ) : (
-                      <input value={row.desa || ''} onChange={e => updateCell(row.id, 'desa', e.target.value)} style={inputStyle} placeholder="Pilih Kec. dulu" />
+                      <input value={row.desa || ''} onChange={e => handleLocalChange(row.id, 'desa', e.target.value)} onBlur={e => updateCell(row.id, 'desa', e.target.value)} style={inputStyle} placeholder="Pilih Kec. dulu" />
                     )}
                   </td>
                   <td style={tdStyle}>
-                    <select value={row.kecamatan || ''} onChange={e => updateCell(row.id, 'kecamatan', e.target.value)} style={{ ...inputStyle, cursor: 'pointer' }}>
+                    <select value={row.kecamatan || ''} onChange={e => { handleLocalChange(row.id, 'kecamatan', e.target.value); updateCell(row.id, 'kecamatan', e.target.value); }} style={{ ...inputStyle, cursor: 'pointer' }}>
                       <option value="">— Pilih —</option>
                       {Object.keys(WILAYAH).map(k => <option key={k} value={k}>{k}</option>)}
                     </select>
                   </td>
                   <td style={tdStyle}>
-                    <input value={row.kabupaten || ''} onChange={e => updateCell(row.id, 'kabupaten', e.target.value)} style={inputStyle} />
+                    <input value={row.kabupaten || ''} onChange={e => handleLocalChange(row.id, 'kabupaten', e.target.value)} onBlur={e => updateCell(row.id, 'kabupaten', e.target.value)} style={inputStyle} />
                   </td>
                   <td style={tdStyle}>
-                    <input value={row.panjang_lokasi || ''} onChange={e => updateCell(row.id, 'panjang_lokasi', e.target.value)} style={{ ...inputStyle, textAlign: 'center' }} />
+                    <input value={row.panjang_lokasi || ''} onChange={e => handleLocalChange(row.id, 'panjang_lokasi', e.target.value)} onBlur={e => updateCell(row.id, 'panjang_lokasi', e.target.value)} style={{ ...inputStyle, textAlign: 'center' }} />
                   </td>
                   <td style={tdStyle}>
-                    <input value={row.usulan_desa || ''} onChange={e => updateCell(row.id, 'usulan_desa', e.target.value)} style={inputStyle} />
+                    <input value={row.usulan_desa || ''} onChange={e => handleLocalChange(row.id, 'usulan_desa', e.target.value)} onBlur={e => updateCell(row.id, 'usulan_desa', e.target.value)} style={inputStyle} />
                   </td>
                   <td style={tdStyle}>
-                    <input type="number" value={row.tahun_pelaksanaan || ''} onChange={e => updateCell(row.id, 'tahun_pelaksanaan', parseInt(e.target.value) || null)} style={{ ...inputStyle, textAlign: 'center' }} />
+                    <input type="number" value={row.tahun_pelaksanaan || ''} onChange={e => handleLocalChange(row.id, 'tahun_pelaksanaan', parseInt(e.target.value) || null)} onBlur={e => updateCell(row.id, 'tahun_pelaksanaan', parseInt(e.target.value) || null)} style={{ ...inputStyle, textAlign: 'center' }} />
                   </td>
                   <td style={tdStyle}>
-                    <input value={row.keterangan || ''} onChange={e => updateCell(row.id, 'keterangan', e.target.value)} style={inputStyle} />
+                    <input value={row.keterangan || ''} onChange={e => handleLocalChange(row.id, 'keterangan', e.target.value)} onBlur={e => updateCell(row.id, 'keterangan', e.target.value)} style={inputStyle} />
                   </td>
                   <td style={tdStyle}>
                     <div style={{ display: 'flex', alignItems: 'center' }}>
-                      <input value={row.link_proposal || ''} onChange={e => updateCell(row.id, 'link_proposal', e.target.value)} style={{ ...inputStyle, flex: 1 }} placeholder="URL..." />
+                      <input value={row.link_proposal || ''} onChange={e => handleLocalChange(row.id, 'link_proposal', e.target.value)} onBlur={e => updateCell(row.id, 'link_proposal', e.target.value)} style={{ ...inputStyle, flex: 1 }} placeholder="URL..." />
                       <button onClick={() => triggerUpload(row.id, 'link_proposal')} style={{ background: 'none', border: 'none', padding: '0 4px', cursor: 'pointer', color: '#64748b' }} title="Upload File">
                         <svg fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24" style={{ width: 14, height: 14 }}><path strokeLinecap="round" strokeLinejoin="round" d="M3 15v4c0 1.1.9 2 2 2h14a2 2 0 002-2v-4M17 8l-5-5-5 5M12 3v12" /></svg>
                       </button>
@@ -416,7 +421,7 @@ export default function TabRekapitulasi({ tahun, role }) {
                   </td>
                   <td style={tdStyle}>
                     <div style={{ display: 'flex', alignItems: 'center' }}>
-                      <input value={row.link_ba_survey || ''} onChange={e => updateCell(row.id, 'link_ba_survey', e.target.value)} style={{ ...inputStyle, flex: 1 }} placeholder="URL BA..." />
+                      <input value={row.link_ba_survey || ''} onChange={e => handleLocalChange(row.id, 'link_ba_survey', e.target.value)} onBlur={e => updateCell(row.id, 'link_ba_survey', e.target.value)} style={{ ...inputStyle, flex: 1 }} placeholder="URL BA..." />
                       <button onClick={() => triggerUpload(row.id, 'link_ba_survey')} style={{ background: 'none', border: 'none', padding: '0 4px', cursor: 'pointer', color: '#64748b' }} title="Upload File">
                         <svg fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24" style={{ width: 14, height: 14 }}><path strokeLinecap="round" strokeLinejoin="round" d="M3 15v4c0 1.1.9 2 2 2h14a2 2 0 002-2v-4M17 8l-5-5-5 5M12 3v12" /></svg>
                       </button>

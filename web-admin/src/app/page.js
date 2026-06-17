@@ -261,11 +261,11 @@ function RootPageContent() {
           .eq('status', 'active')
           .order('start_date', { ascending: false });
         
-        // Ambil semua operator dengan data lengkap
+        // Ambil semua operator dan helper dengan data lengkap
         const operatorsRes = await supabase
           .from('user_profiles')
           .select('id, full_name, role')
-          .eq('role', 'operator');
+          .in('role', ['operator', 'helper']);
         
         // Ambil semua equipment
         const equipmentRes = await supabase.from('heavy_equipment').select('*').order('name');
@@ -286,16 +286,26 @@ function RootPageContent() {
         const operatingOperators = [];
         const readyOperators = [...operatorRows];
         
-        // Hapus operator yang beroperasi dari daftar ready
+        // Hapus operator dan helper yang beroperasi dari daftar ready
         assignmentRows.forEach(a => {
           if (a.operator?.id) {
             operatingOperators.push({
               ...a.operator,
               assignment: a,
-              equipment: a.equipment
+              equipment: a.equipment,
+              role_type: 'operator'
             });
-            // Hapus dari ready
             const idx = readyOperators.findIndex(op => op.id === a.operator.id);
+            if (idx > -1) readyOperators.splice(idx, 1);
+          }
+          if (a.helper?.id) {
+            operatingOperators.push({
+              ...a.helper,
+              assignment: a,
+              equipment: a.equipment,
+              role_type: 'helper'
+            });
+            const idx = readyOperators.findIndex(op => op.id === a.helper.id);
             if (idx > -1) readyOperators.splice(idx, 1);
           }
         });
@@ -730,7 +740,7 @@ function RootPageContent() {
             {/* Kiri: Daftar Semua Operator */}
             <div className="card">
               <div className="card-header" style={{ background: '#eff6ff' }}>
-                <span className="card-title">👷 Daftar Operator ({overview.totalOperators || 0})</span>
+                <span className="card-title">👷 Daftar Personil ({overview.totalOperators || 0})</span>
               </div>
               <div className="card-body" style={{ padding: '0' }}>
                 <div style={{ maxHeight: '360px', overflowY: 'auto' }}>
@@ -740,7 +750,7 @@ function RootPageContent() {
                     ...(overview.operatingOperators || []).map(op => ({ ...op, _status: 'operating' })),
                     ...(overview.readyOperators || []).map(op => ({ ...op, _status: 'ready' })),
                   ].length === 0 ? (
-                    <div style={{ padding: '20px', textAlign: 'center', color: '#64748b' }}>Belum ada operator terdaftar</div>
+                    <div style={{ padding: '20px', textAlign: 'center', color: '#64748b' }}>Belum ada personil terdaftar</div>
                   ) : [
                     ...(overview.operatingOperators || []).map(op => ({ ...op, _status: 'operating' })),
                     ...(overview.readyOperators || []).map(op => ({ ...op, _status: 'ready' })),
@@ -756,7 +766,12 @@ function RootPageContent() {
                         {op.full_name?.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase()}
                       </div>
                       <div style={{ flex: 1 }}>
-                        <div style={{ fontWeight: 600, fontSize: 13, color: '#0f172a' }}>{op.full_name || 'Operator'}</div>
+                        <div style={{ fontWeight: 600, fontSize: 13, color: '#0f172a' }}>
+                          {op.full_name || 'Personil'}
+                          <span style={{ fontSize: 11, fontWeight: 'normal', color: '#64748b', marginLeft: 6 }}>
+                            ({op.role === 'helper' ? 'Helper' : 'Operator'})
+                          </span>
+                        </div>
                         <div style={{ fontSize: 11, marginTop: 2 }}>
                           {op._status === 'operating' ? (
                             <span style={{ color: '#d97706' }}>● Sedang Beroperasi</span>
