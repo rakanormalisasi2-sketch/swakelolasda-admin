@@ -81,6 +81,13 @@ export default function EditFotoModal({ log, onClose, onSave, profileRole }) {
       formData.append('village', log.override_desa || log.assignment?.location_village || 'Unknown');
       formData.append('district', log.override_kecamatan || log.assignment?.location_district || 'Unknown');
       formData.append('date', log.tanggal || new Date().toISOString().split('T')[0]);
+      
+      const resolvedAlat = log.override_alat != null 
+        ? log.override_alat 
+        : (log.equipment 
+           ? [log.equipment.nomor_lambung, log.equipment.merk_type ? `(${log.equipment.merk_type})` : null, log.equipment.name].filter(Boolean).join(' ') 
+           : (log.jenis_alat || ''));
+      formData.append('equipment', resolvedAlat || 'Unknown');
 
       // 3. Upload ke Google Drive
       const res = await fetch('/api/upload/photo', {
