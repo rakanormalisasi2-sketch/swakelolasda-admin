@@ -78,6 +78,32 @@ export default function SurveyFormScreen() {
     loadSavedSignature();
   }, []);
 
+  // Reset state when route params change
+  useEffect(() => {
+    setKecamatanForm((kecamatan as string) || '');
+    setDesaForm((desa as string) || '');
+    setNamaUsulanForm((nama as string) || '');
+    
+    // Clear other form fields to prevent data leaking between surveys
+    setTanggal(new Date());
+    setSungai('');
+    setPenyebab('');
+    setKewenangan('');
+    setPanjangUsulan('');
+    setKeteranganLapangan('');
+    setSelectedEq('');
+    setPhotos([]);
+    setSignatureNarasumber(null);
+    setNamaNarasumber('');
+    setScores({
+      kerawanan_bencana: '', skor_kerawanan: null as any,
+      dampak_kerusakan: '', skor_dampak: null as any,
+      kelas_bahaya: '', skor_bahaya: null as any,
+      bentuk_kegiatan: '', skor_bentuk: null as any,
+      jarak_akses: '', skor_jarak: null as any,
+    });
+  }, [id, nama, kecamatan, desa]);
+
   const loadSavedSignature = async () => {
     try {
       const savedSig = await AsyncStorage.getItem('saved_surveyor_signature');

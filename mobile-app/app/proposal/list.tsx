@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, TextInput, TouchableOpacity, StyleSheet, ScrollView, ActivityIndicator, Alert, Modal, Linking } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { router } from 'expo-router';
 
 export default function ListProposalScreen() {
   const [role, setRole] = useState('seksi_normalisasi');
@@ -270,36 +271,57 @@ export default function ListProposalScreen() {
                 <View style={styles.divider} />
 
                 {/* Edit / Save Buttons */}
-                <View style={{ flexDirection: 'row', gap: 10 }}>
-                  <TouchableOpacity
-                    style={[styles.actionBtn, isEditMode && styles.actionBtnDanger]}
-                    onPress={() => {
-                      if (isEditMode) {
-                        setIsEditMode(false);
-                        // Reset edit data
-                        setEditData({
-                          nama_usulan: selectedProposal.nama_usulan || '',
-                          desa: selectedProposal.desa || '',
-                          kecamatan: selectedProposal.kecamatan || '',
-                          kabupaten: selectedProposal.kabupaten || '',
-                          panjang_lokasi: selectedProposal.panjang_lokasi || '',
-                          keterangan: selectedProposal.keterangan || '',
-                          usulan_desa: selectedProposal.usulan_desa || '',
-                        });
-                      } else {
-                        setIsEditMode(true);
-                      }
-                    }}
-                  >
-                    <Text style={[styles.actionBtnText, isEditMode && { color: '#dc2626' }]}>
-                      {isEditMode ? 'Batal Edit' : '✏️ Edit Data'}
-                    </Text>
-                  </TouchableOpacity>
+                <View style={{ flexDirection: 'column', gap: 10 }}>
+                  <View style={{ flexDirection: 'row', gap: 10 }}>
+                    <TouchableOpacity
+                      style={[styles.actionBtn, isEditMode && styles.actionBtnDanger]}
+                      onPress={() => {
+                        if (isEditMode) {
+                          setIsEditMode(false);
+                          // Reset edit data
+                          setEditData({
+                            nama_usulan: selectedProposal.nama_usulan || '',
+                            desa: selectedProposal.desa || '',
+                            kecamatan: selectedProposal.kecamatan || '',
+                            kabupaten: selectedProposal.kabupaten || '',
+                            panjang_lokasi: selectedProposal.panjang_lokasi || '',
+                            keterangan: selectedProposal.keterangan || '',
+                            usulan_desa: selectedProposal.usulan_desa || '',
+                          });
+                        } else {
+                          setIsEditMode(true);
+                        }
+                      }}
+                    >
+                      <Text style={[styles.actionBtnText, isEditMode && { color: '#dc2626' }]}>
+                        {isEditMode ? 'Batal Edit' : '✏️ Edit Data'}
+                      </Text>
+                    </TouchableOpacity>
 
-                  {isEditMode && (
-                    <TouchableOpacity style={[styles.actionBtn, styles.actionBtnSave]} onPress={handleSave} disabled={saving}>
-                      <Text style={[styles.actionBtnText, { color: '#fff' }]}>
-                        {saving ? 'Menyimpan...' : '💾 Simpan'}
+                    {isEditMode && (
+                      <TouchableOpacity style={[styles.actionBtn, styles.actionBtnSave]} onPress={handleSave} disabled={saving}>
+                        <Text style={[styles.actionBtnText, { color: '#fff' }]}>
+                          {saving ? 'Menyimpan...' : '💾 Simpan'}
+                        </Text>
+                      </TouchableOpacity>
+                    )}
+                  </View>
+
+                  {/* Tombol Buat Ulang BA Survei jika sudah disurvey */}
+                  {!isEditMode && selectedProposal.sudah_survey && (
+                    <TouchableOpacity
+                      style={[styles.actionBtn, { backgroundColor: '#e0f2fe', borderColor: '#bae6fd' }]}
+                      onPress={() => {
+                        const { id, nama_usulan, kecamatan, desa } = selectedProposal;
+                        setSelectedProposal(null);
+                        router.push({
+                          pathname: '/proposal/form',
+                          params: { id, nama: nama_usulan, kecamatan, desa }
+                        });
+                      }}
+                    >
+                      <Text style={[styles.actionBtnText, { color: '#0369a1' }]}>
+                        📝 Edit / Buat Ulang BA Survei (Generate PDF)
                       </Text>
                     </TouchableOpacity>
                   )}
