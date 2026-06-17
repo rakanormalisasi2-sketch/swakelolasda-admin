@@ -8,6 +8,7 @@ import { MASTER_EXCAVATOR_SPECS, calculateFuelPerHour } from '@/utils/calcRapMat
 import KolomManager from './KolomManager';
 import DokumentasiModal from './DokumentasiModal';
 import HourmeterModal from './HourmeterModal';
+import EditFotoModal from './EditFotoModal';
 
 // ─── Evaluasi formula sederhana ─────────────────────────────────────
 function evaluateFormula(formula, log) {
@@ -94,6 +95,8 @@ export default function LaporanPelaksanaanPage() {
   const [hmSelection, setHmSelection] = useState({});   // { [logId]: { before: url, after: url } }
   const [hmLastAfter, setHmLastAfter] = useState(null);  // last after url untuk auto-fill before berikutnya
   const [hmAccordion, setHmAccordion] = useState(null);
+  
+  const [editFotoModalLog, setEditFotoModalLog] = useState(null);
 
   const loadData = useCallback(async () => {
     setLoading(true);
@@ -1396,6 +1399,12 @@ export default function LaporanPelaksanaanPage() {
                                      })}
                                    </div>
                                  ) : '-'}
+                                 <button 
+                                   onClick={() => setEditFotoModalLog(log)}
+                                   style={{marginTop: 8, width:'100%', padding:'4px', fontSize:10, background:'#e0f2fe', color:'#0284c7', border:'1px solid #bae6fd', borderRadius:4, cursor:'pointer', fontWeight:'bold'}}
+                                 >
+                                   ✏️ Edit Foto
+                                 </button>
                                </td>
 
                                {/* Panjang Pekerjaan */}
@@ -1539,6 +1548,19 @@ export default function LaporanPelaksanaanPage() {
           pdfConfig={pdfConfig}
           onClose={() => setHmModalOpen(false)}
           handleUploadTambahan={handleUploadTambahan}
+        />
+      )}
+
+      {/* ================= MODAL EDIT FOTO LAPANGAN ================= */}
+      {editFotoModalLog && (
+        <EditFotoModal
+          log={editFotoModalLog}
+          profileRole={profile.role}
+          onClose={() => setEditFotoModalLog(null)}
+          onSave={(newUrls) => {
+            handleBlurSave(editFotoModalLog.id, 'foto_lapangan_urls', newUrls);
+            setEditFotoModalLog(null);
+          }}
         />
       )}
 
