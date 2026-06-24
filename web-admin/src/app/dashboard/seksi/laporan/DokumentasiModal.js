@@ -31,17 +31,18 @@ export default function DokumentasiModal({ logs, onClose, pdfConfig, handleUploa
   const [filter, setFilter]             = useState('all');
   const [search, setSearch]             = useState('');
   const [groupExpanded, setGroupExpanded] = useState({});
-  const [viewMode, setViewMode]         = useState('flat'); // 'flat' | 'grouped'
+  const [viewMode, setViewMode]         = useState('grouped'); // 'flat' | 'grouped'
 
-  const SUB_MAP_DOK = {
-    normalisasi_sungai: 'NORMALISASI SUNGAI',
-    normalisasi_saluran_irigasi: 'NORMALISASI SALURAN / IRIGASI',
-    rehabilitasi_embung: 'REHABILITASI EMBUNG',
-    pembangunan_embung: 'PEMBANGUNAN EMBUNG',
-    saluran_afvoer: 'SALURAN AIR / AFVOER',
-    normalisasi_embung: 'NORMALISASI EMBUNG',
+  const getJobLabel = (log) => {
+    const op = log.override_operator || log.operator?.full_name || '-';
+    const eq = log.equipment;
+    const alatLabel = log.override_alat || (
+      eq ? [eq.nomor_lambung, eq.merk_type ? `(${eq.merk_type})` : null, eq.name].filter(Boolean).join(' ') : null
+    ) || log.jenis_alat || '-';
+    const k = log.override_kecamatan || log.assignment?.location_district || '-';
+    const d = log.override_desa || log.assignment?.location_village || '-';
+    return `${op} | ${alatLabel} | Kec. ${k} - Desa ${d}`;
   };
-  const getJobLabel = (log) => log.custom_pekerjaan || SUB_MAP_DOK[log.assignment?.job_sub_type] || log.assignment?.job_sub_type || 'Pekerjaan Lainnya';
 
   const rows = useMemo(() => logs.map(log => {
     const urls = log.foto_lapangan_urls
