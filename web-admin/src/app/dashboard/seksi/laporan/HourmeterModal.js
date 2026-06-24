@@ -46,7 +46,7 @@ export default function HourmeterModal({ logs, onClose, pdfConfig, handleUploadT
         : [];
       const sel = hmSelection[log.id] || { before: '', after: '' };
       return { log, urls, sel };
-    }).sort((a, b) => new Date(a.log.tanggal) - new Date(b.log.tanggal))
+    }).sort((a, b) => new Date(b.log.tanggal) - new Date(a.log.tanggal))
   , [logs, hmSelection]);
 
   // Group by pekerjaan label for left panel
