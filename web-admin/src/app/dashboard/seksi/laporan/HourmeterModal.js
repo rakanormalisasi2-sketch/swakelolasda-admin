@@ -25,6 +25,8 @@ export default function HourmeterModal({ logs, onClose, pdfConfig, handleUploadT
   const [activeLogId, setActiveLogId] = useState(null);
   const [viewHmMode, setViewHmMode] = useState('grouped'); // 'flat' | 'grouped'
   const [groupHmExpanded, setGroupHmExpanded] = useState({});
+  const [filter, setFilter] = useState('all');
+  const [search, setSearch] = useState('');
   const [customPekerjaan, setCustomPekerjaan] = useState('');
 
   const getHmJobLabel = (log) => {
@@ -49,16 +51,33 @@ export default function HourmeterModal({ logs, onClose, pdfConfig, handleUploadT
     }).sort((a, b) => new Date(b.log.tanggal) - new Date(a.log.tanggal))
   , [logs, hmSelection]);
 
+  // Apply search and filter
+  const filteredHmRows = useMemo(() => rows.filter(({ log, sel }) => {
+    const hasBefore = !!sel.before;
+    const hasAfter  = !!sel.after;
+    const isPaired  = hasBefore && hasAfter;
+    
+    if (filter === 'selected' && !isPaired) return false;
+    if (filter === 'unselected' && isPaired) return false;
+    
+    const tgl = new Date(log.tanggal).toLocaleDateString('id-ID');
+    const op  = log.override_operator || log.operator?.full_name || log.operator_name || '';
+    const loc = (log.override_desa || log.assignment?.location_village || '') + ' ' +
+                (log.override_kecamatan || log.assignment?.location_district || '');
+    if (search && !`${tgl}${op}${loc}`.toLowerCase().includes(search.toLowerCase())) return false;
+    return true;
+  }), [rows, filter, search]);
+
   // Group by pekerjaan label for left panel
   const groupedHmRows = useMemo(() => {
     const groups = {};
-    rows.forEach(r => {
+    filteredHmRows.forEach(r => {
       const key = getHmJobLabel(r.log);
       if (!groups[key]) groups[key] = [];
       groups[key].push(r);
     });
     return groups;
-  }, [rows]);
+  }, [filteredHmRows]);
 
   const pairedCount = Object.values(hmSelection).filter(s => s?.before && s?.after).length;
 
@@ -178,18 +197,32 @@ export default function HourmeterModal({ logs, onClose, pdfConfig, handleUploadT
         <div style={{ display:'flex', flex:1, overflow:'hidden' }}>
 
           {/* LEFT PANEL: Timeline */}
-          <div style={{ width:280, borderRight:'1px solid #e2e8f0', background:'#f8fafc', display:'flex', flexDirection:'column', flexShrink:0 }}>
-            <div style={{ padding:'10px 14px', borderBottom:'1px solid #e2e8f0', background:'#fff' }}>
-              <div style={{ fontSize:12, fontWeight:600, color:'#64748b', marginBottom:6 }}>TIMELINE ({rows.length} hari)</div>
+          <div style={{ width:310, borderRight:'1px solid #e2e8f0', background:'#f8fafc', display:'flex', flexDirection:'column', flexShrink:0 }}>
+            <div style={{ padding:'12px 14px', borderBottom:'1px solid #e2e8f0', background:'#fff' }}>
+              <input
+                value={search}
+                onChange={e => setSearch(e.target.value)}
+                placeholder="🔍 Cari tanggal, operator, lokasi..."
+                style={{ width:'100%', padding:'7px 10px', borderRadius:8, border:'1px solid #cbd5e1', fontSize:12, outline:'none', marginBottom:8 }}
+              />
               <div style={{ display:'flex', gap:4 }}>
+                {[['all','Semua'],['selected','✅ Lengkap'],['unselected','Belum']].map(([v,l]) => (
+                  <button key={v} onClick={() => setFilter(v)}
+                    style={{ flex:1, padding:'5px 0', fontSize:11, fontWeight:600, borderRadius:6, border:'none', cursor:'pointer',
+                      background: filter===v ? '#059669' : '#f1f5f9', color: filter===v ? '#fff' : '#64748b' }}>
+                    {l}
+                  </button>
+                ))}
+              </div>
+              <div style={{ display:'flex', gap:4, marginTop:6 }}>
                 <button onClick={() => setViewHmMode('flat')}
-                  style={{ flex:1, padding:'4px 0', fontSize:11, fontWeight:600, borderRadius:5, border:'none', cursor:'pointer',
-                    background: viewHmMode==='flat' ? '#059669' : '#f1f5f9', color: viewHmMode==='flat' ? '#fff' : '#64748b' }}>
+                  style={{ flex:1, padding:'5px 0', fontSize:11, fontWeight:600, borderRadius:6, border:'none', cursor:'pointer',
+                    background: viewHmMode==='flat' ? '#0f766e' : '#f1f5f9', color: viewHmMode==='flat' ? '#fff' : '#64748b' }}>
                   📋 Flat
                 </button>
                 <button onClick={() => setViewHmMode('grouped')}
-                  style={{ flex:1, padding:'4px 0', fontSize:11, fontWeight:600, borderRadius:5, border:'none', cursor:'pointer',
-                    background: viewHmMode==='grouped' ? '#059669' : '#f1f5f9', color: viewHmMode==='grouped' ? '#fff' : '#64748b' }}>
+                  style={{ flex:1, padding:'5px 0', fontSize:11, fontWeight:600, borderRadius:6, border:'none', cursor:'pointer',
+                    background: viewHmMode==='grouped' ? '#0f766e' : '#f1f5f9', color: viewHmMode==='grouped' ? '#fff' : '#64748b' }}>
                   🗂️ Per Pekerjaan
                 </button>
               </div>
@@ -197,7 +230,12 @@ export default function HourmeterModal({ logs, onClose, pdfConfig, handleUploadT
             <div style={{ flex:1, overflowY:'auto' }}>
 
               {/* ── FLAT MODE ── */}
-              {viewHmMode === 'flat' && rows.map(({ log, urls, sel }, idx) => {
+              {viewHmMode === 'flat' && (
+                <>
+                  {filteredHmRows.length === 0 && (
+                    <div style={{ padding:24, textAlign:'center', color:'#94a3b8', fontSize:13 }}>Tidak ada data</div>
+                  )}
+                  {filteredHmRows.map(({ log, urls, sel }, idx) => {
                 const isActive = activeLogId === log.id;
                 const hasBefore = !!sel.before;
                 const hasAfter  = !!sel.after;
@@ -234,10 +272,17 @@ export default function HourmeterModal({ logs, onClose, pdfConfig, handleUploadT
                     {urls.length > 0 && <div style={{ fontSize:10, color:'#94a3b8', marginTop:4 }}>{urls.length} foto tersedia</div>}
                   </div>
                 );
-              })}
+                })}
+                </>
+              )}
 
               {/* ── GROUPED MODE ── */}
-              {viewHmMode === 'grouped' && Object.entries(groupedHmRows).map(([groupKey, groupRows]) => {
+              {viewHmMode === 'grouped' && (
+                <>
+                  {Object.keys(groupedHmRows).length === 0 && (
+                    <div style={{ padding:24, textAlign:'center', color:'#94a3b8', fontSize:13 }}>Tidak ada data</div>
+                  )}
+                  {Object.entries(groupedHmRows).map(([groupKey, groupRows]) => {
                 const isOpen = groupHmExpanded[groupKey] !== false;
                 const pairedInGroup = groupRows.filter(({ sel }) => sel.before && sel.after).length;
                 return (
@@ -289,6 +334,8 @@ export default function HourmeterModal({ logs, onClose, pdfConfig, handleUploadT
                   </div>
                 );
               })}
+              </>
+              )}
 
             </div>
           </div>
