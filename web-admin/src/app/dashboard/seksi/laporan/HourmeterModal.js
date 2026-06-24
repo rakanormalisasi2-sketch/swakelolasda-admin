@@ -40,8 +40,8 @@ export default function HourmeterModal({ logs, onClose, pdfConfig, handleUploadT
   // Build rows sorted by date
   const rows = useMemo(() =>
     logs.map(log => {
-      const urls = log.foto_lapangan_urls
-        ? log.foto_lapangan_urls.split(',').map(u => u.trim()).filter(Boolean)
+      const urls = log.foto_hourmeter_urls
+        ? log.foto_hourmeter_urls.split(',').map(u => u.trim()).filter(Boolean)
         : [];
       const sel = hmSelection[log.id] || { before: '', after: '' };
       return { log, urls, sel };
@@ -348,7 +348,7 @@ export default function HourmeterModal({ logs, onClose, pdfConfig, handleUploadT
                       <label htmlFor={'up_hm_'+activeRow.log.id} style={{ display:'inline-block', marginTop:12, padding:'8px 18px', background:'#059669', color:'#fff', borderRadius:8, cursor:'pointer', fontSize:13, fontWeight:600 }}>
                         📤 Upload Foto
                       </label>
-                      <input type="file" id={'up_hm_'+activeRow.log.id} multiple accept="image/*" style={{ display:'none' }} onChange={e => handleUploadTambahan(e, activeRow.log.id, 'lapangan')} />
+                      <input type="file" id={'up_hm_'+activeRow.log.id} multiple accept="image/*" style={{ display:'none' }} onChange={e => handleUploadTambahan(e, activeRow.log.id, 'hourmeter')} />
                     </div>
                   ) : (
                     <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill, minmax(180px, 1fr))', gap:14 }}>
@@ -388,7 +388,7 @@ export default function HourmeterModal({ logs, onClose, pdfConfig, handleUploadT
                       {/* Upload card */}
                       <label htmlFor={'up_hm_'+activeRow.log.id}
                         style={{ borderRadius:12, border:'2px dashed #6ee7b7', display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', minHeight:180, cursor:'pointer', background:'#ecfdf5' }}>
-                        <input type="file" id={'up_hm_'+activeRow.log.id} multiple accept="image/*" style={{ display:'none' }} onChange={e => handleUploadTambahan(e, activeRow.log.id, 'lapangan')} />
+                        <input type="file" id={'up_hm_'+activeRow.log.id} multiple accept="image/*" style={{ display:'none' }} onChange={e => handleUploadTambahan(e, activeRow.log.id, 'hourmeter')} />
                         <span style={{ fontSize:30 }}>📤</span>
                         <span style={{ fontSize:12, fontWeight:700, color:'#059669', marginTop:8 }}>Upload Manual</span>
                         <span style={{ fontSize:11, color:'#6ee7b7', marginTop:4 }}>JPG / PNG</span>
