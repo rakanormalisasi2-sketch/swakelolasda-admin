@@ -25,6 +25,7 @@ export default function HourmeterModal({ logs, onClose, pdfConfig, handleUploadT
   const [activeLogId, setActiveLogId] = useState(null);
   const [viewHmMode, setViewHmMode] = useState('flat'); // 'flat' | 'grouped'
   const [groupHmExpanded, setGroupHmExpanded] = useState({});
+  const [customPekerjaan, setCustomPekerjaan] = useState('');
 
   const SUB_MAP_HM = {
     normalisasi_sungai: 'NORMALISASI SUNGAI',
