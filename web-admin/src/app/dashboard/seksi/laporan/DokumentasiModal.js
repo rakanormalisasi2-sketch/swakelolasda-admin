@@ -53,7 +53,7 @@ export default function DokumentasiModal({ logs, onClose, pdfConfig, handleUploa
       return v && v !== 'skip';
     }).length;
     return { log, urls, selectedCount };
-  }), [logs, dokSelection]);
+  }).sort((a, b) => new Date(b.log.tanggal) - new Date(a.log.tanggal)), [logs, dokSelection]);
 
   // Group rows by pekerjaan
   const groupedRows = useMemo(() => {
