@@ -55,16 +55,27 @@ export default function DokumentasiModal({ logs, onClose, pdfConfig, handleUploa
     return { log, urls, selectedCount };
   }).sort((a, b) => new Date(b.log.tanggal) - new Date(a.log.tanggal)), [logs, dokSelection]);
 
+  const filteredRows = useMemo(() => rows.filter(({ log, urls, selectedCount }) => {
+    if (filter === 'selected' && selectedCount === 0) return false;
+    if (filter === 'unselected' && selectedCount > 0) return false;
+    const tgl = new Date(log.tanggal).toLocaleDateString('id-ID');
+    const op  = log.override_operator || log.operator?.full_name || log.operator_name || '';
+    const loc = (log.override_desa || log.assignment?.location_village || '') + ' ' +
+                (log.override_kecamatan || log.assignment?.location_district || '');
+    if (search && !`${tgl}${op}${loc}`.toLowerCase().includes(search.toLowerCase())) return false;
+    return true;
+  }), [rows, filter, search]);
+
   // Group rows by pekerjaan
   const groupedRows = useMemo(() => {
     const groups = {};
-    rows.forEach(r => {
+    filteredRows.forEach(r => {
       const key = getJobLabel(r.log);
       if (!groups[key]) groups[key] = [];
       groups[key].push(r);
     });
     return groups;
-  }, [rows]);
+  }, [filteredRows]);
 
   // Centang massal per kelompok pekerjaan
   const selectAllGroup = (groupKey, val) => {
@@ -84,17 +95,6 @@ export default function DokumentasiModal({ logs, onClose, pdfConfig, handleUploa
       })
     );
   };
-
-  const filteredRows = useMemo(() => rows.filter(({ log, urls, selectedCount }) => {
-    if (filter === 'selected' && selectedCount === 0) return false;
-    if (filter === 'unselected' && selectedCount > 0) return false;
-    const tgl = new Date(log.tanggal).toLocaleDateString('id-ID');
-    const op  = log.override_operator || log.operator?.full_name || log.operator_name || '';
-    const loc = (log.override_desa || log.assignment?.location_village || '') + ' ' +
-                (log.override_kecamatan || log.assignment?.location_district || '');
-    if (search && !`${tgl}${op}${loc}`.toLowerCase().includes(search.toLowerCase())) return false;
-    return true;
-  }), [rows, filter, search]);
 
   const totalSelected = Object.values(dokSelection).filter(v => v && v !== 'skip').length;
 
