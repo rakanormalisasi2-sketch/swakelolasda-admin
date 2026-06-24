@@ -23,7 +23,7 @@ export default function HourmeterModal({ logs, onClose, pdfConfig, handleUploadT
   const [hmSelection, setHmSelection] = useState({}); // { [logId]: { before: url, after: url } }
   const [hmLastAfter, setHmLastAfter] = useState(null);
   const [activeLogId, setActiveLogId] = useState(null);
-  const [viewHmMode, setViewHmMode] = useState('flat'); // 'flat' | 'grouped'
+  const [viewHmMode, setViewHmMode] = useState('grouped'); // 'flat' | 'grouped'
   const [groupHmExpanded, setGroupHmExpanded] = useState({});
   const [customPekerjaan, setCustomPekerjaan] = useState('');
 
@@ -217,7 +217,7 @@ export default function HourmeterModal({ logs, onClose, pdfConfig, handleUploadT
                         {isPaired ? '✅ Lengkap' : hasBefore ? '⚠️ Kurang After' : '—'}
                       </div>
                     </div>
-                    <div style={{ fontSize:11, color:'#64748b' }}>{hari}</div>
+                    <div style={{ fontSize:11, color:'#64748b', marginTop:2 }}>{hari} &bull; <span style={{fontWeight:600}}>{getHmJobLabel(log)}</span></div>
                     <div style={{ display:'flex', gap:6, marginTop:6 }}>
                       <div style={{ flex:1, fontSize:10, padding:'3px 6px', borderRadius:6, textAlign:'center', border:'1px solid',
                         borderColor: hasBefore ? '#f97316' : '#e2e8f0', background: hasBefore ? '#fff7ed' : '#f8fafc',
