@@ -27,15 +27,16 @@ export default function HourmeterModal({ logs, onClose, pdfConfig, handleUploadT
   const [groupHmExpanded, setGroupHmExpanded] = useState({});
   const [customPekerjaan, setCustomPekerjaan] = useState('');
 
-  const SUB_MAP_HM = {
-    normalisasi_sungai: 'NORMALISASI SUNGAI',
-    normalisasi_saluran_irigasi: 'NORMALISASI SALURAN / IRIGASI',
-    rehabilitasi_embung: 'REHABILITASI EMBUNG',
-    pembangunan_embung: 'PEMBANGUNAN EMBUNG',
-    saluran_afvoer: 'SALURAN AIR / AFVOER',
-    normalisasi_embung: 'NORMALISASI EMBUNG',
+  const getHmJobLabel = (log) => {
+    const op = log.override_operator || log.operator?.full_name || '-';
+    const eq = log.equipment;
+    const alatLabel = log.override_alat || (
+      eq ? [eq.nomor_lambung, eq.merk_type ? `(${eq.merk_type})` : null, eq.name].filter(Boolean).join(' ') : null
+    ) || log.jenis_alat || '-';
+    const k = log.override_kecamatan || log.assignment?.location_district || '-';
+    const d = log.override_desa || log.assignment?.location_village || '-';
+    return `${op} | ${alatLabel} | Kec. ${k} - Desa ${d}`;
   };
-  const getHmJobLabel = (log) => log.custom_pekerjaan || SUB_MAP_HM[log.assignment?.job_sub_type] || log.assignment?.job_sub_type || 'Pekerjaan Lainnya';
 
   // Build rows sorted by date
   const rows = useMemo(() =>
